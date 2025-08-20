@@ -1,1 +1,18 @@
-console.log("hi");
+
+
+const express = require("express");
+const mongoose = require("mongoose");
+
+const app = express();
+
+//Midddleware
+app.use("/",(req, res, next ) => {
+    res.send("It is Working");
+})
+
+mongoose.connect("mongodb+srv://pulmivihansa27:H1234@pul@cluster0.uowmnpn.mongodb.net/")
+.then(()=> console.log("Connected to MongoDB"))
+.then(()=> {
+    app.listen(5000);
+})
+.catch((err)=> console.log((err)));
