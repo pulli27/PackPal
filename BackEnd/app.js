@@ -11,7 +11,7 @@ app.use("/",(req, res, next) => {
 })
 
 mongoose.connect("mongodb+srv://pulmivihansa27:H1234pul@cluster0.uowmnpn.mongodb.net/")
-.then(()=> console/log("Connected to MongoDB"))
+.then(()=> console.log("Connected to MongoDB"))
 .then(()=> {
     app.listen(5000);
 })
