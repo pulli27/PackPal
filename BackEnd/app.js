@@ -2,13 +2,17 @@
 
 const express = require("express");
 const mongoose = require("mongoose");
+const router = require("./Routes/productRoutes");
 
 const app = express();
 
 //Middleware
-app.use("/",(req, res, next) => {
-    res.send("It is Working");
-})
+app.use(express.json());  //postman eke insert karan data tika jason ekt responsive wen widiht hdn ek thm wenneh meke
+app.use("/products",router);
+
+//app.use("/",(req, res, next) => {
+    //res.send("It is Working");
+
 
 mongoose.connect("mongodb+srv://pulmivihansa27:H1234pul@cluster0.uowmnpn.mongodb.net/")
 .then(()=> console.log("Connected to MongoDB"))
