@@ -1,0 +1,18 @@
+const express = require("express");
+const {
+  getAllInventories,
+  addInventory,
+  getById,
+  updateInventory,
+  deleteInventory,
+} = require("../Controllers/InventoryItemController");
+
+const router = express.Router();
+
+router.get("/", getAllInventories);
+router.post("/", addInventory);
+router.get("/:id", getById);
+router.put("/:id", updateInventory);
+router.delete("/:id", deleteInventory);
+
+module.exports = router;

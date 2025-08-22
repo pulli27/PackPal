@@ -1,0 +1,121 @@
+const Inventory = require("../Model/InventoryItemModel");
+
+// Get all inventories
+const getAllInventories = async (req, res, next) => {
+  try {
+    const inventories = await Inventory.find();
+
+    if (!inventory || inventory.length === 0) {
+      return res.status(404).json({ message: "No inventories found" });
+    }
+
+    return res.status(200).json({ inventories });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ message: "Error fetching inventories" });
+  }
+};
+
+// Add a new product
+const addInventory = async (req, res, next) => {
+  const { ItemId, ItemName, Description, Quantity,ReOrder_Level,Unit_Price } = req.body;
+
+  try {
+    const inventory = new Inventory({
+      ItemNo,
+      ItemName, 
+      Description, 
+      Quantity,
+      ReOrder_Level,
+      Unit_Price,
+    });
+
+    await inventory.save();
+
+    return res.status(201).json({ inventory });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ message: "Error adding inventory" });
+  }
+};
+
+// Get product by ID
+const getById = async (req, res, next) => {
+  const id = req.params.id;
+
+  try {
+    const inventory = await Inventory.findById(id);
+
+    if (!inventory) {
+      return res.status(404).json({ message: "Inventory not found" });
+    }
+
+    return res.status(200).json({ inventory });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Update product details
+const updateInventory = async (req, res, next) => {
+  const id = req.params.id;
+  const { ItemId, ItemName, Description, Quantity,ReOrder_Level,Unit_Price } = req.body;
+
+  try {
+    const oldInventory = await Inventory.findById(id);
+    if (!oldInventory) {
+      return res.status(404).json({ message: "Inventory not found" });
+    }
+
+    const updatedInventory = await Inventory.findByIdAndUpdate(
+      id,
+      {
+        ItemNo,
+        ItemName, 
+        Description, 
+        Quantity,
+        ReOrder_Level,
+        Unit_Price,
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      message: "Inventory updated successfully",
+      beforeUpdate: oldInventory,
+      afterUpdate: updatedInventory,
+    });
+  } catch (err) {
+    console.error("Error updating inventory:", err);
+    return res.status(500).json({ message: "Server error while updating inventory" });
+  }
+};
+
+// Delete product
+const deleteInventory = async (req, res, next) => {
+  const id = req.params.id;
+
+  try {
+    const inentory = await Inventory.findByIdAndDelete(id);
+
+    if (!inventory) {
+      return res.status(404).json({ message: "Inventory not found" });
+    }
+
+    return res.status(200).json({
+      message: "Inventory deleted successfully",
+      deletedInventory: inventory,
+    });
+  } catch (err) {
+    console.error("Error deleting inventory:", err);
+    return res.status(500).json({ message: "Unable to delete inventory" });
+  }
+};
+
+// Exports
+exports.getAllInventories = getAllInventories;
+exports.addInventory = addInventory;
+exports.getById = getById;
+exports.updateInventory = updateInventory;
+exports.deleteInventory = deleteInventory;
