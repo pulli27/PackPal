@@ -8,8 +8,8 @@ const cartSchema = new mongoose.Schema({
   },
   product_name: String,
   quantity: Number,
-  price_per_unit: Number,
-  customer_id: String,
+  product_price: Number,
+  product_discounts: Number,
   selected_variant: String,
   /*created_at: {
     type: Date,
