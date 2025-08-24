@@ -1,119 +1,94 @@
 const Inventory = require("../Model/InventoryItemModel");
 
-// Get all inventories
-const getAllInventories = async (req, res, next) => {
+// GET /inventories
+const getAllInventories = async (_req, res) => {
   try {
-    const inventories = await Inventory.find();
-
-    if (!inventory || inventory.length === 0) {
-      return res.status(404).json({ message: "No inventories found" });
-    }
-
+    const inventories = await Inventory.find().lean();
+    // Return 200 with an array (even if empty)
     return res.status(200).json({ inventories });
   } catch (err) {
-    console.log(err);
+    console.error("getAllInventories error:", err);
     return res.status(500).json({ message: "Error fetching inventories" });
   }
 };
 
-// Add a new product
-const addInventory = async (req, res, next) => {
-  const { ItemId, ItemName, Description, Quantity,ReOrder_Level,Unit_Price } = req.body;
-
+// POST /inventories
+const addInventory = async (req, res) => {
   try {
-    const inventory = new Inventory({
-      ItemNo,
-      ItemName, 
-      Description, 
+    const { ItemId, ItemName, Description, Quantity, ReOrder_Level, Unit_Price } = req.body;
+
+    if (ItemId === undefined || !ItemName) {
+      return res.status(400).json({ message: "ItemId and ItemName are required" });
+    }
+
+    const exists = await Inventory.findOne({ ItemId });
+    if (exists) return res.status(409).json({ message: "ItemId already exists" });
+
+    const inventory = await Inventory.create({
+      ItemId,
+      ItemName,
+      Description,
       Quantity,
       ReOrder_Level,
       Unit_Price,
     });
 
-    await inventory.save();
-
     return res.status(201).json({ inventory });
   } catch (err) {
-    console.log(err);
+    console.error("addInventory error:", err);
     return res.status(500).json({ message: "Error adding inventory" });
   }
 };
 
-// Get product by ID
-const getById = async (req, res, next) => {
-  const id = req.params.id;
-
+// GET /inventories/:id
+const getById = async (req, res) => {
   try {
-    const inventory = await Inventory.findById(id);
-
-    if (!inventory) {
-      return res.status(404).json({ message: "Inventory not found" });
-    }
-
+    const inventory = await Inventory.findById(req.params.id).lean();
+    if (!inventory) return res.status(404).json({ message: "Inventory not found" });
     return res.status(200).json({ inventory });
   } catch (err) {
-    console.log(err);
+    console.error("getById error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
 
-// Update product details
-const updateInventory = async (req, res, next) => {
-  const id = req.params.id;
-  const { ItemId, ItemName, Description, Quantity,ReOrder_Level,Unit_Price } = req.body;
-
+// PUT /inventories/:id
+const updateInventory = async (req, res) => {
   try {
-    const oldInventory = await Inventory.findById(id);
-    if (!oldInventory) {
-      return res.status(404).json({ message: "Inventory not found" });
-    }
+    const { ItemId, ItemName, Description, Quantity, ReOrder_Level, Unit_Price } = req.body;
 
-    const updatedInventory = await Inventory.findByIdAndUpdate(
-      id,
-      {
-        ItemNo,
-        ItemName, 
-        Description, 
-        Quantity,
-        ReOrder_Level,
-        Unit_Price,
-      },
-      { new: true }
-    );
+    const before = await Inventory.findById(req.params.id).lean();
+    if (!before) return res.status(404).json({ message: "Inventory not found" });
+
+    const after = await Inventory.findByIdAndUpdate(
+      req.params.id,
+      { ItemId, ItemName, Description, Quantity, ReOrder_Level, Unit_Price },
+      { new: true, runValidators: true }
+    ).lean();
 
     return res.status(200).json({
       message: "Inventory updated successfully",
-      beforeUpdate: oldInventory,
-      afterUpdate: updatedInventory,
+      beforeUpdate: before,
+      afterUpdate: after,
     });
   } catch (err) {
-    console.error("Error updating inventory:", err);
+    console.error("updateInventory error:", err);
     return res.status(500).json({ message: "Server error while updating inventory" });
   }
 };
 
-// Delete product
-const deleteInventory = async (req, res, next) => {
-  const id = req.params.id;
-
+// DELETE /inventories/:id
+const deleteInventory = async (req, res) => {
   try {
-    const inentory = await Inventory.findByIdAndDelete(id);
-
-    if (!inventory) {
-      return res.status(404).json({ message: "Inventory not found" });
-    }
-
-    return res.status(200).json({
-      message: "Inventory deleted successfully",
-      deletedInventory: inventory,
-    });
+    const deleted = await Inventory.findByIdAndDelete(req.params.id).lean();
+    if (!deleted) return res.status(404).json({ message: "Inventory not found" });
+    return res.status(200).json({ message: "Inventory deleted successfully", deletedInventory: deleted });
   } catch (err) {
-    console.error("Error deleting inventory:", err);
+    console.error("deleteInventory error:", err);
     return res.status(500).json({ message: "Unable to delete inventory" });
   }
 };
 
-// Exports
 exports.getAllInventories = getAllInventories;
 exports.addInventory = addInventory;
 exports.getById = getById;
