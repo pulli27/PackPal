@@ -1,0 +1,95 @@
+const mongoose = require("mongoose");
+const Finance = require("../Model/FinanceSalaryModel");
+
+// GET /finances
+const getAllFinances = async (req, res) => {
+  try {
+    const finances = await Finance.find().lean().exec();
+    return res.status(200).json({ finances });
+  } catch (err) {
+    console.error("[getAllFinances]", err && err.stack ? err.stack : err);
+    return res.status(500).json({ message: "Error fetching finances" });
+  }
+};
+
+// POST /finances
+const addFinance = async (req, res) => {
+  try {
+    const { EmpId, Emp_Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No } = req.body;
+    if (!EmpId || !Emp_Name || !Base_Sal) {
+      return res.status(400).json({ message: "EmpId, Emp_Name and Base_Sal are required" });
+    }
+    const finance = await Finance.create({ EmpId, Emp_Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No });
+    return res.status(201).json({ finance });
+  } catch (err) {
+    console.error("[addFinance]", err && err.stack ? err.stack : err);
+    return res.status(500).json({ message: "Error adding finance record" });
+  }
+};
+
+// GET /finances/:id
+const getById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log("[getById] param id =", id);
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid id format" });
+    }
+
+    const finance = await Finance.findById(id).lean().exec();
+    if (!finance) return res.status(404).json({ message: "Finance record not found" });
+
+    return res.status(200).json({ finance });
+  } catch (err) {
+    console.error("[getById] error:", err && err.stack ? err.stack : err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// PUT /finances/:id
+const updateFinance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid id format" });
+    }
+
+    const allowed = ["EmpId","Emp_Name","Designation","Epf_No","Base_Sal","Bank_Name","branch","Acc_No"];
+    const updates = {};
+    for (const k of allowed) if (k in req.body) updates[k] = req.body[k];
+
+    const before = await Finance.findById(id).exec();
+    if (!before) return res.status(404).json({ message: "Finance record not found" });
+
+    const after = await Finance.findByIdAndUpdate(id, { $set: updates }, { new: true }).exec();
+    return res.status(200).json({
+      message: "Finance updated successfully",
+      beforeUpdate: before,
+      afterUpdate: after
+    });
+  } catch (err) {
+    console.error("[updateFinance] error:", err && err.stack ? err.stack : err);
+    return res.status(500).json({ message: "Server error while updating finance" });
+  }
+};
+
+// DELETE /finances/:id
+const deleteFinance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid id format" });
+    }
+
+    const deleted = await Finance.findByIdAndDelete(id).exec();
+    if (!deleted) return res.status(404).json({ message: "Finance record not found" });
+
+    return res.status(200).json({ message: "Finance deleted successfully", deletedFinance: deleted });
+  } catch (err) {
+    console.error("[deleteFinance] error:", err && err.stack ? err.stack : err);
+    return res.status(500).json({ message: "Unable to delete finance" });
+  }
+};
+
+module.exports = { getAllFinances, addFinance, getById, updateFinance, deleteFinance };

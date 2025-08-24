@@ -1,0 +1,19 @@
+const mongoose = require("mongoose");
+const { Schema } = mongoose;
+
+const financeSchema = new Schema(
+  {
+    EmpId: { type: Number, required: true },
+    Emp_Name: { type: String },
+    Designation: { type: String },
+    Epf_No: { type: String },
+    Base_Sal: { type: Number },
+    Bank_Name: { type: String },
+    branch: { type: String },
+    // Use String to avoid large-number precision issues
+    Acc_No: { type: String },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("FinanceSalaryModel", financeSchema);

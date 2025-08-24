@@ -1,0 +1,38 @@
+const express = require("express");
+const {
+  getAllFinances,
+  addFinance,
+  getById,
+  updateFinance,
+  deleteFinance,
+} = require("../Controllers/FinanceSalaryController");
+
+const router = express.Router();
+
+// seed helper to create one doc and return its id
+router.post("/test-create", async (req, res, next) => {
+  try {
+    const payload = {
+      EmpId: 1,
+      Emp_Name: "John Silva",
+      Designation: "Developer",
+      Epf_No: "85451/D/01",
+      Base_Sal: 50000,
+      Bank_Name: "ABC Bank",
+      branch: "Colombo",
+      Acc_No: "1234567890",
+    };
+    const r = await require("../Model/FinanceSalaryModel").create(payload);
+    return res.status(201).json({ _id: r._id, finance: r });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/", getAllFinances);
+router.post("/", addFinance);
+router.get("/:id", getById);
+router.put("/:id", updateFinance);
+router.delete("/:id", deleteFinance);
+
+module.exports = router;
