@@ -10,10 +10,9 @@ const financeSchema = new Schema(
     Base_Sal: { type: Number },
     Bank_Name: { type: String },
     branch: { type: String },
-    // Use String to avoid large-number precision issues
     Acc_No: { type: String },
   },
-  { timestamps: true }
+  { timestamps: false }
 );
 
 module.exports = mongoose.model("FinanceSalaryModel", financeSchema);
