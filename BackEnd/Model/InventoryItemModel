@@ -29,7 +29,7 @@ const inventorySchema = new Schema(
       default: 0,
     },
   },
-  { timestamps: true, versionKey: false }
+  { timestamps: false, versionKey: false }
 );
 
 // 3rd arg sets the actual Mongo collection name to 'inventories'
