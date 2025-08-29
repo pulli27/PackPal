@@ -1,0 +1,121 @@
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --muted:#6b7280;
+  --text:#0f172a;
+  --border:#e5e7eb;
+
+  --brand:#2563eb;      /* blue */
+  --brand-600:#1d4ed8;
+  --success:#22c55e;
+  --danger:#ef4444;
+  --warning:#f59e0b;
+  --chip:#eef2ff;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  background:var(--bg);
+  color:var(--text);
+  padding-left: 280px;
+  
+}
+
+/* Topbar */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-left: -200px;
+  padding:16px 20px; border-bottom:1px solid var(--border); background:#fff;
+  position:sticky; top:0; z-index:10;
+}
+.title{font-size:24px; margin-left: 200px;}
+.topbar-actions{display:flex; gap:10px; align-items:center}
+.avatar{border:none; background:#eef2ff; border-radius:999px; padding:8px 10px; cursor:pointer}
+
+/* Layout */
+.container{padding:20px; max-width:1200px; margin-inline:auto}
+
+/* Buttons */
+.btn{
+  display:inline-flex; gap:8px; align-items:center; border:1px solid transparent;
+  padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600;
+}
+.btn .icon{font-size:16px}
+.btn-primary{background:var(--brand); color:#fff}
+.btn-primary:hover{background:var(--brand-600)}
+.btn-ghost{background:#fff; border-color:var(--border)}
+.btn-ghost:hover{border-color:#cbd5e1}
+.hide-sm{display:inline}
+@media (max-width: 640px){ .hide-sm{display:none} }
+
+/* KPI cards */
+.kpi-grid{
+  display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-bottom:16px;
+}
+.kpi{
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  display:flex; gap:12px; padding:16px;
+}
+.kpi-icon{
+  width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
+  background:var(--chip); font-size:20px;
+}
+.kpi-icon.passed{background:#ecfdf5}
+.kpi-icon.failed{background:#fef2f2}
+.kpi-icon.inventory{background:#eff6ff}
+.kpi-title{color:var(--muted); margin:0 0 4px}
+.kpi-value{font-size:24px; font-weight:700; margin:0}
+
+/* Toolbar */
+.card{
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  padding:16px; margin-bottom:16px;
+}
+.toolbar{display:flex; align-items:center; justify-content:space-between; gap:16px}
+.toolbar-right{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.muted{color:var(--muted)}
+.search{
+  display:flex; align-items:center; gap:8px; border:1px solid var(--border);
+  padding:10px 12px; border-radius:10px; background:#fff; min-width:260px;
+}
+.search input{border:none; outline:none; background:transparent; width:200px}
+
+/* Grid section */
+.grid-2{display:grid; grid-template-columns: 1fr 1fr; gap:16px}
+@media (max-width: 920px){ .kpi-grid{grid-template-columns: 1fr 1fr}
+  .grid-2{grid-template-columns: 1fr} }
+
+/* Cards / tables */
+.card-header{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:8px;
+}
+.table-wrap{overflow:auto}
+.table{width:100%; border-collapse:separate; border-spacing:0}
+.table th, .table td{
+  text-align:left; padding:12px 10px; border-bottom:1px solid var(--border); vertical-align:top;
+}
+.table th{color:var(--muted); font-weight:600; background:#fafafa}
+.table tr:last-child td{border-bottom:none}
+.table a.link{color:var(--brand); text-decoration:none; font-weight:600}
+.table a.link:hover{text-decoration:underline}
+
+/* Chips */
+.badge{
+  display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:600;
+}
+.badge.high{background:#fee2e2; color:#991b1b}
+.badge.medium{background:#fef3c7; color:#92400e}
+.badge.passed{background:#dcfce7; color:#166534}
+.badge.failed{background:#fee2e2; color:#991b1b}
+.badge.pending{background:#fef9c3; color:#854d0e}
+
+/* Bag name with subtext */
+.bag-title{font-weight:700; color:#0b1220; margin:0}
+.bag-sub{color:var(--muted); font-size:12px; margin-top:2px}
+
+/* Small helpers */
+.nowrap{white-space:nowrap}
