@@ -16,7 +16,7 @@ app.use("/products",router);
 
 const MONGO_URI = "mongodb+srv://pulmivihansa27:H1234pul@cluster0.mz80y30.mongodb.net/PackPal?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI)
+mongoose.connect(MONGO_URI)w
   .then(() => {
     console.log("Connected to MongoDB");
     app.listen(5000, () => console.log("Server running on http://localhost:5000"));
