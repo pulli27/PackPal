@@ -1,23 +1,16 @@
 import React from "react";
-import { Route, Routes} from "react-router";
-import './App.css';
-import InventoryDashboard from './Components/Dashboard/InventoryDashboard';
-import ItemInventory from './Components/ItemInventory/ItemInventory';
+import { Routes, Route } from "react-router-dom";
+import "./App.css";
+import InventoryDashboard from "./Components/Dashboard/InventoryDashboard";
+import ItemInventory from "./Components/ItemInventory/ItemInventory";
+import Suppliers from "./Components/Suppliers/Suppliers";
 
-function App() {
+export default function App() {
   return (
-    <div>
-   
-   <React.Fragment>
     <Routes>
-      
-      <Route path="/maindashboard" element={<InventoryDashboard/>}/>
-      <Route path="/iteminventory" element={<ItemInventory/>}/>
-    
+      <Route path="/maindashboard" element={<InventoryDashboard />} />
+      <Route path="/iteminventory" element={<ItemInventory />} />
+      <Route path="/supplier" element={<Suppliers />} />
     </Routes>
-   </React.Fragment>
-    </div>
   );
 }
-
-export default App;

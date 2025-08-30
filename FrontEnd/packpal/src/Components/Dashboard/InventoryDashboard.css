@@ -41,7 +41,7 @@ body {
   gap: 20px; margin-bottom: 30px;
 }
 .metric-card {
-  background: linear-gradient(135deg, #667eea, #181157);
+  background: linear-gradient(135deg, #354fc5, #15122f);
   border-radius: 15px; padding: 25px; color: #fff;
   position: relative; overflow: hidden;
   transition: transform .3s ease, box-shadow .3s ease;

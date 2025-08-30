@@ -452,13 +452,12 @@ export default function ItemInventory() {
         {/* Header */}
         <div className="header">
           <h1>Item Inventory</h1>
-          <div className="search-container">
-            <div className="search-box">
-              <span className="search-icon" aria-hidden>🔍</span>
-              <input id="searchInput" type="text" placeholder="Search items..." />
+          
+            <div class="search">
+              <input id="searchInput" type="text" placeholder=" 🔍 Search items..." />
             </div>
             <button className="add-btn" id="addBtn">Add New Item</button>
-          </div>
+          
         </div>
 
         {/* Inline Add/Edit Form */}
@@ -528,7 +527,7 @@ export default function ItemInventory() {
         {/* Stats */}
         <div className="stats-grid">
           <div className="metric-card">
-            <div className="stat-number" style={{ color: "#00061fff" }} id="totalItems">0</div>
+            <div className="stat-number" style={{ color: "#ffffffff" }} id="totalItems">0</div>
             <div className="stat">Total Items</div>
           </div>
           <div className="metric-card">
@@ -536,7 +535,7 @@ export default function ItemInventory() {
             <div className="stat">Low Stock Items</div>
           </div>
           <div className="metric-card">
-            <div className="stat-number" style={{ color: "#00061fff" }} id="totalValue">LKR 0</div>
+            <div className="stat-number" style={{ color: "#ffffffff" }} id="totalValue">LKR 0</div>
             <div className="stat">Total Inventory Value</div>
           </div>
         </div>
