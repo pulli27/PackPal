@@ -3,11 +3,11 @@ import Sidebar from "../Sidebar/Sidebar";
 import "./InventoryDashboard.css";
 
 const initialRows = [
-  { product: "Wireless Headphones", stock: 142, value: 14200, status: "in-stock" },
-  { product: "Coffee Maker Pro",    stock: 8,   value: 1600,  status: "low-stock" },
-  { product: "Gaming Mouse",        stock: 0,   value: 0,     status: "out-of-stock" },
-  { product: "Desk Lamp LED",       stock: 67,  value: 3350,  status: "in-stock" },
-  { product: "Bluetooth Speaker",   stock: 15,  value: 1500,  status: "low-stock" }
+  { product: "Mini backpack", stock: 142, value: 14200, status: "in-stock" },
+  { product: "Rolling school bag",    stock: 8,   value: 1600,  status: "low-stock" },
+  { product: "Crossbody bag",        stock: 0,   value: 0,     status: "out-of-stock" },
+  { product: " Laptop backpack ",       stock: 67,  value: 3350,  status: "in-stock" },
+  { product: "Beach tote",   stock: 15,  value: 1500,  status: "low-stock" }
 ];
 
 function InventoryDashboard() {

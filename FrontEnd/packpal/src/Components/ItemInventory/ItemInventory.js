@@ -1,24 +1,23 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import "./ItemInventory.css";
 import Sidebar from "../Sidebar/Sidebar";
 
 export default function ItemInventory() {
+  // keep inventory & editing index in refs so handlers always read the latest values
+  const inventoryRef = useRef([
+    { id: "1001", name: "Leather Backpack",  description: "Brown leather bag", quantity: 450, unitPrice: 80.0,  avgDailyUsage: 3, leadTimeDays: 3 },
+    { id: "1002", name: "Canvas Tote",       description: "Beige shoulder bag", quantity: 300, unitPrice: 25.0,  avgDailyUsage: 2, leadTimeDays: 2 },
+    { id: "1003", name: "Laptop Briefcase",  description: "Black laptop bag",   quantity: 12,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 5 },
+    { id: "1004", name: "Travel Duffel",     description: "Large blue bag",     quantity: 500, unitPrice: 20.0,  avgDailyUsage: 2, leadTimeDays: 2 },
+    { id: "1005", name: "Travel Duffel",     description: "Large blue bag",     quantity: 10,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 7 }
+  ]);
+  const editingIndexRef = useRef(-1);
+
   useEffect(() => {
     /* ===== Helpers & State ===== */
     const SAFETY_STOCK = 40;
 
-    // Seed data
-    let inventory = [
-      { id: "1001", name: "Leather Backpack",  description: "Brown leather bag", quantity: 450, unitPrice: 80.0,  avgDailyUsage: 3, leadTimeDays: 3 },
-      { id: "1002", name: "Canvas Tote",       description: "Beige shoulder bag", quantity: 300, unitPrice: 25.0,  avgDailyUsage: 2, leadTimeDays: 2 },
-      { id: "1003", name: "Laptop Briefcase",  description: "Black laptop bag",   quantity: 12,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 5 },
-      { id: "1004", name: "Travel Duffel",     description: "Large blue bag",     quantity: 500, unitPrice: 20.0,  avgDailyUsage: 2, leadTimeDays: 2 },
-      { id: "1005", name: "Travel Duffel",     description: "Large blue bag",     quantity: 10,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 7 }
-    ];
-
-    let editingIndex = -1;
-
-    const $  = (id) => document.getElementById(id);
+    const $ = (id) => document.getElementById(id);
     const toNum = (v) => Number(v) || 0;
 
     const computeReorderLevel = (item) =>
@@ -32,34 +31,35 @@ export default function ItemInventory() {
       if (show) $("itemId")?.focus();
     }
 
+    function updateRopPreview() {
+      const preview =
+        (toNum($("avgDailyUsage")?.value) * toNum($("leadTimeDays")?.value)) + SAFETY_STOCK;
+      if ($("reorderLevel")) $("reorderLevel").value = Math.max(0, Math.round(preview));
+      if ($("safetyStock")) $("safetyStock").value = SAFETY_STOCK;
+    }
+
     function resetForm() {
       $("itemForm")?.reset();
-      $("formTitle").textContent = "Add New Item";
-      $("reorderLevel").value = 0;
-      $("avgDailyUsage").value = 0;
-      $("leadTimeDays").value = 0;
-      $("safetyStock").value = SAFETY_STOCK;
-      editingIndex = -1;
+      if ($("formTitle")) $("formTitle").textContent = "Add New Item";
+      if ($("reorderLevel")) $("reorderLevel").value = 0;
+      if ($("avgDailyUsage")) $("avgDailyUsage").value = 0;
+      if ($("leadTimeDays")) $("leadTimeDays").value = 0;
+      if ($("safetyStock")) $("safetyStock").value = SAFETY_STOCK;
+      editingIndexRef.current = -1;
       updateRopPreview();
     }
 
-    function updateRopPreview() {
-      const preview =
-        (toNum($("avgDailyUsage").value) * toNum($("leadTimeDays").value)) + SAFETY_STOCK;
-      $("reorderLevel").value = Math.max(0, Math.round(preview));
-      $("safetyStock").value = SAFETY_STOCK;
-    }
-
     function updateStats() {
+      const inventory = inventoryRef.current;
       const totalItems = inventory.length;
       const low = inventory.filter((i) => toNum(i.quantity) <= computeReorderLevel(i)).length;
       const value = inventory.reduce((s, i) => s + totalPriceOf(i), 0);
-      $("totalItems").textContent = totalItems;
-      $("lowStockItems").textContent = low;
-      $("totalValue").textContent = `LKR ${value.toLocaleString()}`;
+      if ($("totalItems")) $("totalItems").textContent = totalItems;
+      if ($("lowStockItems")) $("lowStockItems").textContent = low;
+      if ($("totalValue")) $("totalValue").textContent = `LKR ${value.toLocaleString()}`;
     }
 
-    function renderTable(list = inventory) {
+    function renderTable(list = inventoryRef.current) {
       const tbody = $("inventoryBody");
       if (!tbody) return;
       tbody.innerHTML = "";
@@ -67,7 +67,7 @@ export default function ItemInventory() {
         const rop = computeReorderLevel(item);
         const totalPrice = totalPriceOf(item);
         const tr = document.createElement("tr");
-        if (item.quantity <= rop) tr.classList.add("low-stock");
+        if (toNum(item.quantity) <= rop) tr.classList.add("low-stock");
         tr.innerHTML = `
           <td class="item-id">${item.id}</td>
           <td class="item-name">${item.name}</td>
@@ -87,11 +87,11 @@ export default function ItemInventory() {
       updateStats();
     }
 
-    /* ===== CRUD bound to window (so table buttons work) ===== */
+    /* ===== CRUD (bound to window so row buttons work) ===== */
     function editItem(index) {
-      const it = inventory[index];
+      const it = inventoryRef.current[index];
       showInlineForm(true);
-      $("formTitle").textContent = "Edit Item";
+      if ($("formTitle")) $("formTitle").textContent = "Edit Item";
       $("itemId").value = it.id;
       $("itemName").value = it.name;
       $("description").value = it.description;
@@ -101,14 +101,14 @@ export default function ItemInventory() {
       $("leadTimeDays").value = toNum(it.leadTimeDays);
       $("safetyStock").value = SAFETY_STOCK;
       updateRopPreview();
-      editingIndex = index;
+      editingIndexRef.current = index;
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
     }
 
     function deleteItem(index) {
-      const item = inventory[index];
+      const item = inventoryRef.current[index];
       if (window.confirm(`Delete "${item.name}" (ID: ${item.id})?`)) {
-        inventory.splice(index, 1);
+        inventoryRef.current.splice(index, 1);
         renderTable();
       }
     }
@@ -118,7 +118,7 @@ export default function ItemInventory() {
 
     /* ===== Report builders ===== */
     function buildInventoryReport() {
-      const totalItems = inventory.length;
+      const inventory = inventoryRef.current;
       const lowStockItems = inventory.filter((i) => toNum(i.quantity) <= computeReorderLevel(i));
       const totalValue = inventory.reduce((s, i) => s + totalPriceOf(i), 0);
       const avgUnit = inventory.reduce((s, i) => s + toNum(i.unitPrice), 0) / (inventory.length || 1);
@@ -132,10 +132,8 @@ export default function ItemInventory() {
       }));
 
       return {
-        
-
         summary: {
-          totalItems,
+          totalItems: inventory.length,
           totalQuantity: totalQty,
           totalValue,
           avgUnitPrice: avgUnit,
@@ -215,13 +213,13 @@ export default function ItemInventory() {
 
     function generateReport() {
       const data = buildInventoryReport();
-      $("reportContent").innerHTML = inventoryReportHTML(data);
-      $("reportModal").style.display = "block";
+      if ($("reportContent")) $("reportContent").innerHTML = inventoryReportHTML(data);
+      if ($("reportModal")) $("reportModal").style.display = "block";
     }
     window.__inv_generateReport = generateReport;
 
     function closeReportModal() {
-      $("reportModal").style.display = "none";
+      if ($("reportModal")) $("reportModal").style.display = "none";
     }
 
     // PDF
@@ -232,9 +230,11 @@ export default function ItemInventory() {
           alert("PDF tools not found. Add jsPDF and html2canvas scripts in public/index.html.");
           return;
         }
-        const txt = btn.innerHTML;
-        btn.innerHTML = "⏳ Generating PDF...";
-        btn.disabled = true;
+        const txt = btn?.innerHTML;
+        if (btn) {
+          btn.innerHTML = "⏳ Generating PDF...";
+          btn.disabled = true;
+        }
 
         const temp = document.createElement("div");
         temp.style.position = "absolute";
@@ -249,7 +249,6 @@ export default function ItemInventory() {
         temp.style.background = "#fff";
 
         const data = buildInventoryReport();
-        // ✅ Build the content OUTSIDE the backticked string to avoid escaping issues
         const contentHTML = inventoryReportHTML(data)
           .replace(/class="report-actions"[\s\S]*<\/div>\s*$/, "");
 
@@ -262,7 +261,14 @@ export default function ItemInventory() {
 
         document.body.appendChild(temp);
 
-        window.html2canvas(temp, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", width: 794, height: temp.scrollHeight })
+        window.html2canvas(temp, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          width: 794,
+          height: temp.scrollHeight
+        })
           .then((canvas) => {
             document.body.removeChild(temp);
             const { jsPDF } = window.jspdf;
@@ -280,13 +286,17 @@ export default function ItemInventory() {
               hLeft -= pageH;
             }
             pdf.save(`inventory_report_${new Date().toISOString().split("T")[0]}.pdf`);
-            btn.innerHTML = txt;
-            btn.disabled = false;
+            if (btn) {
+              btn.innerHTML = txt;
+              btn.disabled = false;
+            }
           })
           .catch((err) => {
             if (document.body.contains(temp)) document.body.removeChild(temp);
-            btn.innerHTML = txt;
-            btn.disabled = false;
+            if (btn) {
+              btn.innerHTML = txt;
+              btn.disabled = false;
+            }
             console.error(err);
             alert("PDF generation failed. Please try again.");
           });
@@ -297,7 +307,7 @@ export default function ItemInventory() {
     }
 
     function printReport() {
-      const src = $("reportContent").innerHTML;
+      const src = $("reportContent")?.innerHTML || "";
       const w = window.open("", "_blank");
       const doc = `
         <!DOCTYPE html><html><head><title>Inventory Report</title>
@@ -341,7 +351,7 @@ export default function ItemInventory() {
     window.__inv_printReport  = printReport;
     window.__inv_downloadJSON = downloadJSON;
 
-    /* ===== Listeners ===== */
+    /* ===== Named Listeners (attach once, remove on cleanup) ===== */
     const addBtn = $("addBtn");
     const cancelBtn = $("cancelBtn");
     const clearBtn = $("clearBtn");
@@ -350,41 +360,22 @@ export default function ItemInventory() {
     const lead = $("leadTimeDays");
     const form = $("itemForm");
 
-    addBtn?.addEventListener("click", () => {
+    function onAdd() {
       resetForm();
       showInlineForm(true);
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
-    });
-
-    cancelBtn?.addEventListener("click", () => {
+    }
+    function onCancel() {
       showInlineForm(false);
       resetForm();
-    });
+    }
+    function onClear() { resetForm(); }
+    function onAvg() { updateRopPreview(); }
+    function onLead() { updateRopPreview(); }
 
-    clearBtn?.addEventListener("click", resetForm);
-    avg?.addEventListener("input", updateRopPreview);
-    lead?.addEventListener("input", updateRopPreview);
-
-    form?.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const data = {
-        id: $("itemId").value.trim(),
-        name: $("itemName").value.trim(),
-        description: $("description").value.trim(),
-        quantity: parseInt($("quantity").value, 10) || 0,
-        unitPrice: parseFloat($("unitPrice").value) || 0,
-        avgDailyUsage: parseInt($("avgDailyUsage").value, 10) || 0,
-        leadTimeDays: parseInt($("leadTimeDays").value, 10) || 0,
-      };
-      if (editingIndex === -1) inventory.push(data);
-      else inventory[editingIndex] = data;
-      renderTable();
-      resetForm();
-      showInlineForm(false);
-    });
-
-    searchInput?.addEventListener("input", (e) => {
-      const term = e.target.value.toLowerCase();
+    function onSearch(e) {
+      const term = (e.target.value || "").toLowerCase();
+      const inventory = inventoryRef.current;
       const filtered = inventory.filter(
         (i) =>
           i.id.toLowerCase().includes(term) ||
@@ -393,6 +384,7 @@ export default function ItemInventory() {
       );
       const mapped = filtered.map((item) => ({ item, index: inventory.indexOf(item) }));
       const tbody = $("inventoryBody");
+      if (!tbody) return;
       tbody.innerHTML = "";
       mapped.forEach(({ item, index }) => {
         const rop = computeReorderLevel(item);
@@ -414,24 +406,68 @@ export default function ItemInventory() {
           </td>`;
         tbody.appendChild(tr);
       });
-    });
+      updateStats();
+    }
+
+    function onSubmit(e) {
+      e.preventDefault();
+      const data = {
+        id: $("itemId").value.trim(),
+        name: $("itemName").value.trim(),
+        description: $("description").value.trim(),
+        quantity: parseInt($("quantity").value, 10) || 0,
+        unitPrice: parseFloat($("unitPrice").value) || 0,
+        avgDailyUsage: parseInt($("avgDailyUsage").value, 10) || 0,
+        leadTimeDays: parseInt($("leadTimeDays").value, 10) || 0,
+      };
+
+      const list = inventoryRef.current;
+
+      // Optional: prevent duplicate IDs (comment out if not needed)
+      const dupIndex = list.findIndex((i) => i.id === data.id && editingIndexRef.current !== list.indexOf(i));
+      if (dupIndex !== -1) {
+        alert(`Item ID ${data.id} already exists.`);
+        return;
+      }
+
+      if (editingIndexRef.current === -1) list.push(data);
+      else list[editingIndexRef.current] = data;
+
+      renderTable();
+      resetForm();
+      showInlineForm(false);
+    }
+
+    // attach
+    addBtn?.addEventListener("click", onAdd);
+    cancelBtn?.addEventListener("click", onCancel);
+    clearBtn?.addEventListener("click", onClear);
+    avg?.addEventListener("input", onAvg);
+    lead?.addEventListener("input", onLead);
+    searchInput?.addEventListener("input", onSearch);
+    form?.addEventListener("submit", onSubmit);
 
     // Modal close (clicking outside)
-    const clickHandler = (e) => {
+    function clickHandler(e) {
       const m = $("reportModal");
       if (e.target === m) closeReportModal();
-    };
+    }
     window.addEventListener("click", clickHandler);
 
-    // Initial render
+    // Initial render & ensure form hidden initially (if your CSS doesn't already)
+    showInlineForm(false);
     renderTable();
 
-    // Cleanup on unmount
+    // Cleanup — remove listeners so Strict Mode dev double-mount won't double-bind
     return () => {
-      addBtn?.replaceWith(addBtn.cloneNode(true));
-      cancelBtn?.replaceWith(cancelBtn.cloneNode(true));
-      clearBtn?.replaceWith(clearBtn.cloneNode(true));
-      searchInput?.replaceWith(searchInput.cloneNode(true));
+      addBtn?.removeEventListener("click", onAdd);
+      cancelBtn?.removeEventListener("click", onCancel);
+      clearBtn?.removeEventListener("click", onClear);
+      avg?.removeEventListener("input", onAvg);
+      lead?.removeEventListener("input", onLead);
+      searchInput?.removeEventListener("input", onSearch);
+      form?.removeEventListener("submit", onSubmit);
+
       window.removeEventListener("click", clickHandler);
       delete window.__inv_editItem;
       delete window.__inv_deleteItem;
@@ -443,141 +479,147 @@ export default function ItemInventory() {
   }, []);
 
   return (
-
     <div className="page-shell">
-          <Sidebar />
+      <Sidebar />
 
-    <div className="main-content">
-      <div className="container">
-        {/* Header */}
-        <div className="header">
-          <h1>Item Inventory</h1>
-          
-            <div class="search">
+      <div className="main-content">
+        <div className="container">
+          {/* Header */}
+          <div className="header">
+            <h1>Item Inventory</h1>
+
+            <div className="search">
               <input id="searchInput" type="text" placeholder=" 🔍 Search items..." />
             </div>
             <button className="add-btn" id="addBtn">Add New Item</button>
-          
-        </div>
+          </div>
 
-        {/* Inline Add/Edit Form */}
-        <div id="inlineForm" className="form-card">
-          <div className="form-header">
-            <div>
-              <div className="form-title" id="formTitle">Add New Item</div>
-              <div className="hint">
-                Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (fixed at 40)</b>.<br />
-                The value updates automatically and is read-only.
-                <br /><br /><b>Total price</b> is calculated automatically.
+          {/* Inline Add/Edit Form */}
+          <div id="inlineForm" className="form-card">
+            <div className="form-header">
+              <div>
+                <div className="form-title" id="formTitle">Add New Item</div>
+                <div className="hint">
+                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (fixed at 40)</b>.<br />
+                  The value updates automatically and is read-only.
+                  <br /><br /><b>Total price</b> is calculated automatically.
+                </div>
               </div>
+              <button className="btn btn-light" id="cancelBtn" type="button">Cancel</button>
             </div>
-            <button className="btn btn-light" id="cancelBtn" type="button">Cancel</button>
+
+            <form id="itemForm">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="itemId">Item ID</label>
+                  <input id="itemId" required />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="itemName">Item Name</label>
+                  <input id="itemName" required />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="description">Description</label>
+                  <input id="description" required />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="quantity">Quantity</label>
+                  <input id="quantity" type="number" min="0" required />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="avgDailyUsage">Avg Daily Usage</label>
+                  <input id="avgDailyUsage" type="number" min="0" step="1" defaultValue="0" required />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="leadTimeDays">Lead Time (days)</label>
+                  <input id="leadTimeDays" type="number" min="0" step="1" defaultValue="0" required />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="safetyStock">Safety Stock (fixed)</label>
+                  <input id="safetyStock" type="number" defaultValue="40" disabled style={{ background: "#f3f4f6", cursor: "not-allowed" }} title="Safety Stock is fixed at 40" />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="reorderLevel">Reorder Level (auto)</label>
+                  <input id="reorderLevel" type="number" min="0" readOnly style={{ background: "#f9fafb" }} />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="unitPrice">Unit Price</label>
+                  <input id="unitPrice" type="number" step="0.01" min="0" required />
+                </div>
+              </div>
+              <div className="form-actions">
+                <button type="submit" className="btn btn-primary">Save Item</button>
+                <button type="button" className="btn btn-light" id="clearBtn">Clear</button>
+              </div>
+            </form>
           </div>
 
-          <form id="itemForm">
-            <div className="form-grid">
-              <div className="form-group">
-                <label htmlFor="itemId">Item ID</label>
-                <input id="itemId" required />
-              </div>
-              <div className="form-group">
-                <label htmlFor="itemName">Item Name</label>
-                <input id="itemName" required />
-              </div>
-              <div className="form-group">
-                <label htmlFor="description">Description</label>
-                <input id="description" required />
-              </div>
-              <div className="form-group">
-                <label htmlFor="quantity">Quantity</label>
-                <input id="quantity" type="number" min="0" required />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="avgDailyUsage">Avg Daily Usage</label>
-                <input id="avgDailyUsage" type="number" min="0" step="1" defaultValue="0" required />
-              </div>
-              <div className="form-group">
-                <label htmlFor="leadTimeDays">Lead Time (days)</label>
-                <input id="leadTimeDays" type="number" min="0" step="1" defaultValue="0" required />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="safetyStock">Safety Stock (fixed)</label>
-                <input id="safetyStock" type="number" defaultValue="40" disabled style={{ background: "#f3f4f6", cursor: "not-allowed" }} title="Safety Stock is fixed at 40" />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="reorderLevel">Reorder Level (auto)</label>
-                <input id="reorderLevel" type="number" min="0" readOnly style={{ background: "#f9fafb" }} />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="unitPrice">Unit Price</label>
-                <input id="unitPrice" type="number" step="0.01" min="0" required />
-              </div>
+          {/* Stats */}
+          <div className="stats-grid">
+            <div className="metric-card">
+              <div className="stat-number" style={{ color: "#ffffffff" }} id="totalItems">0</div>
+              <div className="stat">Total Items</div>
             </div>
-            <div className="form-actions">
-              <button type="submit" className="btn btn-primary">Save Item</button>
-              <button type="button" className="btn btn-light" id="clearBtn">Clear</button>
+            <div className="metric-card">
+              <div className="stat-number" style={{ color: "#ca1c09ff" }} id="lowStockItems">0</div>
+              <div className="stat">Low Stock Items</div>
             </div>
-          </form>
-        </div>
-
-        {/* Stats */}
-        <div className="stats-grid">
-          <div className="metric-card">
-            <div className="stat-number" style={{ color: "#ffffffff" }} id="totalItems">0</div>
-            <div className="stat">Total Items</div>
+            <div className="metric-card">
+              <div className="stat-number" style={{ color: "#ffffffff" }} id="totalValue">LKR 0</div>
+              <div className="stat">Total Inventory Value</div>
+            </div>
           </div>
-          <div className="metric-card">
-            <div className="stat-number" style={{ color: "#ca1c09ff" }} id="lowStockItems">0</div>
-            <div className="stat">Low Stock Items</div>
+
+          {/* Table */}
+          <div className="table-container">
+            <table id="inventoryTable">
+              <thead>
+                <tr>
+                  <th>ITEM ID</th>
+                  <th>ITEM NAME</th>
+                  <th>DESCRIPTION</th>
+                  <th>QUANTITY</th>
+                  <th>REORDER LEVEL</th>
+                  <th>TOTAL PRICE</th>
+                  <th>UNIT PRICE</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryBody"></tbody>
+            </table>
           </div>
-          <div className="metric-card">
-            <div className="stat-number" style={{ color: "#ffffffff" }} id="totalValue">LKR 0</div>
-            <div className="stat">Total Inventory Value</div>
+
+          {/* Generate report */}
+          <div className="report-section">
+            <button
+              className="generate-report-btn"
+              onClick={() => window.__inv_generateReport && window.__inv_generateReport()}
+            >
+              📊 Generate Report
+            </button>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="table-container">
-          <table id="inventoryTable">
-            <thead>
-              <tr>
-                <th>ITEM ID</th>
-                <th>ITEM NAME</th>
-                <th>DESCRIPTION</th>
-                <th>QUANTITY</th>
-                <th>REORDER LEVEL</th>
-                <th>TOTAL PRICE</th>
-                <th>UNIT PRICE</th>
-                <th>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody id="inventoryBody"></tbody>
-          </table>
-        </div>
-
-        {/* Generate report */}
-        <div className="report-section">
-          <button
-            className="generate-report-btn"
-            onClick={() => window.__inv_generateReport && window.__inv_generateReport()}
-          >
-            📊 Generate Report
-          </button>
-        </div>
-      </div>
-
-      {/* Report Modal */}
-      <div id="reportModal" className="modal">
-        <div className="modal-content">
-          <span className="close" onClick={() => { const el = document.getElementById("reportModal"); if (el) el.style.display = "none"; }}>&times;</span>
-          <div id="reportContent"></div>
+        {/* Report Modal */}
+        <div id="reportModal" className="modal">
+          <div className="modal-content">
+            <span
+              className="close"
+              onClick={() => {
+                const el = document.getElementById("reportModal");
+                if (el) el.style.display = "none";
+              }}
+            >
+              &times;
+            </span>
+            <div id="reportContent"></div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
   );
 }
