@@ -1,142 +1,109 @@
 
-const Cart = require("../Model/Cartmodel");
+const Product = require("../Model/CartModel");
 
-// GET /api/carts
-const getAllCarts = async (req, res) => {
-  try {
-    const carts = await Cart.find().sort({ created_at: -1 });
-    // Return 200 with possibly empty array (standard API behavior)
-    return res.status(200).json({ success: true, carts });
-  } catch (err) {
-    console.error("Error fetching carts:", err);
-    return res.status(500).json({ success: false, message: "Internal Server Error" });
-  }
+// @desc    Get all products
+// @route   GET /api/products
+exports.getProducts = async (req, res) => {
+    try {
+        const products = await Product.find();
+        res.status(200).json({ success: true, count: products.length, data: products });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to fetch products", error: err.message });
+    }
 };
 
-// POST /api/carts
-const addCarts = async (req, res) => {
-  try {
-    if (!req.body || Object.keys(req.body).length === 0) {
-      return res.status(400).json({ success: false, message: "Request body is missing" });
+// @desc    Get single product by ID
+// @route   GET /api/products/:id
+exports.getProductById = async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id);
+        if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
+        res.status(200).json({ success: true, data: product });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to fetch product", error: err.message });
     }
-
-    const {
-      ProductId, product_name, quantity, product_price,
-      product_discounts, selected_variant, //created_at
-    } = req.body;
-
-    if (!ProductId || !product_name || !quantity || !product_price || !product_discounts) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields: ProductId, product_name, quantity, product_price, product_discounts "
-      });
-    }
-
-    const cart = new Cart({
-      ProductId,
-      product_name,
-      quantity,//customer_id
-      product_price,
-      product_discounts,
-      selected_variant,
-      //created_at
-    });
-
-    await cart.save();
-
-    return res.status(201).json({
-      success: true,
-      message: "Cart added successfully",
-      cart
-    });
-  } catch (err) {
-    console.error("Error adding cart:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to add cart",
-      error: err.message
-    });
-  }
 };
 
-// GET /api/carts/:id
-const getById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const cart = await Cart.findById(id);
+// @desc    Add new product
+// @route   POST /api/products
+exports.addProduct = async (req, res) => {
+    try {
+        const { name, category, img, price, stock, rating } = req.body;
 
-    if (!cart) {
-      return res.status(404).json({ success: false, message: "Cart not found" });
+        if (!name || !price) {
+            return res.status(400).json({ success: false, message: "Name and price are required" });
+        }
+
+        const newProduct = await Product.create({
+            name,
+            category,
+            img,
+            price,
+            stock,
+            rating,
+            discountType: "none",
+            discountValue: 0
+        });
+
+        res.status(201).json({ success: true, message: "Product added successfully", data: newProduct });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to add product", error: err.message });
     }
-
-    return res.status(200).json({ success: true, cart });
-  } catch (error) {
-    console.error("Error fetching cart by ID:", error);
-    return res.status(500).json({ success: false, message: "Internal Server Error" });
-  }
 };
 
-// PUT /api/carts/:id
-const updateCart = async (req, res) => {
-  try {
-    const { id } = req.params;
+// @desc    Update product details
+// @route   PUT /api/products/:id
+exports.updateProduct = async (req, res) => {
+    try {
+        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true
+        });
 
-    if (!req.body || Object.keys(req.body).length === 0) {
-      return res.status(400).json({ success: false, message: "Request body is missing" });
+        if (!updatedProduct) return res.status(404).json({ success: false, message: "Product not found" });
+
+        res.status(200).json({ success: true, message: "Product updated successfully", data: updatedProduct });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to update product", error: err.message });
     }
-
-    const {
-      ProductId, product_name, quantity, product_price,
-      product_discounts, selected_variant,// created_at
-    } = req.body;
-
-    const updatedCart = await Cart.findByIdAndUpdate(
-      id,
-      { ProductId, product_name, quantity, product_price, product_discounts, selected_variant },
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedCart) {
-      return res.status(404).json({ success: false, message: "Cart not found" });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Cart updated successfully",
-      updatedCart
-    });
-  } catch (err) {
-    console.error("Error updating cart:", err);
-    return res.status(500).json({ success: false, message: "Unable to update cart", error: err.message });
-  }
 };
 
-// DELETE /api/carts/:id
-const deleteCart = async (req, res) => {
-  try {
-    const { id } = req.params;
+// @desc    Delete product
+// @route   DELETE /api/products/:id
+exports.deleteProduct = async (req, res) => {
+    try {
+        const deletedProduct = await Product.findByIdAndDelete(req.params.id);
+        if (!deletedProduct) return res.status(404).json({ success: false, message: "Product not found" });
 
-    const cart = await Cart.findByIdAndDelete(id);
-
-    if (!cart) {
-      return res.status(404).json({ success: false, message: "Cart not found" });
+        res.status(200).json({ success: true, message: "Product deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to delete product", error: err.message });
     }
-
-    return res.status(200).json({
-      success: true,
-      message: "Cart deleted successfully",
-      cart
-    });
-  } catch (err) {
-    console.error("Error deleting cart:", err);
-    return res.status(500).json({ success: false, message: "Unable to delete cart", error: err.message });
-  }
 };
 
-module.exports = {
-  getAllCarts,
-  addCarts,
-  getById,
-  updateCart,
-  deleteCart
+// @desc    Apply discount to a product
+// @route   PUT /api/products/:id/discount
+exports.applyDiscount = async (req, res) => {
+    try {
+        const { discountType, discountValue } = req.body;
+
+        if (!["none", "percentage", "fixed"].includes(discountType)) {
+            return res.status(400).json({ success: false, message: "Invalid discount type" });
+        }
+
+        const updatedProduct = await Product.findByIdAndUpdate(
+            req.params.id,
+            { discountType, discountValue },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedProduct) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        res.status(200).json({ success: true, message: "Discount applied successfully", data: updatedProduct });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to apply discount", error: err.message });
+    }
 };

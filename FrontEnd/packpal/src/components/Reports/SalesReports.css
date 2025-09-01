@@ -1,0 +1,16 @@
+.reports-page .grid { display: grid; gap: 12px; }
+@media (min-width: 900px) {
+  .reports-page .grid.grid-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+.reports-page .section { background:#fff; border:1px solid #e5e7eb; border-radius:14px; margin-bottom:22px; }
+.reports-page .head { display:flex; justify-content:space-between; align-items:center; padding:16px 18px; border-bottom:1px solid #e5e7eb; }
+.reports-page .body { padding:18px; }
+.reports-page .stats { display:grid; gap:16px; }
+@media (min-width:900px){ .reports-page .stats{grid-template-columns:repeat(4,1fr)} }
+.reports-page .card.stat { border:1px solid #e5e7eb; border-radius:14px; padding:18px; background:#fff; }
+.reports-page .card.stat .l { color:#637087; text-transform:uppercase; font-size:12px; letter-spacing:.04em; }
+.reports-page table { width:100%; border-collapse:collapse; }
+.reports-page thead th { background:#f3f4f6; color:#374151; text-transform:uppercase; font-size:12px; letter-spacing:.04em; }
+.reports-page th, .reports-page td { padding:12px 14px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; font-size:14px; }
+.reports-page td.right { text-align:right; }
