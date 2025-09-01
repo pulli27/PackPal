@@ -1,0 +1,194 @@
+/* ===== Scope everything to this page ===== */
+.epf, .epf * { box-sizing: border-box; }
+
+/* Align page with sidebar, like FinanceDashboard */
+.epf .container{
+  max-width: 1400px;
+  margin: 0 auto;
+  background: rgba(255,255,255,.95);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.1);
+  margin-left: 280px; /* same offset as Finance main-content */
+}
+@media (max-width: 768px){
+  .epf .container{ margin-left: 0; padding: 20px; }
+}
+
+/* ---- Header (match FinanceDashboard) ---- */
+.epf .content-header {
+  margin-top: -30px;
+  text-align: center;
+  margin-bottom: 20px;
+
+}
+.epf .content-header h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+    color: #000;
+}
+.epf .content-header p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+  margin-left: 0px;
+}
+.epf .content-header .header-actions {
+  margin-top: 12px;
+  margin-left: 1000px;
+}
+.epf .emoji{
+  font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.epf .btn-pay{
+    width:150px;
+    height: 50px;
+    
+}
+/* ---- Alert ---- */
+.epf .alert{
+  padding: 20px; border-radius: 15px; margin-bottom: 30px;
+  display: flex; align-items: center; font-size: 16px; font-weight: 500;
+  animation: epf-pulse 2s infinite;
+}
+.epf .alert-warning{
+  background: linear-gradient(135deg,#fef3c7,#fed7aa);
+  border-left: 5px solid #f59e0b;
+  color: #92400e;
+  box-shadow: 0 10px 25px rgba(245,158,11,.2);
+}
+.epf .alert-icon{ font-size: 24px; margin-right: 15px; }
+@keyframes epf-pulse { 0%,100%{ transform: scale(1) } 50%{ transform: scale(1.02) } }
+
+/* ---- KPI Cards ---- */
+.epf .stats-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(300px,1fr));
+  gap: 25px;
+  margin-bottom: 40px;
+}
+.epf .stat-card{
+  background:#fff; border-radius:20px; padding:30px;
+  box-shadow:0 10px 30px rgba(0,0,0,.1);
+  transition: all .4s ease; position: relative; overflow: hidden;
+}
+.epf .stat-card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:5px;
+  background:linear-gradient(90deg,#354fc5,#15122f);
+}
+.epf .stat-card:hover{ transform: translateY(-10px); box-shadow: 0 20px 50px rgba(0,0,0,.15); }
+.epf .stat-header{ display:flex; align-items:center; margin-bottom:20px; }
+.epf .stat-icon{
+  width:60px; height:60px; border-radius:15px;
+  display:flex; align-items:center; justify-content:center;
+  margin-right:20px; font-size:28px; color:#fff;
+}
+.epf .stat-info h3{ font-size:18px; font-weight:600; color:#333; margin-bottom:5px; }
+.epf .stat-info p{ font-size:14px; color:#666; }
+.epf .stat-value{ font-size:36px; font-weight:700; color:#333; margin-bottom:15px; }
+.epf .stat-details{ display:flex; justify-content:space-between; align-items:center; }
+.epf .stat-change{ font-size:14px; font-weight:600; display:flex; align-items:center; }
+.epf .positive{ color:#10b981 } .epf .negative{ color:#ef4444 } .epf .neutral{ color:#6b7280 }
+
+/* ---- Main content ---- */
+.epf .main-content{
+  display:grid; grid-template-columns:2fr 1fr; gap:30px; margin-bottom:30px;
+}
+@media (max-width:768px){
+  .epf .main-content{ grid-template-columns:1fr; }
+}
+
+/* ---- Table ---- */
+.epf .contributions-table{
+  background:#fff; border-radius:20px; overflow:hidden;
+  box-shadow:0 10px 30px rgba(0,0,0,.1);
+}
+.epf .table-header{
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  color:#fff; padding:25px 30px;
+  font-size:20px; font-weight:600; display:flex; align-items:center;
+}
+.epf .table-header-icon{ margin-right:15px; font-size:24px; }
+.epf .table-content{ max-height:500px; overflow-y:auto; }
+
+.epf table{ width:100%; border-collapse: collapse; }
+.epf th{
+  background:#f8fafc; padding:20px; text-align:left; font-weight:600; color:#374151;
+  border-bottom:2px solid #e5e7eb; position: sticky; top: 0; z-index:10;
+}
+.epf td{ padding:20px; border-bottom:1px solid #f3f4f6; color:#6b7280; font-weight:500; }
+.epf tr:hover{ background: linear-gradient(135deg,#f8fafc,#f1f5f9); }
+.epf .due.danger{ color:#ef4444; font-weight:600 }
+.epf .due.warn{ color:#f59e0b; font-weight:600 }
+
+/* Status badges */
+.epf .status-badge{
+  padding:8px 16px; border-radius:25px; font-size:12px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.5px;
+}
+.epf .status-paid{ background:linear-gradient(135deg,#d1fae5,#a7f3d0); color:#065f46; }
+.epf .status-pending{ background:linear-gradient(135deg,#fef3c7,#fde68a); color:#92400e; }
+.epf .status-overdue{ background:linear-gradient(135deg,#fee2e2,#fecaca); color:#dc2626; }
+
+/* Buttons */
+.epf .action-buttons{ display:flex; gap:10px; }
+.epf .btn{
+  padding:8px 16px; border:none; border-radius:8px; font-weight:600; cursor:pointer;
+  transition:all .3s ease; text-decoration:none; display:inline-block; text-align:center;
+  font-size:12px; color:#fff;
+}
+.epf .btn:hover{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.2); }
+.epf .btn-pay{ background:linear-gradient(135deg,#10b981,#059669); }
+.epf .btn-view{ background:linear-gradient(135deg,#3b82f6,#2563eb); }
+/* New: neutral secondary button (used in modals' Cancel) */
+.epf .btn-secondary{ background:linear-gradient(135deg,#f3f4f6,#e5e7eb); color:#374151; }
+
+/* Sidebar column */
+.epf .sidebar-content{ display:flex; flex-direction:column; gap:20px; }
+.epf .quick-actions{
+  background:#fff; border-radius:20px; padding:25px;
+  box-shadow:0 10px 30px rgba(0,0,0,.1);
+}
+.epf .quick-actions h3{
+  font-size:18px; font-weight:600; color:#333; margin-bottom:20px; display:flex; align-items:center;
+}
+.epf .quick-actions h3::before{ content:'⚡'; margin-right:10px; font-size:20px; }
+.epf .action-btn{
+  width:100%; padding:15px 20px; margin-bottom:15px; border:none; border-radius:12px; font-weight:600; cursor:pointer;
+  transition:all .3s ease; display:flex; align-items:center; justify-content:center; font-size:14px;
+}
+.epf .action-btn-primary{ background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; }
+.epf .action-btn-secondary{ background:linear-gradient(135deg,#f3f4f6,#e5e7eb); color:#374151; }
+
+/* Modals */
+.epf .modal{
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,.7); z-index:1000; justify-content:center; align-items:center;
+}
+.epf .modal.active{ display:flex; }
+.epf .modal-content{
+  background:#fff; border-radius:20px; padding:30px; width:90%; max-width:500px;
+  box-shadow:0 20px 60px rgba(0,0,0,.3); animation: epf-modalSlideIn .3s ease-out;
+}
+@keyframes epf-modalSlideIn { from{opacity:0;transform:translateY(-50px) scale(.9)} to{opacity:1;transform:translateY(0) scale(1)} }
+.epf .modal-header{
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
+  padding-bottom:15px; border-bottom:2px solid #f0f0f0;
+}
+.epf .modal-title{ font-size:24px; font-weight:700; color:#333; }
+.epf .close-btn{ background:none; border:none; font-size:24px; cursor:pointer; color:#666; transition:color .3s ease; }
+.epf .close-btn:hover{ color:#ef4444; }
+
+.epf .mb{ margin-bottom:20px; }
+.epf .summary-box{ background:#f8fafc; padding:20px; border-radius:10px; margin-bottom:20px; }
+.epf .summary-box .row{ display:flex; justify-content:space-between; margin-bottom:10px; }
+.epf .summary-box .row.total{ font-weight:700; font-size:16px; padding-top:10px; border-top:2px solid #e5e7eb; }
+.epf .summary-box .ok{ color:#059669; }
+.epf .dual{ display:flex; gap:15px; }
+.epf .big{ flex:1; padding:15px; }
+.epf .mt{ margin-top:30px; }
+
+/* Clean up: old header classes no longer used (safe to remove if present)
+   .epf .page-header, .epf .page-title, .epf .page-icon, .epf .page-subtitle { } */

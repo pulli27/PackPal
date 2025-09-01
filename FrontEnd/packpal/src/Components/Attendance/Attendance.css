@@ -1,0 +1,151 @@
+/* Reuse the same look as SalaryCal; scoped where helpful */
+
+/* Layout offset for sidebar */
+.Attendance { padding-left: 280px; }
+@media (max-width:1024px){ .Attendance { padding-left: 0; } }
+
+/* Container */
+.Attendance .container {
+  max-width: 1400px;
+  margin: 0 auto;
+  background: rgba(255,255,255,0.95);
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+/* Header */
+.Attendance .container h1{
+  font-size: 3rem;
+  font-weight: 700; 
+  margin-bottom: 10px;
+}
+.Attendance .container p{
+  font-size: 1.2rem;
+  opacity: 0.9;
+  margin-left: 330px;
+}
+
+/* Section */
+.Attendance .section{
+  background:#fff;
+  border-radius:15px;
+  padding:25px;
+  margin-bottom:25px;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+  border:1px solid rgba(102,126,234,.1);
+}
+.Attendance .section h2{
+  font-size:1.6rem;
+  margin-bottom:20px;
+  padding-bottom:10px;
+  color:#2c3e50;
+  border-bottom:3px solid #667eea;
+}
+
+/* Tabs INSIDE section */
+.Attendance .section .nav{
+  margin:15px 0;
+  padding:10px;
+  background:#f9f9ff;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,.05);
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+}
+.Attendance .section .tab-btn{
+    padding: 13px 30px;
+  border-radius: 5px;
+  background: #ffffff;
+  font-weight: 700;
+  color: #1f2937;
+  border: none;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+.Attendance .section .tab-btn:hover{  background: rgba(102,126,234,0.1);
+  color: #667eea; }
+.Attendance .section .tab-btn.active{
+background: linear-gradient(45deg,#354fc5,#15122f);
+  color: #fff;
+}
+
+/* Form */
+.Attendance .form-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:15px;
+  margin-bottom:20px;
+}
+.Attendance .form-group{ display:flex; flex-direction:column; }
+.Attendance label{ font-weight:600; color:#2c3e50; margin-bottom:5px; }
+.Attendance input,
+.Attendance select{
+  padding:12px;
+  border:2px solid #e0e6ed;
+  border-radius:8px;
+  font-size:14px;
+  transition:.3s;
+}
+.Attendance input:focus,
+.Attendance select:focus{
+  outline:none;
+  border-color:#667eea;
+  box-shadow:0 0 0 3px rgba(102,126,234,.1);
+}
+
+/* Buttons */
+.Attendance .btn{
+  padding: 12px 24px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform .3s ease, box-shadow .3s ease;
+  margin: 5px;
+  color: #fff;
+  margin-left: 925px;
+}
+.Attendance .btn:hover{ transform:translateY(-2px); box-shadow:0 10px 20px rgba(0,0,0,.2); }
+.Attendance .btn-primary{ background:linear-gradient(45deg,#354fc5,#15122f); color:#fff; }
+.Attendance .btn-success{ background:linear-gradient(45deg,#2281ad,#3f8d9e); color:#fff; }
+.Attendance .btn-warning{ background:linear-gradient(45deg,#22b845,#1bb82a); color:#fff; }
+.Attendance .btn-danger{  background:linear-gradient(45deg,#e72121,#e72121); color:#fff; }
+
+/* Table */
+.Attendance table{
+  width:100%; border-collapse:collapse; margin-top:20px; background:#fff;
+  border-radius:10px; overflow:hidden; box-shadow:0 5px 15px rgba(0,0,0,.08);
+}
+.Attendance th{
+  background:linear-gradient(45deg,#667eea,#764ba2);
+  color:#fff; padding:15px; text-align:left; font-weight:600;
+}
+.Attendance td{ padding:15px; border-bottom:1px solid #e0e6ed; }
+.Attendance tbody tr:hover{ background:#f8f9ff; }
+.Attendance .actions{
+  display:flex; gap:10px; justify-content:center; align-items:center;
+}
+.Attendance .actions .btn{
+  padding:8px 16px; margin:0; border-radius:8px; font-size:.85rem; box-shadow:none;
+}
+
+/* Modal (scoped) */
+.Attendance .salary-modal{
+  display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%;
+  background:rgba(0,0,0,.5); backdrop-filter:blur(5px);
+}
+.Attendance .salary-modal-content{
+  background:#fff; margin:10% auto; padding:30px; border-radius:20px; width:90%; max-width:500px;
+  box-shadow:0 20px 40px rgba(0,0,0,.3);
+}
+.Attendance .salary-modal-close{ color:#aaa; float:right; font-size:28px; font-weight:700; cursor:pointer; }
+.Attendance .salary-modal-close:hover{ color:#000; }
+
+/* Responsive */
+@media (max-width:768px){
+  .Attendance { padding-left:0; }
+  .Attendance .form-grid{ grid-template-columns:1fr; }
+  .Attendance .section .nav{ flex-direction:column; }
+}

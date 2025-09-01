@@ -1,0 +1,245 @@
+/* ========= Scope everything to .salary-page ========= */
+
+/* Layout offset for sidebar */
+.salary-page .salarycal { padding-left: 280px; }
+@media (max-width:1024px){
+  .salary-page .salarycal { padding-left: 0; }
+}
+
+/* Page / background (moved off body) */
+.salary-page {
+  min-height: 100vh;
+  padding: 24px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+}
+
+/* Container */
+.salary-page .container{
+  max-width:1400px;
+  margin:0 auto;
+  background:rgba(255,255,255,.95);
+  border-radius:20px;
+  padding:30px;
+  box-shadow:0 20px 40px rgba(0,0,0,.1);
+}
+
+/* Header */
+.salary-page .container h1{
+  text-align:center;
+  margin-bottom:30px;
+  font-size:2.2rem;
+  font-weight:700;
+  background:linear-gradient(45deg,#000,#000);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  color:#2c3e50; /* fallback */
+}
+
+/* (Optional) top chips row – if you ever use it */
+.salary-page .nav.chips{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:center;
+  margin:14px 0 20px;
+}
+.salary-page .chip{
+  border:none;
+  color:#fff;
+  padding:8px 14px;
+  border-radius:20px;
+  background:linear-gradient(45deg,#667eea,#764ba2);
+  font-weight:600;
+  cursor:default;
+}
+.salary-page .chip.active{ background:linear-gradient(45deg,#46d38b,#3bb273); }
+
+/* Small tools row */
+.salary-page .tools{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  margin:-6px 0 10px;
+}
+.salary-page .tools button{
+  border:none;
+  padding:6px 10px;
+  border-radius:8px;
+  background:#edf2ff;
+  color:#334;
+  cursor:pointer;
+}
+
+/* Section card */
+.salary-page .section{
+  background:#fff;
+  border-radius:15px;
+  padding:25px;
+  margin-bottom:25px;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+  border:1px solid rgba(102,126,234,.1);
+}
+.salary-page .section h2{
+  font-size:1.6rem;
+  margin-bottom:20px;
+  padding-bottom:10px;
+  color:#2c3e50;
+  border-bottom:3px solid #667eea;
+}
+
+/* Tabs INSIDE section */
+.salary-page .section .nav{
+  margin:15px 0;
+  padding:10px;
+  background:#f9f9ff;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,.05);
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+}
+.salary-page .section .tab-btn{
+  padding:8px 16px;
+  border-radius:6px;
+  background:#e5e7eb;
+  color:#1f2937;
+  border:none;
+  transition:all .3s ease;
+  cursor:pointer;
+  text-decoration: none; /* for NavLink anchor rendering */
+  display:inline-block;
+}
+.salary-page .section .tab-btn:hover{ background:#dbeafe; }
+.salary-page .section .tab-btn.active{
+  background:linear-gradient(45deg,#667eea,#764ba2);
+  color:#fff;
+}
+
+/* Forms */
+.salary-page .form-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:15px;
+  margin-bottom:20px;
+}
+.salary-page .form-group{ display:flex; flex-direction:column; }
+.salary-page label{ font-weight:600; color:#2c3e50; margin-bottom:5px; }
+.salary-page input,
+.salary-page select{
+  padding:12px;
+  border:2px solid #e0e6ed;
+  border-radius:8px;
+  font-size:14px;
+  transition:.3s;
+  background:#fff;
+}
+.salary-page input:focus,
+.salary-page select:focus{
+  outline:none;
+  border-color:hsl(229, 76%, 66%);
+  box-shadow:0 0 0 3px rgba(102,126,234,.1);
+}
+
+/* Buttons */
+.salary-page .btn{
+  padding:12px 24px;
+  border:none;
+  border-radius:25px;
+  cursor:pointer;
+  font-weight:600;
+  transition:transform .3s, box-shadow .3s, opacity .2s;
+  margin:5px;
+  color:#fff;
+  
+}
+.salary-page .btn:hover{ transform:translateY(-2px); box-shadow:0 10px 20px rgba(0,0,0,.2); }
+.salary-page .btn:disabled{ opacity:.6; cursor:not-allowed; box-shadow:none; transform:none; }
+.salary-page .btn-primary{ background:linear-gradient(45deg,#4b7bec,#6c5ce7); }
+.salary-page .btn-success{ background:linear-gradient(45deg,#11998e,#38ef7d); }
+.salary-page .btn-warning{ background:linear-gradient(45deg,#f093fb,#f5576c); }
+.salary-page .btn-danger{  background:linear-gradient(45deg,#fc466b,#3f5efb); }
+
+/* Action row */
+.salary-page .actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  
+}
+.salary-page .actions .btn{
+  padding:10px 18px;
+  border-radius:18px;
+  margin:0;
+}
+
+/* Mini calc panel */
+.salary-page .calc{
+  margin-top:18px;
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  color:#fff;
+  border-radius:12px;
+  padding:18px;
+}
+.salary-page .calc h3{ margin-bottom:10px; }
+.salary-page .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; }
+.salary-page .tile{ background:rgba(255,255,255,.12); border-radius:10px; padding:12px; text-align:center; }
+.salary-page .tile h4{ font-size:13px; opacity:.9; margin-bottom:6px; }
+.salary-page .tile .amt{ font-size:18px; font-weight:800; }
+
+/* Tables */
+.salary-page table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:20px;
+  background:#fff;
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:0 5px 15px rgba(0,0,0,.08);
+}
+.salary-page th{
+  background:linear-gradient(45deg,#667eea,#764ba2);
+  color:#fff;
+  padding:15px;
+  text-align:left;
+  font-weight:600;
+}
+.salary-page td{ padding:15px; border-bottom:1px solid #e0e6ed; }
+.salary-page tbody tr:hover{ background:#f8f9ff; }
+
+/* Modal (scoped) */
+.salary-page .salary-modal{
+  display:none;
+  position:fixed;
+  z-index:1000;
+  left:0; top:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,.5);
+  backdrop-filter:blur(5px);
+}
+.salary-page .salary-modal-content{
+  background:#fff;
+  margin:10% auto;
+  padding:30px;
+  border-radius:20px;
+  width:90%;
+  max-width:500px;
+  box-shadow:0 20px 40px rgba(0,0,0,.3);
+}
+.salary-page .salary-modal-close{
+  color:#aaa;
+  float:right;
+  font-size:28px;
+  font-weight:700;
+  cursor:pointer;
+}
+.salary-page .salary-modal-close:hover{ color:#000; }
+
+/* Responsive */
+@media (max-width:768px){
+  .salary-page .salarycal{ padding-left:0; }
+  .salary-page .form-grid{ grid-template-columns:1fr; }
+  .salary-page .section .nav{ flex-direction:column; }
+}
