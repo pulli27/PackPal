@@ -3,12 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./ProductList.css";
 
-/* ===================== ONE PLACE TO EDIT =====================
-   If you still get 404, your backend route is different.
-   Change this to your actual route, e.g.:
-   - "http://localhost:5002/users"
-   - "http://localhost:5002/api/products"
-   - "/products"  (if using CRA proxy)
+/* ===================== ONE PLACE TO EDIT =====================-[-[]]
 */
 const URL = "http://localhost:5000/carts";
 
