@@ -1,6 +1,11 @@
 /* ===== Scope everything to this page ===== */
 .epf, .epf * { box-sizing: border-box; }
 
+/* Root default font */
+.epf {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
+
 /* Align page with sidebar, like FinanceDashboard */
 .epf .container{
   max-width: 1400px;
@@ -21,13 +26,12 @@
   margin-top: -30px;
   text-align: center;
   margin-bottom: 20px;
-
 }
 .epf .content-header h1 {
   font-size: 3rem;
   font-weight: 700;
   margin-bottom: 10px;
-    color: #000;
+  color: #000;
 }
 .epf .content-header p {
   font-size: 1.2rem;
@@ -43,10 +47,10 @@
 }
 
 .epf .btn-pay{
-    width:150px;
-    height: 50px;
-    
+  width:150px;
+  height: 50px;
 }
+
 /* ---- Alert ---- */
 .epf .alert{
   padding: 20px; border-radius: 15px; margin-bottom: 30px;

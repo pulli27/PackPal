@@ -1,7 +1,9 @@
 /* src/Components/Dashboard/FinanceDashboard.css */
 /* Dashboard-only styles (no sidebar selectors here) */
 
-.dashboard-layout
+.dashboard-layout{
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
 
 .main-content {
   

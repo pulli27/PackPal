@@ -3,8 +3,15 @@
    =========================== */
 
 /* Layout wrapper (sidebar offset) */
-.salarycal { padding-left: 280px; background: #f6f7fb; min-height: 100vh; }
-@media (max-width: 1024px) { .salarycal { padding-left: 0; } }
+.salarycal { 
+  padding-left: 280px; 
+  background: #f6f7fb; 
+  min-height: 100vh; 
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
+@media (max-width: 1024px) { 
+  .salarycal { padding-left: 0; } 
+}
 
 /* Container */
 .salarycal .container {
