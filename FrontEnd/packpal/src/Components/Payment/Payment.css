@@ -1,0 +1,111 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+body {
+  /* Apply the blue gradient background */
+  background: linear-gradient(135deg, #454C86, #3B3F5C);
+  min-height: 100vh;
+  padding: 20px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+header h1 {
+  color: #ffffff; /* white text for contrast */
+}
+
+header input {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.card p {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.card h2 {
+  margin-top: 5px;
+  color: #0f172a;
+}
+
+.table-container {
+  background: #fff;
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.table-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.table-actions input,
+.table-actions select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead {
+  background: #f1f5f9;
+}
+
+th, td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status.paid {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status.pending {
+  background: #fef9c3;
+  color: #ca8a04;
+}
+
+.status.failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
