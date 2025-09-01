@@ -1,11 +1,13 @@
+// src/Components/ItemInventory/ItemInventory.jsx
 import React, { useEffect, useRef } from "react";
 import "./ItemInventory.css";
 import Sidebar from "../Sidebar/Sidebar";
 import axios from "axios";
 
-const fetchHandler = async () =>{
-  return await axios.get(URL).then((res) => res.data);
-}
+/* ===== Backend config ===== */
+const USE_BACKEND = false; // set to true to load from API
+const URL = "http://localhost:5000/inventory"; // change to your endpoint (expects {items:[...]} response)
+
 export default function ItemInventory() {
   // keep inventory & editing index in refs so handlers always read the latest values
   const inventoryRef = useRef([
@@ -461,6 +463,30 @@ export default function ItemInventory() {
     // Initial render & ensure form hidden initially (if your CSS doesn't already)
     showInlineForm(false);
     renderTable();
+
+    // ===== OPTIONAL: Load from backend after initial render =====
+    async function loadFromBackend() {
+      if (!USE_BACKEND) return;
+      try {
+        const res = await axios.get(URL);
+        const items = Array.isArray(res?.data?.items) ? res.data.items : [];
+        // Normalize fields if needed
+        inventoryRef.current = items.map((it) => ({
+          id: String(it.id ?? it._id ?? ""),
+          name: it.name ?? "",
+          description: it.description ?? "",
+          quantity: Number(it.quantity ?? 0),
+          unitPrice: Number(it.unitPrice ?? 0),
+          avgDailyUsage: Number(it.avgDailyUsage ?? 0),
+          leadTimeDays: Number(it.leadTimeDays ?? 0),
+        }));
+        renderTable();
+      } catch (err) {
+        console.error("Failed to fetch inventory:", err);
+        // keep seed data on failure
+      }
+    }
+    loadFromBackend();
 
     // Cleanup — remove listeners so Strict Mode dev double-mount won't double-bind
     return () => {
