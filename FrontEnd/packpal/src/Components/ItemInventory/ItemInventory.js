@@ -1,7 +1,11 @@
 import React, { useEffect, useRef } from "react";
 import "./ItemInventory.css";
 import Sidebar from "../Sidebar/Sidebar";
+import axios from "axios";
 
+const fetchHandler = async () =>{
+  return await axios.get(URL).then((res) => res.data);
+}
 export default function ItemInventory() {
   // keep inventory & editing index in refs so handlers always read the latest values
   const inventoryRef = useRef([

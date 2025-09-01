@@ -110,7 +110,7 @@ tbody tr:nth-child(5){animation-delay:.5s;}
   background-color: rgba(0,0,0,.5); backdrop-filter: blur(5px);
 }
 .modal-content {
-  background: #fff; margin: 5% auto; padding: 0; border-radius: 20px;
+  background: #fff; margin: 5% auto; padding: 25px; border-radius: 20px;
   width: 90%; max-width: 600px; box-shadow: 0 20px 40px rgba(0,0,0,.2); animation: modalSlideIn .3s ease;
 }
 @keyframes modalSlideIn { from { opacity: 0; transform: translateY(-50px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
