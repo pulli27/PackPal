@@ -295,19 +295,19 @@ export default function Analytics() {
             <ul className="list">
               <li>
                 <span>HB-001</span> Leather Handbag <em>Units:</em> 210{" "}
-                <strong>$19,950</strong>
+                <strong>LKR19,950</strong>
               </li>
               <li>
                 <span>BP-014</span> Urban Backpack <em>Units:</em> 180{" "}
-                <strong>$16,200</strong>
+                <strong>LKR16,200</strong>
               </li>
               <li>
                 <span>TT-022</span> Canvas Tote <em>Units:</em> 125{" "}
-                <strong>$8,750</strong>
+                <strong>LKR8,750</strong>
               </li>
               <li>
                 <span>AC-105</span> Premium Strap <em>Units:</em> 90{" "}
-                <strong>$4,320</strong>
+                <strong>LKR4,320</strong>
               </li>
             </ul>
           </div>
@@ -323,18 +323,17 @@ export default function Analytics() {
           <div className="report-kpis">
             <div className="rkpi">
               <small>Revenue</small>
-              <strong>$92,450</strong>
+              <strong>LKR 92,450</strong>
             </div>
             <div className="rkpi">
               <small>Orders</small>
-              <strong>1,245</strong>
+              <strong>LKR 1,245</strong>
             </div>
             <div className="rkpi">
               <small>Active Users</small>
-              <strong>8,432</strong>
+              <strong>M  8,432</strong>
             </div>
           </div>
-
           <h3>Orders by Category</h3>
           <table className="tbl">
             <thead>
