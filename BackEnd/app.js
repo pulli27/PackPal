@@ -1,10 +1,11 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const cors = require("cors");
+
 
 const router = require("./Routes/FinanceSalaryRoute");
 
 const app = express();
+const cors = require("cors");
 
 // Middleware
 app.use(cors());

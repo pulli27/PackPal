@@ -3,7 +3,7 @@ const { Schema } = mongoose;
 
 const financeSchema = new Schema(
   {
-    EmpId: { type: Number, required: true },
+    EmpId: { type: String, required: true },
     Emp_Name: { type: String },
     Designation: { type: String },
     Epf_No: { type: String },

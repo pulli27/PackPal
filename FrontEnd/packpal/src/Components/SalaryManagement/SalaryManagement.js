@@ -336,7 +336,7 @@ function SalaryManagement() {
   window.transferSalary = transferSalary;
 
   return (
-    <div className="salarymanage page-wrap">
+    <div className="salarycal">
       <Sidebar />
 
       <div className="container">
