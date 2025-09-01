@@ -1,50 +1,153 @@
 :root{
   --bg:#f6f7fb; --card:#fff; --text:#0f172a; --muted:#6b7280; --border:#e5e7eb;
   --brand:#2563eb; --brand-600:#1d4ed8;
-  --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
   --ready:#6d8bff; --not:#cbd5ff;
 }
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);
-  font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial}
 
-.topbar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);
-  display:flex;justify-content:space-between;align-items:center;padding:14px 20px;z-index:10}
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial
+}
+
+/* ===== Top bar ===== */
+.topbar{
+  position:sticky;
+  top:0;
+  background:#fff;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:14px 20px;
+  z-index:10
+}
 .page-title{margin:0;font-size:22px}
 .topbar-actions{display:flex;gap:10px;align-items:center}
 .avatar{border:none;background:#eef2ff;border-radius:999px;padding:8px 10px;cursor:pointer}
 
+/* ===== Container ===== */
 .container{max-width:1200px;margin:0 auto;padding:20px}
 .section-head{display:flex;justify-content:space-between;align-items:center;margin:8px 0 16px}
 .title-with-icon{display:flex;gap:10px;align-items:center}
 .emoji{font-size:18px}
 
-.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);
-  background:#fff;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+/* ===== Buttons ===== */
+.btn{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border:1px solid var(--border);
+  background:#fff;
+  padding:10px 14px;
+  border-radius:10px;
+  font-weight:600;
+  cursor:pointer
+}
 .btn:hover{border-color:#cbd5e1}
-.btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
-.btn-primary:hover{background:var(--brand-600)}
+.btn-primary{background:#2563eb;border-color:#2563eb;color:#fff}
+.btn-primary:hover{background:#1d4ed8}
 .icon{font-size:16px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px}
 
-/* Filters */
-.filters{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:12px}
+/* ===== Card ===== */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px
+}
+
+/* ===== Filters ===== */
+.filters{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+  padding:12px
+}
 .filters label{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
-.filters input,.filters select{border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);background:#fff}
+.filters input,.filters select{
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px;
+  color:var(--text);
+  background:#fff
+}
 
-/* KPIs */
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:16px 0}
+/* ===== KPIs ===== */
+.kpis{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:16px;
+  margin:16px 0
+}
 .kpi{padding:14px}
 .kpi-value{font-size:28px;font-weight:800;margin:8px 0 0}
 .muted{color:var(--muted)}
 
-/* Already had this for bar tooltip positioning */
-.bar-wrap { position: relative; padding: 12px; }
+/* ===== Charts ===== */
+.charts{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin:4px 0 16px
+}
 
-/* NEW: position the donut tooltip relative to the canvas holder */
-.donut-canvas { position: relative; display: inline-block; }
+/* Chart headers (title closer to top) */
+.card-header{
+  padding:6px 14px;        /* reduced */
+  border-bottom:1px solid var(--border)
+}
+.card-header h3{margin:0}
 
-/* Tooltip style (shared by both charts) */
+/* --- Bar Chart --- */
+.bar-wrap{
+  position:relative;
+  padding:6px 12px 16px;   /* less top padding */
+}
+.bar-wrap canvas{
+  display:block;
+  margin:0 auto;
+  height:auto
+}
+
+/* --- Donut Chart --- */
+.donut-wrap{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  padding:10px
+}
+.donut-canvas{
+  position:relative;
+  display:inline-block
+}
+.donut-canvas canvas{
+  display:block;
+  margin:0 auto;
+  height:auto
+}
+.legend{
+  display:flex;
+  gap:16px;
+  align-items:center;
+  font-weight:600;
+  color:#374151;
+  margin-top:6px
+}
+.dot{
+  display:inline-block;
+  width:12px;
+  height:12px;
+  border-radius:3px;
+  margin-right:6px
+}
+.dot-ready{background:var(--ready)}
+.dot-not{background:var(--not)}
+
+/* ===== Tooltip ===== */
 .chart-tooltip{
   position:absolute;
   pointer-events:none;
@@ -54,53 +157,36 @@ body{margin:0;background:var(--bg);color:var(--text);
   border-radius:8px;
   font-size:12px;
   box-shadow:0 4px 14px rgba(0,0,0,.18);
-  transform: translate(-50%, -110%);
-  white-space:nowrap;
+  transform:translate(-50%,-110%);
+  white-space:nowrap
 }
-.chart-tooltip .tip-title{ font-weight:700; margin-bottom:2px; }
+.chart-tooltip .tip-title{font-weight:700;margin-bottom:2px}
 
-
-/* Charts */
-.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:4px 0 16px}
-.card-header{padding:12px 14px;border-bottom:1px solid var(--border)}
-.donut-wrap{display:flex;align-items:center;gap:18px;padding:12px}
-.legend{display:flex;flex-direction:column;gap:10px;font-weight:600;color:#374151}
-.dot{display:inline-block;width:12px;height:12px;border-radius:999px;margin-right:8px}
-.dot-ready{background:var(--ready)} .dot-not{background:var(--not)}
-
-/* wrapper for bar canvas so tooltip can be absolutely positioned */
-.bar-wrap { position: relative; padding: 12px; }
-
-/* simple tooltip */
-.chart-tooltip{
-  position:absolute;
-  pointer-events:none;
-  background:#111;
-  color:#fff;
-  padding:6px 8px;
-  border-radius:8px;
-  font-size:12px;
-  box-shadow:0 4px 14px rgba(0,0,0,.18);
-  transform: translate(-50%, -110%);
-  white-space:nowrap;
-}
-.chart-tooltip .tip-title{ font-weight:700; margin-bottom:2px; }
-
-
-/* Table */
+/* ===== Table ===== */
 .table-card{padding:6px}
 .table-wrap{overflow:auto}
 .table{width:100%;border-collapse:separate;border-spacing:0}
-.table th,.table td{padding:12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.table th,.table td{
+  padding:12px;
+  border-bottom:1px solid var(--border);
+  text-align:left;
+  vertical-align:top
+}
 .table th{color:var(--muted);font-size:12px;background:#fafafa}
-.badge{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.badge{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700
+}
 .badge.green{background:#dcfce7;color:#166534}
 .badge.red{background:#fee2e2;color:#991b1b}
 .badge.amber{background:#fef3c7;color:#92400e}
 .badge.ready{background:#eef2ff;color:#1e3a8a;border:1px solid #dbeafe}
 .badge.not{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
 
-/* Print styles for PDF */
+/* ===== Print ===== */
 @media print{
   .topbar, .section-head .btn{display:none!important}
   body{background:#fff}

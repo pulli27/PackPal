@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./SewingInstruction.css"; // ✅ correct relative import
 import Sidebar from "../Sidebar/Sidebar"; 
+import axios from "axios";
 
+const URL = "http://Localhost:5000/products";
+
+const fetchHandler = async () =>{
+  return await axios.get(URL).then((res) => res.data);
+}
 export default function SewingInstruction() {
   // ---------- initial data ----------
   const seed = useMemo(
@@ -205,7 +211,7 @@ export default function SewingInstruction() {
           </button>
         </div>
       </header>
-
+     
       <main className="container">
         <section className="section-head">
           <h2>Sewing Instructions</h2>
@@ -391,5 +397,6 @@ export default function SewingInstruction() {
         </div>
       </dialog>
     </div>
+    
   );
 }

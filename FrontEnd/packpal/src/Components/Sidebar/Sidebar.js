@@ -1,29 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import "./Sidebar.css";
 import { NavLink } from "react-router-dom";
+import "./Sidebar.css";
 
-
-
-/**
- * Sidebar
- * - Mobile close on outside click
- * - Active link highlight
- * - LocalStorage remembers last page
- */
-export default function Sidebar({ initialActive = "reports", onNavigate, onLogout }) {
-  const [active, setActive] = useState(initialActive);
+export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const sidebarRef = useRef(null);
 
-  // Restore last page
-  useEffect(() => {
-    try {
-      const last = localStorage.getItem("financehub:lastPage");
-      if (last) setActive(last);
-    } catch {}
-  }, []);
-
-  // Close on outside click (mobile)
+  // close on outside click (mobile)
   useEffect(() => {
     const handleDocClick = (e) => {
       if (window.innerWidth <= 768) {
@@ -41,119 +24,44 @@ export default function Sidebar({ initialActive = "reports", onNavigate, onLogou
     return () => document.removeEventListener("click", handleDocClick);
   }, []);
 
-  const titleMap = {
-    dashboard: "Dashboard",
-    salary: "Salary Calculator",
-    epf: "EPF/ETF Management",
-    reports: "Financial Reports",
-    revenue: "Revenue & Sales",
-    balance: "Balance Sheet",
-    settings: "Settings",
-  };
-
-  const navigate = (key) => {
-    setActive(key);
-    try {
-      localStorage.setItem("financehub:lastPage", key);
-    } catch {}
-    if (window.showNotification) {
-      window.showNotification(`Opening ${titleMap[key] || "Feature"}...`, "info");
-    }
-    onNavigate?.(key);
-  };
-
-  const logout = () => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!window.confirm("Are you sure you want to logout?")) return;
-    if (window.showNotification) window.showNotification("Logging out...", "info");
-    setTimeout(() => {
-      alert("You have been logged out successfully!");
-      onLogout?.();
-    }, 800);
-  };
-
   return (
-    <aside
-      ref={sidebarRef}
-      id="sidebar"
-      className={`sidebar ${open ? "active" : ""}`}
-    >
+    <aside ref={sidebarRef} id="sidebar" className={`sidebar ${open ? "active" : ""}`}>
       <div className="sidebar-header">
-        <h2>💰 PackPal</h2>
+        <h2>🛍️ PackPal</h2>
         <p>Product Dashboard Portal</p>
       </div>
 
       <nav className="sidebar-nav">
-        <NavLink to="/maindashboard"
-          className={`nav-item ${active === "dashboard" ? "active" : ""}`}
-          onClick={(e) => { e.preventDefault();
-            navigate("dashboard");}}
-        >
+        {/* IMPORTANT: no preventDefault — let NavLink navigate */}
+        <NavLink to="/maindashboard" className={({isActive}) => `nav-item ${isActive ? "active":""}`}>
           <i className="fas fa-chart-line" /> Dashboard
         </NavLink>
 
-        <NavLink
-          to="/sewing"
-          className={`nav-item ${active === "sewing" ? "active" : ""}`}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("sewing");
-          }}
-        >
+        <NavLink to="/sewing" className={({isActive}) => `nav-item ${isActive ? "active":""}`}>
           <i className="fas fa-cut" /> Sewing Instruction
         </NavLink>
-
-        <NavLink
-          to="/employee"
-          className={`nav-item ${active === "employee" ? "active" : ""}`}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("employee");
-          }}
-        >
-          <i className="fas fa-shield-alt" /> Quality Check
+        
+        <NavLink to="/quality" className={({isActive}) => `nav-item ${isActive ? "active":""}`}>
+          <i className="fas fa-shield" /> Quality Check
         </NavLink>
 
-        <NavLink
-          to="/reports"
-          className={`nav-item ${active === "reports" ? "active" : ""}`}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("reports");
-          }}
-        >
-          <i className="fas fa-boxes" /> Reports
-        </NavLink>
-
-        <NavLink
-          to="/quality"
-          className={`nav-item ${active === "quality" ? "active" : ""}`}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("quality");
-          }}
-        >
+        <NavLink to="/employee" className={({isActive}) => `nav-item ${isActive ? "active":""}`}>
           <i className="fas fa-users" /> Employee
         </NavLink>
 
-       
+        <NavLink to="/reports" className={({isActive}) => `nav-item ${isActive ? "active":""}`}>
+          <i className="fas fa-boxes" /> Reports
+        </NavLink>
 
         <div className="nav-divider" />
 
-        <a
-          href="#"
-          className={`nav-item ${active === "settings" ? "active" : ""}`}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("settings");
-          }}
-        >
-          <i className="fas fa-cog" /> Settings
-        </a>
+        <NavLink to="/settings" className={({isActive}) => `nav-item ${isActive ? "active":""}`}>
+          <i className="fas fa-cog" /> Setting
+        </NavLink>
       </nav>
 
       <div className="logout-section">
-        <button className="logout-btn" type="button" onClick={logout}>
+        <button className="logout-btn" type="button" onClick={() => alert("Logged out")}>
           <i className="fas fa-sign-out-alt" /> Logout
         </button>
       </div>

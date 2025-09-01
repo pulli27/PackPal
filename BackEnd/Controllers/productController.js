@@ -92,7 +92,17 @@ const updateProduct = async (req, res, next) => {
   }
 };
 
-w
+// DELETE /inventories/:id
+const deleteProduct = async (req, res) => {
+  try {
+    const deleted = await Product.findByIdAndDelete(req.params.id).lean();
+    if (!deleted) return res.status(404).json({ message: "Product not found" });
+    return res.status(200).json({ message: "Product deleted successfully", deleteProduct: deleted });
+  } catch (err) {
+    console.error("deleteProduct error:", err);
+    return res.status(500).json({ message: "Unable to delete product" });
+  }
+};
 
 // Exports
 exports.getAllProducts = getAllProducts;

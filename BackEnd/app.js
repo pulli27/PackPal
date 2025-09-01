@@ -5,9 +5,11 @@ const mongoose = require("mongoose");
 const router = require("./Routes/productRoutes");
 
 const app = express();
+const cors = require("cors");
 
 //Middleware
 app.use(express.json());  //postman eke insert karan data tika jason ekt responsive wen widiht hdn ek thm wenneh meke
+app.use(cors());
 app.use("/products",router);
 
 //app.use("/",(req, res, next) => {

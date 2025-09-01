@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import "./Employee.css";
+import Sidebar from "../Sidebar/Sidebar";
 
 export default function Employee() {
   // ----- data (replace with API later) -----
@@ -115,6 +116,7 @@ export default function Employee() {
 
   return (
     <div>
+      <Sidebar/>
       <header className="topbar">
         <h1 className="page-title">Inventory</h1>
         <div className="topbar-actions">
