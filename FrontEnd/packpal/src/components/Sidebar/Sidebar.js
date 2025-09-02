@@ -11,7 +11,7 @@ function Sidebar()  {
           <Link to="/dashboard">📊 Dashboard</Link>
         </li>
         <li>
-          <Link to="/products">🛒 Products</Link>
+          <Link to="/products">🛒 Products List</Link>
         </li>
         <li>
           <Link to="/discounts">💸 Discounts</Link>

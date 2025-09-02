@@ -3,8 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./ProductList.css";
 
-/* ===================== ONE PLACE TO EDIT =====================-[-[]]
-*/
+/* ===================== ONE PLACE TO EDIT ===================== */
 const URL = "http://localhost:5000/carts";
 
 /* ===================== Helpers ===================== */
@@ -26,12 +25,11 @@ const effectivePrice = (p) => {
 };
 const saving = (p) => Math.max(0, Number(p?.price || 0) - effectivePrice(p));
 
-// Normalize server → UI (handles Mongo _id or SQL id)
 const toUI = (row) => ({
   id: String(row?.id ?? row?._id ?? row?.productId ?? Math.random().toString(36).slice(2, 10)),
   name: row?.name ?? "Unnamed",
   category: row?.category ?? "",
-  img: row?.img ?? "",
+  img: row?.img ?? "", // "images/<file>" or URL
   price: Number(row?.price ?? 0),
   stock: Number(row?.stock ?? 0),
   rating: Number(row?.rating ?? 0),
@@ -39,13 +37,13 @@ const toUI = (row) => ({
   discountValue: Number(row?.discountValue ?? 0),
 });
 
-// Accept array or common wrappers
 const unpackList = (payload) =>
   Array.isArray(payload) ? payload : payload?.products ?? payload?.items ?? payload?.data ?? [];
 
 /* ===================== Validation helpers ===================== */
-const isValidUrl = (s) => {
-  if (!s) return true; // optional
+const isAcceptableImageRef = (s) => {
+  if (!s) return true;
+  if (s.startsWith("images/")) return true; // served from /public/images
   try {
     const u = new URL(s);
     return u.protocol === "http:" || u.protocol === "https:";
@@ -64,11 +62,8 @@ const validateProduct = (f) => {
   const rating = Number(f.rating);
 
   if (!name) errs.name = "Product name is required.";
-  if (String(price).trim() === "" || Number.isNaN(price)) {
-    errs.price = "Enter a valid price.";
-  } else if (price < 0) {
-    errs.price = "Price must be ≥ 0.";
-  }
+  if (String(price).trim() === "" || Number.isNaN(price)) errs.price = "Enter a valid price.";
+  else if (price < 0) errs.price = "Price must be ≥ 0.";
 
   if (String(stock).trim() !== "") {
     const iv = parseInt(stock, 10);
@@ -76,18 +71,13 @@ const validateProduct = (f) => {
   }
 
   if (String(rating).trim() !== "") {
-    if (Number.isNaN(rating) || rating < 0 || rating > 5) {
-      errs.rating = "Rating must be between 0 and 5.";
-    }
+    if (Number.isNaN(rating) || rating < 0 || rating > 5) errs.rating = "Rating must be 0–5.";
   }
 
-  if (img && !isValidUrl(img)) {
-    errs.img = "Image must be a valid http(s) URL.";
+  if (img && !isAcceptableImageRef(img)) {
+    errs.img = "Pick from /public/images or paste a valid http(s) URL.";
   }
-
-  if (category.length > 50) {
-    errs.category = "Category is too long (max 50 chars).";
-  }
+  if (category.length > 50) errs.category = "Category is too long (max 50 chars).";
 
   return errs;
 };
@@ -110,6 +100,7 @@ function ProductModal({ open, onClose, onSave, product }) {
   });
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
+  const [previewSrc, setPreviewSrc] = useState("");
 
   const syncValidate = (next) => {
     const e = validateProduct(next);
@@ -130,42 +121,46 @@ function ProductModal({ open, onClose, onSave, product }) {
       setForm(initial);
       setTouched({});
       syncValidate(initial);
+      if (initial.img?.startsWith("images/")) setPreviewSrc("/" + initial.img);
+      else setPreviewSrc(initial.img || "");
     }
   }, [open, product]);
 
   if (!open) return null;
 
   const hasErrors = Object.keys(errors).length > 0;
-
   const setField = (key, val) => {
     const next = { ...form, [key]: val };
     setForm(next);
     syncValidate(next);
+    if (key === "img") setPreviewSrc(val?.startsWith("images/") ? "/" + val : val);
   };
-
   const markTouched = (key) => setTouched((t) => ({ ...t, [key]: true }));
-
   const fieldClass = (key) => (touched[key] && errors[key] ? "input error" : "input");
-
   const errorText = (key) =>
     touched[key] && errors[key] ? <div className="err-text">{errors[key]}</div> : null;
+
+  // NOTE: This only records a relative path. Make sure the file is present under /public/images.
+  const handlePickFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const rel = `images/${file.name}`;
+    setField("img", rel);
+    setPreviewSrc("/" + rel);
+  };
 
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-head">
           <h3>{product ? `Edit Product #${product.id}` : "Add Product"}</h3>
-          <button className="x" onClick={onClose}>
-            ×
-          </button>
+          <button className="x" onClick={onClose}>×</button>
         </div>
 
         <div className="modal-body">
           <form className="grid grid-3" onSubmit={(e) => e.preventDefault()}>
             <div>
-              <label>
-                Product Name <span style={{ color: "#b91c1c" }}>*</span>
-              </label>
+              <label>Product Name <span style={{ color: "#b91c1c" }}>*</span></label>
               <input
                 className={fieldClass("name")}
                 value={form.name}
@@ -192,22 +187,24 @@ function ProductModal({ open, onClose, onSave, product }) {
             </div>
 
             <div>
-              <label>Image URL</label>
-              <input
-                className={fieldClass("img")}
-                placeholder="https://example.com/image.jpg"
-                value={form.img}
-                onChange={(e) => setField("img", e.target.value)}
-                onBlur={() => markTouched("img")}
-                inputMode="url"
-              />
+              <label>Image (pick from /public/images)</label>
+              <input type="file" accept="image/*" onChange={handlePickFile} />
+              <small className="muted">Saved as <code>{form.img || "images/… (none)"}</code></small>
+              {previewSrc ? (
+                <div style={{ marginTop: 8 }}>
+                  <img
+                    src={previewSrc}
+                    alt=""
+                    className="pimg"
+                    onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")}
+                  />
+                </div>
+              ) : null}
               {errorText("img")}
             </div>
 
             <div>
-              <label>
-                Price (LKR) <span style={{ color: "#b91c1c" }}>*</span>
-              </label>
+              <label>Price (LKR) <span style={{ color: "#b91c1c" }}>*</span></label>
               <input
                 className={fieldClass("price")}
                 type="number"
@@ -253,27 +250,16 @@ function ProductModal({ open, onClose, onSave, product }) {
         </div>
 
         <div className="modal-foot">
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
+          <button className="btn" onClick={onClose}>Cancel</button>
           <button
             className="btn primary"
             disabled={hasErrors}
             title={hasErrors ? "Fix validation errors to save" : "Save"}
             onClick={() => {
-              // mark all touched so errors show if user tries early
-              setTouched({
-                name: true,
-                category: true,
-                img: true,
-                price: true,
-                stock: true,
-                rating: true,
-              });
+              setTouched({ name: true, category: true, img: true, price: true, stock: true, rating: true });
               const errs = validateProduct(form);
               setErrors(errs);
               if (Object.keys(errs).length > 0) return;
-
               const payload = {
                 name: form.name.trim(),
                 category: form.category.trim(),
@@ -300,6 +286,10 @@ export default function ProductList() {
   const [err, setErr] = useState("");
   const [modal, setModal] = useState({ open: false, product: null });
 
+  // Customer view search
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState(""); // applied when user presses Search
+
   const fetchAll = async () => {
     setLoading(true);
     setErr("");
@@ -321,11 +311,21 @@ export default function ProductList() {
     fetchAll();
   }, []);
 
-  // Build sequential numbers 1..N for display only
   const productsWithSeq = useMemo(
     () => products.map((p, i) => ({ ...p, seq: i + 1 })),
     [products]
   );
+
+  // Customer view filtered list
+  const customerFiltered = useMemo(() => {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) return productsWithSeq;
+    return productsWithSeq.filter(
+      (p) =>
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
+    );
+  }, [productsWithSeq, query]);
 
   const discounted = useMemo(
     () =>
@@ -335,35 +335,17 @@ export default function ProductList() {
     [productsWithSeq]
   );
 
-  const exportProducts = () => {
-    const blob = new Blob([JSON.stringify(products, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "products.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const onSaveModal = async (payload) => {
     try {
       if (!modal.product) {
-        // CREATE
-        await axios.post(URL, payload, {
-          headers: { "Content-Type": "application/json" },
-        });
+        await axios.post(URL, payload, { headers: { "Content-Type": "application/json" } });
       } else {
-        // UPDATE (use REAL backend id)
         await axios.put(`${URL}/${modal.product.id}`, payload, {
           headers: { "Content-Type": "application/json" },
         });
       }
-      await fetchAll(); // refresh after save
+      await fetchAll();
       setModal({ open: false, product: null });
-
-      // Notify other pages (e.g., dashboard) to refetch
       window.dispatchEvent(new Event("products:changed"));
     } catch (e) {
       const msg =
@@ -373,7 +355,7 @@ export default function ProductList() {
       alert(msg);
     }
   };
-
+//delete function
   const onDelete = async (realId) => {
     if (!window.confirm("Delete this product?")) return;
     try {
@@ -389,22 +371,35 @@ export default function ProductList() {
     }
   };
 
+  const imgSrc = (val) => {
+    if (!val) return "https://via.placeholder.com/64";
+    if (val.startsWith("images/")) return "/" + val;
+    return val;
+  };
+
   return (
     <div className="content products-page">
       <h1 className="page-title">Products</h1>
       <p className="muted">Customer listing + Admin CRUD</p>
 
       {loading && <div className="muted">Loading products…</div>}
-      {err && (
-        <div className="error" style={{ color: "#b91c1c", marginBottom: 8 }}>
-          {err}
-        </div>
-      )}
+      {err && <div className="error" style={{ color: "#b91c1c", marginBottom: 8 }}>{err}</div>}
 
-      {/* Customer Listing */}
+      {/* Customer Listing with SEARCH and stacked price cell */}
       <section className="section">
         <div className="head">
           <h3>Product Listing (Customer View)</h3>
+          <div className="actions">
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") setQuery(searchInput); }}
+              placeholder="Search by name or category"
+              style={{ minWidth: 240 }}
+            />
+            <button className="btn" onClick={() => setQuery(searchInput)}>Search</button>
+            <button className="btn" onClick={() => { setSearchInput(""); setQuery(""); }}>Clear</button>
+          </div>
         </div>
         <div className="body">
           <table>
@@ -414,12 +409,10 @@ export default function ProductList() {
                 <th>PRODUCT</th>
                 <th>CATEGORY</th>
                 <th className="right">PRICE</th>
-                <th className="center">DISCOUNT</th>
-                <th>SAVE</th>
               </tr>
             </thead>
             <tbody>
-              {productsWithSeq.map((p) => {
+              {customerFiltered.map((p) => {
                 const ep = effectivePrice(p);
                 const sv = saving(p);
                 return (
@@ -427,69 +420,51 @@ export default function ProductList() {
                     <td>
                       <img
                         className="pimg"
-                        src={p.img || "https://via.placeholder.com/64"}
+                        src={imgSrc(p.img)}
                         alt=""
-                        onError={(e) =>
-                          (e.currentTarget.src = "https://via.placeholder.com/64")
-                        }
+                        onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")}
                       />
                     </td>
                     <td>{p.name}</td>
                     <td>{p.category || ""}</td>
+
+                    {/* Stacked: old/new price + (discount + save) under it */}
                     <td className="right">
-                      {sv > 0 && <div className="price-old">{money(p.price)}</div>}
-                      <div className="price-new">{money(ep)}</div>
-                    </td>
-                    <td className="center">
-                      {p.discountType !== "none" && p.discountValue > 0 ? (
-                        <span className="discount-chip">
-                          {p.discountType === "percentage"
-                            ? pct(p.discountValue)
-                            : "LKR " + Number(p.discountValue).toLocaleString()}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      {sv > 0 ? (
-                        <span className="save-text">Save {money(sv)}</span>
-                      ) : (
-                        "—"
-                      )}
+                      <div className="price-stack">
+                        {sv > 0 && <div className="price-old">{money(p.price)}</div>}
+                        <div className="price-new">{money(ep)}</div>
+                        {sv > 0 && (
+                          <div className="meta">
+                            <span className="discount-chip">
+                              {p.discountType === "percentage"
+                                ? pct(p.discountValue)
+                                : "LKR " + Number(p.discountValue).toLocaleString()}
+                            </span>
+                            <span className="save-text">Save {money(sv)}</span>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
               })}
-              {!loading && !err && productsWithSeq.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="muted">
-                    No products
-                  </td>
-                </tr>
+              {!loading && !err && customerFiltered.length === 0 && (
+                <tr><td colSpan={4} className="muted">No matching products</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </section>
 
-      {/* Admin CRUD */}
+      {/* Admin CRUD (no export button) */}
       <section className="section">
         <div className="head">
           <h3>Manage Products (CRUD)</h3>
           <div className="actions">
-            <button
-              className="btn primary"
-              onClick={() => setModal({ open: true, product: null })}
-            >
+            <button className="btn primary" onClick={() => setModal({ open: true, product: null })}>
               ➕ Add Product
             </button>
-            <button className="btn" onClick={exportProducts}>
-              Export JSON
-            </button>
-            <button className="btn" onClick={fetchAll}>
-              Reload
-            </button>
+            <button className="btn" onClick={fetchAll}>Reload</button>
           </div>
         </div>
         <div className="body">
@@ -510,16 +485,13 @@ export default function ProductList() {
             <tbody>
               {productsWithSeq.map((p) => (
                 <tr key={p.id}>
-                  {/* 👉 Display sequential id */}
                   <td>{p.seq}</td>
                   <td>
                     <img
                       className="pimg"
-                      src={p.img || "https://via.placeholder.com/64"}
+                      src={imgSrc(p.img)}
                       alt=""
-                      onError={(e) =>
-                        (e.currentTarget.src = "https://via.placeholder.com/64")
-                      }
+                      onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")}
                     />
                   </td>
                   <td>{p.name}</td>
@@ -536,10 +508,7 @@ export default function ProductList() {
                   <td className="center">{(p.rating || 0).toFixed(1)}</td>
                   <td>
                     <div className="actions">
-                      <button
-                        className="btn"
-                        onClick={() => setModal({ open: true, product: p /* real id stays in p.id */ })}
-                      >
+                      <button className="btn" onClick={() => setModal({ open: true, product: p })}>
                         Edit
                       </button>
                       <button className="btn red" onClick={() => onDelete(p.id)}>
@@ -550,11 +519,7 @@ export default function ProductList() {
                 </tr>
               ))}
               {!loading && !err && productsWithSeq.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="muted">
-                    No products
-                  </td>
-                </tr>
+                <tr><td colSpan={9} className="muted">No products</td></tr>
               )}
             </tbody>
           </table>
@@ -564,9 +529,7 @@ export default function ProductList() {
       {/* Active Discounts */}
       {discounted.length > 0 && (
         <section className="section">
-          <div className="head">
-            <h3>Active Discounts</h3>
-          </div>
+          <div className="head"><h3>Active Discounts</h3></div>
           <div className="body">
             <table>
               <thead>
@@ -586,15 +549,12 @@ export default function ProductList() {
                   const sv = saving(p);
                   return (
                     <tr key={p.id}>
-                      {/* 👉 Show sequential id in this section as well */}
                       <td>{i + 1}</td>
                       <td>{p.name}</td>
                       <td className="right">{money(p.price)}</td>
                       <td>{p.discountType === "percentage" ? "Percentage" : "Fixed"}</td>
                       <td className="right">
-                        {p.discountType === "percentage"
-                          ? pct(p.discountValue)
-                          : money(p.discountValue)}
+                        {p.discountType === "percentage" ? pct(p.discountValue) : money(p.discountValue)}
                       </td>
                       <td className="right">{money(ep)}</td>
                       <td className="right">{money(sv)}</td>
