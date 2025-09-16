@@ -5,10 +5,13 @@ import "./CartDashboard.css";
 import TransactionsTable from "../TransactionsTable/TransactionsTable";
 
 const PRODUCTS_URL = "http://localhost:5000/carts";
-const TX_URL       = "http://localhost:5000/transactions";
+const TX_URL = "http://localhost:5000/transactions";
 
 const money = (n) =>
-  "LKR" + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  "LKR" + Number(n || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const unpackList = (payload) =>
   Array.isArray(payload)
@@ -23,9 +26,10 @@ const toProduct = (row) => ({
   discountValue: Number(row?.discountValue ?? 0),
 });
 
+// ✅ Always format the transaction date as YYYY-MM-DD
 const toTx = (row) => ({
   id: String(row?.id ?? row?._id ?? row?.txId ?? row?.transactionId ?? Math.random().toString(36).slice(2, 10)),
-  date: row?.date ?? "",
+  date: row?.date ? String(row.date).slice(0, 10) : "", // ✅ Only date
   customer: row?.customer ?? "",
   fmc: Boolean(row?.fmc),
   productName: row?.productName ?? row?.product?.name ?? "",
@@ -56,7 +60,8 @@ export default function CartDashboard() {
   useEffect(() => {
     let mounted = true;
     const loadAll = async () => {
-      setLoading(true); setErr("");
+      setLoading(true);
+      setErr("");
       try {
         const [p, t] = await Promise.all([
           fetchHandler.getProducts(),
@@ -104,19 +109,24 @@ export default function CartDashboard() {
     const totalPending = pendRows.reduce((s, r) => s + (Number(r?.total) || 0), 0);
 
     const recent = [...t]
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)))
+      .sort(
+        (a, b) =>
+          String(b.date).localeCompare(String(a.date)) ||
+          String(b.id).localeCompare(String(a.id))
+      )
       .slice(0, 10);
 
     return { productsCount, activeDiscounts, totalPaid, totalPending, recent };
   }, [products, txs]);
 
-  // 🔹 Create table rows with sequential TX ID (1..N) for display
+  // ✅ Create table rows with formatted dates + sequential TX ID
   const recentWithSeq = useMemo(
     () =>
       recent.map((t, i) => ({
         ...t,
-        txId: t.id,          // keep the real backend id if you need it later
-        id: String(i + 1),   // override 'id' so the table shows 1,2,3,4…
+        date: t.date ? String(t.date).slice(0, 10) : "", // ✅ Force date-only
+        txId: t.id, // real backend id if needed
+        id: String(i + 1), // display sequential number
       })),
     [recent]
   );
@@ -141,7 +151,7 @@ export default function CartDashboard() {
       <section className="section">
         <div className="head"><h3>Recent Transactions</h3></div>
         <TransactionsTable
-          rows={recentWithSeq}    // ← pass the numbered rows
+          rows={recentWithSeq}  // ✅ Now dates are always YYYY-MM-DD
           limit={10}
           showActions={false}
           showDiscountCol={true}

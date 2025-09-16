@@ -4,9 +4,10 @@ import axios from "axios";
 import "./Finance.css";
 import TransactionsTable from "../TransactionsTable/TransactionsTable";
 
-/* ===== BACKEND ROUTES (edit if needed) ===== */
+
+/* ===== BACKEND ROUTES ===== */
 const PRODUCTS_URL = "http://localhost:5000/carts";
-const TX_URL       = "http://localhost:5000/transactions";
+const TX_URL = "http://localhost:5000/transactions";
 
 /* ===== Helpers ===== */
 const money = (n) =>
@@ -42,7 +43,9 @@ const exportCsv = (filename, rows, headers) => {
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `${filename}.csv`; a.click();
+  a.href = url;
+  a.download = `${filename}.csv`;
+  a.click();
   URL.revokeObjectURL(url);
 };
 const printHtml = (inner) => {
@@ -74,9 +77,10 @@ const toProduct = (row) => ({
   discountValue: Number(row?.discountValue ?? 0),
 });
 
+// ✅ Updated here → Ensure only YYYY-MM-DD is shown
 const toTx = (row) => ({
-  id: String(row?.id ?? row?._id ?? row?.txId ?? row?.transactionId ?? Math.random().toString(36).slice(2, 10)), // REAL id
-  date: row?.date ?? nowISO(),
+  id: String(row?.id ?? row?._id ?? row?.txId ?? row?.transactionId ?? Math.random().toString(36).slice(2, 10)),
+  date: row?.date ? row.date.slice(0, 10) : nowISO(), // ✅ Remove time
   customer: row?.customer ?? "",
   customerId: row?.customerId ?? "",
   fmc: Boolean(row?.fmc),
@@ -106,7 +110,6 @@ const fetchHandler = {
 export default function FinancePage() {
   const [products, setProducts] = useState([]);
   const [txs, setTxs] = useState([]);
-
   const [form, setForm] = useState({
     customer: "",
     customerId: "",
@@ -127,7 +130,8 @@ export default function FinancePage() {
   /* ===== Load from DB ===== */
   useEffect(() => {
     (async () => {
-      setLoading(true); setErr("");
+      setLoading(true);
+      setErr("");
       try {
         const [p, t] = await Promise.all([
           fetchHandler.getProducts(),
@@ -147,7 +151,6 @@ export default function FinancePage() {
   const refreshTransactions = async () => {
     const fresh = await fetchHandler.getTransactions();
     setTxs(fresh);
-    // notify dashboard
     window.dispatchEvent(new Event("tx:changed"));
   };
 
@@ -235,21 +238,18 @@ export default function FinancePage() {
 
   /* ===== Create display rows with sequential TX ID ===== */
   const rowsWithSeq = useMemo(() => {
-    // map visible list to sequential 1..N
     return filtered.map((t, i) => ({
       ...t,
-      rid: t.id,        // keep REAL id for actions
-      id: String(i + 1) // display id shown in the first column
+      rid: t.id,
+      id: String(i + 1)
     }));
   }, [filtered]);
 
-  // helpers to map display id -> real id
   const realIdFromDisplay = (displayId) => {
     const row = rowsWithSeq.find(r => String(r.id) === String(displayId));
     return row?.rid;
   };
 
-  // wrappers the table will call with the display id
   const handleCycleStatus = (displayId) => {
     const real = realIdFromDisplay(displayId);
     if (real) cycleStatus(real);
@@ -262,8 +262,8 @@ export default function FinancePage() {
   /* ===== Exports/Print use the same sequential IDs ===== */
   const exportTxCsv = () =>
     exportCsv("transactions", rowsWithSeq, [
-      "id","date","customer","customerId","fmc","productName","qty",
-      "unitPrice","discountPerUnit","total","method","status","notes",
+      "id", "date", "customer", "customerId", "fmc", "productName", "qty",
+      "unitPrice", "discountPerUnit", "total", "method", "status", "notes",
     ]);
 
   const printTx = () => {
@@ -304,24 +304,24 @@ export default function FinancePage() {
           <div className="grid grid-3">
             <div>
               <label>Customer Name</label>
-              <input value={form.customer} onChange={(e)=>setForm(f=>({...f, customer:e.target.value}))} placeholder="e.g., Jane Doe"/>
+              <input value={form.customer} onChange={(e) => setForm(f => ({ ...f, customer: e.target.value }))} placeholder="e.g., Jane Doe" />
             </div>
             <div>
               <label>Customer ID</label>
-              <input value={form.customerId} onChange={(e)=>setForm(f=>({...f, customerId:e.target.value}))} placeholder="e.g., FMC-001"/>
+              <input value={form.customerId} onChange={(e) => setForm(f => ({ ...f, customerId: e.target.value }))} placeholder="e.g., FMC-001" />
             </div>
             <div>
               <label>Finance Managed Customer?</label>
-              <select value={form.fmc} onChange={(e)=>setForm(f=>({...f, fmc:e.target.value}))}>
+              <select value={form.fmc} onChange={(e) => setForm(f => ({ ...f, fmc: e.target.value }))}>
                 <option value="true">Yes (FMC)</option>
                 <option value="false">No (Regular)</option>
               </select>
             </div>
             <div>
               <label>Product</label>
-              <select value={form.productId} onChange={(e)=>setForm(f=>({...f, productId:e.target.value}))}>
+              <select value={form.productId} onChange={(e) => setForm(f => ({ ...f, productId: e.target.value }))}>
                 <option value="">Select a product</option>
-                {products.map(p=>(
+                {products.map(p => (
                   <option key={p.id} value={p.id}>
                     {p.name} — {money(effectivePrice(p))}
                   </option>
@@ -330,27 +330,27 @@ export default function FinancePage() {
             </div>
             <div>
               <label>Quantity</label>
-              <input type="number" min="1" value={form.qty} onChange={(e)=>setForm(f=>({...f, qty:e.target.value}))}/>
+              <input type="number" min="1" value={form.qty} onChange={(e) => setForm(f => ({ ...f, qty: e.target.value }))} />
             </div>
             <div>
               <label>Date</label>
-              <input type="date" value={form.date} onChange={(e)=>setForm(f=>({...f, date:e.target.value}))}/>
+              <input type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))} />
             </div>
             <div>
               <label>Payment Method</label>
-              <select value={form.method} onChange={(e)=>setForm(f=>({...f, method:e.target.value}))}>
+              <select value={form.method} onChange={(e) => setForm(f => ({ ...f, method: e.target.value }))}>
                 <option>Cash</option><option>Card</option><option>Bank Transfer</option><option>Invoice</option>
               </select>
             </div>
             <div>
               <label>Status</label>
-              <select value={form.status} onChange={(e)=>setForm(f=>({...f, status:e.target.value}))}>
+              <select value={form.status} onChange={(e) => setForm(f => ({ ...f, status: e.target.value }))}>
                 <option>Paid</option><option>Pending</option><option>Refund</option>
               </select>
             </div>
             <div>
               <label>Notes</label>
-              <input value={form.notes} onChange={(e)=>setForm(f=>({...f, notes:e.target.value}))} placeholder="Optional"/>
+              <input value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
 
@@ -358,9 +358,9 @@ export default function FinancePage() {
             <button className="btn primary" onClick={addTx}>➕ Add Transaction</button>
             <button
               className="btn"
-              onClick={()=>setForm({
-                customer:"", customerId:"", fmc:"true", productId:"", qty:1,
-                date: nowISO(), method:"Cash", status:"Paid", notes:""
+              onClick={() => setForm({
+                customer: "", customerId: "", fmc: "true", productId: "", qty: 1,
+                date: nowISO(), method: "Cash", status: "Paid", notes: ""
               })}
             >
               Clear
@@ -393,9 +393,9 @@ export default function FinancePage() {
         </div>
 
         <TransactionsTable
-          rows={rowsWithSeq}                // 👉 shows TX ID as 1..N
-          onCycleStatus={handleCycleStatus} // 👉 map back to real id
-          onDelete={handleDelete}           // 👉 map back to real id
+          rows={rowsWithSeq}
+          onCycleStatus={handleCycleStatus}
+          onDelete={handleDelete}
           showActions={true}
         />
       </section>

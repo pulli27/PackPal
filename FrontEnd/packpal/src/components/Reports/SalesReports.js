@@ -60,7 +60,7 @@ const printHtml = (inner) => {
   w.print();
 };
 
-/* -------- pricing helpers (match your app) -------- */
+/* -------- pricing helpers -------- */
 const effectivePrice = (p) => {
   if (p.discountType === "percentage")
     return Math.max(0, p.price * (1 - (p.discountValue || 0) / 100));
@@ -75,11 +75,11 @@ export default function ReportsPage() {
   const [products, setProducts] = useState(() => load(LS.products, []));
   const [txs, setTxs] = useState(() => load(LS.tx, []));
 
-  const [repType, setRepType] = useState("sales");
+  const [repType, setRepType] = useState("discounts");
   const [repRange, setRepRange] = useState("all");
   const [generatedAt, setGeneratedAt] = useState("");
 
-  // keep in sync with other pages (Dashboard / Finance)
+  // Sync with storage
   useEffect(() => {
     const refresh = () => {
       setProducts(load(LS.products, []));
@@ -108,40 +108,6 @@ export default function ReportsPage() {
   /* ------- prepare report ------- */
   const { title, stats, headers, rows } = useMemo(() => {
     const type = repType;
-    if (type === "sales") {
-      const paid = dataInRange.filter(
-        (t) => (t.status || "").toLowerCase() === "paid"
-      );
-      const revenue = paid.reduce((s, t) => s + (Number(t.total) || 0), 0);
-      const avg = paid.length ? revenue / paid.length : 0;
-      const top = (() => {
-        const map = {};
-        paid.forEach((t) => {
-          map[t.productName] = (map[t.productName] || 0) + (Number(t.qty) || 0);
-        });
-        return Object.entries(map).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
-      })();
-
-      return {
-        title: "Sales Summary",
-        stats: [
-          ["Total Paid TX", paid.length],
-          ["Revenue", money(revenue)],
-          ["Average Ticket", money(avg)],
-          ["Top Product", top],
-        ],
-        headers: ["TX ID", "Date", "Customer", "Product", "Qty", "Total", "Status"],
-        rows: paid.map((t) => [
-          t.id,
-          t.date,
-          t.customer || "",
-          t.productName || "",
-          t.qty,
-          money(t.total),
-          t.status,
-        ]),
-      };
-    }
 
     if (type === "discounts") {
       const discounted = dataInRange.filter((t) => Number(t.discountPerUnit) > 0);
@@ -199,7 +165,7 @@ export default function ReportsPage() {
       };
     }
 
-    // FMC
+    // FMC Report
     const only = dataInRange.filter((t) => !!t.fmc);
     const revenue = only
       .filter((t) => (t.status || "").toLowerCase() === "paid")
@@ -241,22 +207,6 @@ export default function ReportsPage() {
   const onGenerate = () => setGeneratedAt(new Date().toLocaleString());
 
   const onExport = () => {
-    // convert the rendered rows back to raw CSV shape per report
-    if (repType === "sales") {
-      const paid = dataInRange.filter(
-        (t) => (t.status || "").toLowerCase() === "paid"
-      );
-      exportCsv("sales_report", paid.map((t) => ({
-        id: t.id,
-        date: t.date,
-        customer: t.customer,
-        product: t.productName,
-        qty: t.qty,
-        total: t.total,
-        status: t.status,
-      })));
-      return;
-    }
     if (repType === "discounts") {
       const discounted = dataInRange.filter((t) => Number(t.discountPerUnit) > 0);
       exportCsv(
@@ -288,7 +238,6 @@ export default function ReportsPage() {
       );
       return;
     }
-    // fmc
     const only = dataInRange.filter((t) => !!t.fmc);
     exportCsv(
       "fmc_report",
@@ -358,7 +307,6 @@ export default function ReportsPage() {
             <div>
               <label>Report Type</label>
               <select value={repType} onChange={(e) => setRepType(e.target.value)}>
-                <option value="sales">Sales Summary</option>
                 <option value="discounts">Discount Impact</option>
                 <option value="inventory">Inventory Snapshot</option>
                 <option value="fmc">FMC Finance Summary</option>

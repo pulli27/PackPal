@@ -7,6 +7,7 @@ import ProductList from "./components/Product/ProductList";
 import Discounts from "./components/Discounts/Discounts";
 import Finance from "./components/Finance/Finance";
 import SalesReports from "./components/Reports/SalesReports";
+import CustomerView from "./components/Product/CustomerView";  // ✅ Import Customer View
 
 import "./App.css";
 
@@ -16,13 +17,24 @@ function App() {
       <Sidebar />
       <main className="content">
         <Routes>
-          {/* redirect root to /dashboard */}
+          {/* Redirect root to /dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          {/* Dashboard */}
           <Route path="/dashboard" element={<CartDashboard />} />
+
+          {/* Products + Customer View */}
           <Route path="/products" element={<ProductList />} />
-          <Route path="/discounts" element={<Discounts />} /> 
-           <Route path="/finance" element={<Finance />} /> 
-          /<Route path="/reports" element={<SalesReports />} /> 
+          <Route path="/customer-view" element={<CustomerView />} />  {/* ✅ New route */}
+
+          {/* Discounts */}
+          <Route path="/discounts" element={<Discounts />} />
+
+          {/* Finance */}
+          <Route path="/finance" element={<Finance />} />
+
+          {/* Reports */}
+          <Route path="/reports" element={<SalesReports />} />
         </Routes>
       </main>
     </div>

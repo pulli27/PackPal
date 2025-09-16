@@ -13,7 +13,7 @@ const transactionSchema = new mongoose.Schema({
   method: { type: String, default: 'Cash' },
   status: { type: String, enum: ['Paid','Pending','Refund'], default: 'Paid' },
   notes: String,
-  date: { type: Date, default: Date.now }
+  date: { type: Date, default: Date}
 }, { timestamps: true });
 
 module.exports = mongoose.model('Transaction', transactionSchema);
