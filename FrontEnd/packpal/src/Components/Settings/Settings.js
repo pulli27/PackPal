@@ -445,7 +445,7 @@ export default function Setting() {
                       <input
                         type="text"
                         className="form-input"
-                        defaultValue="BagCorp Industries"
+                        defaultValue="PackPal"
                         placeholder="Enter company name"
                       />
                     </div>
@@ -458,10 +458,10 @@ export default function Setting() {
                     </div>
                     <div className="form-control-section">
                       <select className="form-select" defaultValue="USD">
-                        <option value="USD">US Dollar ($)</option>
+                        <option value="USD">Sri Lankan Rupee (Rs.)</option>
                         <option value="EUR">Euro (€)</option>
                         <option value="GBP">British Pound (£)</option>
-                        <option value="LKR">Sri Lankan Rupee (Rs.)</option>
+                        <option value="LKR">US Dollar ($)</option>
                         <option value="INR">Indian Rupee (₹)</option>
                       </select>
                     </div>
