@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import "./Setting.css";
+import "./Settings.css";
 import Sidebar from "../Sidebar/Sidebar";
 
 // ---------- Translations (outside component) ----------
