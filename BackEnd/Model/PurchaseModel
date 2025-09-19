@@ -1,0 +1,40 @@
+// BackEnd/Model/PurchaseModel.js
+const mongoose = require("mongoose");
+
+const PurchaseSchema = new mongoose.Schema(
+  {
+    // Business-friendly ID like "O-001"
+    id: { type: String, required: true, unique: true, index: true },
+
+    // Who you're buying from
+    supplier: { type: String, required: true },
+
+    // Free-text items list (e.g., "Zippers (25), Buckles (40)")
+    items: { type: String, default: "" },
+
+    // Dates
+    orderDate: { type: Date, default: Date.now },
+    deliveryDate: { type: Date },
+
+    // Workflow status
+    status: {
+      type: String,
+      enum: ["pending", "approved", "delivered", "cancelled"],
+      default: "pending",
+      index: true,
+    },
+
+    // UI shows a priority field in your modal
+    priority: { type: String, enum: ["normal", "high", "urgent"], default: "normal" },
+
+    // Optional notes
+    notes: { type: String, default: "" },
+  },
+  { timestamps: true, versionKey: false }
+);
+
+// Helpful search
+PurchaseSchema.index({ supplier: "text", items: "text", id: "text" });
+
+// Collection name = "purchases"
+module.exports = mongoose.model("Purchase", PurchaseSchema, "purchases");

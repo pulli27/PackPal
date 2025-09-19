@@ -110,27 +110,27 @@ function InventoryDashboard() {
           {/* Metrics */}
           <section className="metrics-row">
             <article className="metric-card">
-              <div className="metric-change">+5.2%</div>
+              
               <div className="metric-value">325</div>
               <div className="metric-label">Total Products</div>
             </article>
             <article className="metric-card">
-              <div className="metric-change">+3.1%</div>
+              
               <div className="metric-value">1,000</div>
               <div className="metric-label">Total Items</div>
             </article>
             <article className="metric-card">
-              <div className="metric-change">+12.8%</div>
+              
               <div className="metric-value">70</div>
               <div className="metric-label">Low Stock Products</div>
             </article>
             <article className="metric-card">
-              <div className="metric-change">-5%</div>
+              
               <div className="metric-value">35</div>
               <div className="metric-label">Out of Stock</div>
             </article>
             <article className="metric-card">
-              <div className="metric-change">+8.5%</div>
+              
               <div className="metric-value">LKR 250,000</div>
               <div className="metric-label">Total Value of Stock</div>
             </article>

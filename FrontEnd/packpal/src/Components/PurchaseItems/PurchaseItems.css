@@ -29,7 +29,7 @@
 .btn{
   border:none;border-radius:12px;padding:12px 18px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.25s;font-size:14px;
 }
-.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.btn-pr{background:linear-gradient(135deg,#6a5af9,#15122f);color:#fff}
 .btn-primary:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(102,126,234,.35)}
 .btn-secondary{background:#f8f9fa;color:#495057;border:2px solid #e9ecef}
 .btn-secondary:hover{background:#e9ecef; transform:translateY(-2px)}
@@ -80,3 +80,84 @@ td .btn{padding:6px 10px}
   .search-box{width:180px}
   .metrics-row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 }
+
+/* --- Action cell spacing --- */
+#purchaseTable td.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* --- Base pill button --- */
+.btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  line-height: 1;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+  box-shadow: 0 8px 22px rgba(17, 24, 39, 0.12);
+  white-space: nowrap;
+}
+
+.btn:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, .45);
+  outline-offset: 2px;
+}
+
+.btn:hover { transform: translateY(-1px); filter: brightness(1.02); }
+.btn:active { transform: translateY(0); filter: brightness(.98); }
+
+/* ---- VIEW = light blue ---- */
+.btn-view{
+  background: linear-gradient(135deg,#93c5fd,#3b82f6);
+  
+}
+
+/* ---- APPROVE = green (unchanged look, just matching style system) ---- */
+.btn-suc{
+  margin-top: 5px;
+  margin-bottom: 5px;
+  background: linear-gradient(135deg,#34d399,#059669);
+  
+}
+
+/* ---- EDIT = blue ---- */
+.btn-sec{
+  background: #3b82f6; /* indigo → blue */
+  
+}
+
+.btn-secon{
+  background: linear-gradient(135deg,#6a5af9,#15122f); /* indigo → blue */
+ 
+}
+
+/* ---- DELETE = red ---- */
+.btn-danger{
+  margin-top: 5px;
+  background: #e74c3c; /* coral → rose/red */
+  
+}
+
+/* Optional: subtle “soft” glow like in your reference image */
+.btn::after{
+  content:"";
+  position:absolute;
+  inset:auto;
+}
+.btn {
+  position: relative; /* needed for the glow below */
+  --glow: 0 0 0 0 rgba(0,0,0,0);
+}
+.btn-view { --glow: 0 10px 24px rgba(59,130,246,.28); }
+.btn-edit { --glow: 0 10px 24px rgba(79,70,229,.28); }
+.btn-delete { --glow: 0 10px 24px rgba(225,29,72,.32); }
+.btn-approve { --glow: 0 10px 24px rgba(16,185,129,.28); }
+.btn:hover { box-shadow: var(--glow); }
+
+/* If you had older utility classes (btn-secondary / btn-danger / btn-success),
+   you can keep them, but these new ones will style the action buttons. */

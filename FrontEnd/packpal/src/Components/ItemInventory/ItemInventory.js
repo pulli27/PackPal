@@ -2,8 +2,42 @@
 import React, { useEffect, useRef } from "react";
 import "./ItemInventory.css";
 import Sidebar from "../Sidebar/Sidebar";
-// Use the same shared axios client you used in SalaryCal
 import { api } from "../../lib/api";
+
+/* ---------------------------
+   Runtime PDF tools loader (jsPDF + AutoTable)
+   --------------------------- */
+function getJsPDFCtor() {
+  if (window?.jspdf?.jsPDF) return window.jspdf.jsPDF; // UMD 2.x
+  if (window?.jsPDF) return window.jsPDF;               // older global
+  return null;
+}
+function hasAutoTable() {
+  const jsPDF = getJsPDFCtor();
+  return !!(jsPDF && jsPDF.API && jsPDF.API.autoTable);
+}
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+async function ensurePdfTools() {
+  if (getJsPDFCtor() && hasAutoTable()) return;
+  const urls = [];
+  if (!getJsPDFCtor()) {
+    urls.push("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  }
+  if (!hasAutoTable()) {
+    urls.push("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js");
+  }
+  for (const url of urls) await loadScript(url);
+  if (!getJsPDFCtor() || !hasAutoTable()) throw new Error("Failed to load jsPDF/AutoTable");
+}
 
 export default function ItemInventory() {
   // Seed data to render UI immediately; replaced by backend data after load
@@ -20,6 +54,7 @@ export default function ItemInventory() {
     const SAFETY_STOCK = 40;
     const $ = (id) => document.getElementById(id);
     const toNum = (v) => Number(v) || 0;
+    const asLKR = (n) => `LKR ${Number(n || 0).toLocaleString()}`;
 
     const computeReorderLevel = (item) =>
       Math.max(0, Math.round((toNum(item.avgDailyUsage) * toNum(item.leadTimeDays)) + SAFETY_STOCK));
@@ -54,7 +89,7 @@ export default function ItemInventory() {
       const value = inventory.reduce((s, i) => s + totalPriceOf(i), 0);
       if ($("totalItems")) $("totalItems").textContent = totalItems;
       if ($("lowStockItems")) $("lowStockItems").textContent = low;
-      if ($("totalValue")) $("totalValue").textContent = `LKR ${value.toLocaleString()}`;
+      if ($("totalValue")) $("totalValue").textContent = asLKR(value);
     }
 
     function renderTable(list = inventoryRef.current) {
@@ -72,8 +107,8 @@ export default function ItemInventory() {
           <td>${item.description}</td>
           <td class="quantity">${item.quantity}</td>
           <td class="reorder-level">${rop}</td>
-          <td class="price">LKR ${totalPrice.toLocaleString()}</td>
-          <td class="unit-price">LKR ${toNum(item.unitPrice).toFixed(2)}</td>
+          <td class="price">${asLKR(totalPrice)}</td>
+          <td class="unit-price">${Number(toNum(item.unitPrice)).toFixed(2)}</td>
           <td>
             <div class="action-cell">
               <button class="btn-edit"   onclick="window.__inv_editItem(${index})">Edit</button>
@@ -85,7 +120,7 @@ export default function ItemInventory() {
       updateStats();
     }
 
-    // ===== API helpers (using shared client like SalaryCal) =====
+    // ===== API helpers =====
     const apiInv = {
       create: (item) => api.post("/api/inventory", item),
       update: (id, item) => api.put(`/api/inventory/${encodeURIComponent(id)}`, item),
@@ -93,7 +128,7 @@ export default function ItemInventory() {
       list:   () => api.get("/api/inventory"),
     };
 
-    // ===== CRUD (bound to window so row buttons work) =====
+    // ===== CRUD =====
     function editItem(index) {
       const it = inventoryRef.current[index];
       showInlineForm(true);
@@ -147,7 +182,8 @@ export default function ItemInventory() {
       const inventory = inventoryRef.current;
       const lowStockItems = inventory.filter((i) => toNum(i.quantity) <= computeReorderLevel(i));
       const totalValue = inventory.reduce((s, i) => s + totalPriceOf(i), 0);
-      const avgUnit = inventory.reduce((s, i) => s + toNum(i.unitPrice), 0) / (inventory.length || 1);
+      const avgUnit =
+        inventory.reduce((s, i) => s + toNum(i.unitPrice), 0) / (inventory.length || 1);
       const totalQty = inventory.reduce((s, i) => s + toNum(i.quantity), 0);
 
       const inventoryWithCalcs = inventory.map((item) => ({
@@ -178,62 +214,81 @@ export default function ItemInventory() {
 
     function inventoryReportHTML(reportData) {
       const { summary, inventory: items, lowStockItems } = reportData;
+
+      const statCard = (num, label, color) => `
+        <div class="report-stat v2">
+          <div class="report-stat-number" style="color:${color}">${num}</div>
+          <div class="report-stat-label">${label}</div>
+        </div>`;
+
+      const lowStockSection = `
+        <div class="section-title danger">⚠️ Low Stock Alert</div>
+        ${
+          lowStockItems.length
+            ? `
+          <table class="report-table report-table--danger">
+            <thead><tr>
+              <th>ITEM ID</th><th>ITEM NAME</th><th>CURRENT QTY</th>
+              <th>REORDER LEVEL</th><th>SHORTAGE</th><th>UNIT PRICE</th>
+            </tr></thead>
+            <tbody>
+              ${lowStockItems
+                .map(
+                  (i) => `
+                <tr>
+                  <td>${i.id}</td><td>${i.name}</td><td>${i.quantity}</td>
+                  <td>${i.reorderLevel}</td><td>${Math.max(0, i.reorderLevel - i.quantity)}</td>
+                  <td>LKR ${Number(toNum(i.unitPrice)).toFixed(2)}</td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>`
+            : `<div class="banner-ok">Great news — no items are currently below their reorder level.</div>`
+        }`;
+
+      const allInventorySection = `
+        <div class="section-title">📦 Complete Inventory</div>
+        <table class="report-table report-table--primary">
+          <thead><tr>
+            <th>ITEM ID</th><th>ITEM NAME</th><th>DESCRIPTION</th><th>QUANTITY</th>
+            <th>REORDER LEVEL</th><th>UNIT PRICE</th><th>TOTAL VALUE</th>
+          </tr></thead>
+          <tbody>
+            ${items
+              .map(
+                (i) => `
+              <tr ${i.isLowStock ? 'class="low-stock-highlight"' : ""}>
+                <td>${i.id}</td><td>${i.name}</td><td>${i.description}</td>
+                <td>${i.quantity}</td><td>${i.reorderLevel}</td>
+                <td>LKR ${Number(toNum(i.unitPrice)).toFixed(2)}</td>
+                <td>LKR ${i.totalPrice.toLocaleString()}</td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>`;
+
       return `
         <div class="report-header">
-          <h1 class="report-title">📋 Inventory Management Report</h1>
+          <h1 class="report-title">🧾 Inventory Management Report</h1>
           <p class="report-subtitle">Generated on ${summary.reportDate}</p>
         </div>
 
-        <div class="report-stats">
-          <div class="report-stat"><div class="report-stat-number">${summary.totalItems}</div><div class="report-stat-label">Total Items</div></div>
-          <div class="report-stat"><div class="report-stat-number">${summary.totalQuantity.toLocaleString()}</div><div class="report-stat-label">Total Quantity</div></div>
-          <div class="report-stat"><div class="report-stat-number">LKR ${summary.totalValue.toLocaleString()}</div><div class="report-stat-label">Total Value</div></div>
-          <div class="report-stat"><div class="report-stat-number" style="color:#e74c3c">${summary.lowStockCount}</div><div class="report-stat-label">Low Stock Items</div></div>
-          <div class="report-stat"><div class="report-stat-number">LKR ${summary.avgUnitPrice.toFixed(2)}</div><div class="report-stat-label">Avg Unit Price</div></div>
-          <div class="report-stat"><div class="report-stat-number">${summary.fixedSafetyStock}</div><div class="report-stat-label">Safety Stock</div></div>
+        <div class="report-stats v2">
+          ${statCard(summary.totalItems, "TOTAL ITEMS", "#3563ff")}
+          ${statCard(summary.totalQuantity.toLocaleString(), "TOTAL QUANTITY", "#3563ff")}
+          ${statCard("LKR " + summary.totalValue.toLocaleString(), "TOTAL VALUE", "#3563ff")}
+          ${statCard(summary.lowStockCount, "LOW STOCK ITEMS", "#e74c3c")}
+          ${statCard(summary.fixedSafetyStock, "SAFETY STOCK", "#3563ff")}
         </div>
 
-        ${lowStockItems.length ? `
-        <div style="margin:30px 0">
-          <h3 style="color:#e74c3c;margin-bottom:15px">⚠️ Low Stock Alert</h3>
-          <table class="report-table">
-            <thead><tr>
-              <th>Item ID</th><th>Item Name</th><th>Current Qty</th><th>Reorder Level</th><th>Shortage</th><th>Unit Price</th>
-            </tr></thead>
-            <tbody>
-              ${lowStockItems.map(i => `
-                <tr class="low-stock-highlight">
-                  <td>${i.id}</td><td>${i.name}</td><td>${i.quantity}</td>
-                  <td>${i.reorderLevel}</td><td>${i.reorderLevel - i.quantity}</td>
-                  <td>LKR ${toNum(i.unitPrice).toFixed(2)}</td>
-                </tr>`).join("")}
-            </tbody>
-          </table>
-        </div>` : ""}
-
-        <div style="margin:30px 0">
-          <h3 style="color:#2c3e50;margin-bottom:15px">📦 Complete Inventory</h3>
-          <table class="report-table">
-            <thead><tr>
-              <th>Item ID</th><th>Item Name</th><th>Description</th><th>Quantity</th>
-              <th>Reorder Level</th><th>Unit Price</th><th>Total Value</th>
-            </tr></thead>
-            <tbody>
-              ${items.map(i => `
-                <tr ${i.isLowStock ? 'class="low-stock-highlight"' : ""}>
-                  <td>${i.id}</td><td>${i.name}</td><td>${i.description}</td>
-                  <td>${i.quantity}</td><td>${i.reorderLevel}</td>
-                  <td>LKR ${toNum(i.unitPrice).toFixed(2)}</td>
-                  <td>LKR ${i.totalPrice.toLocaleString()}</td>
-                </tr>`).join("")}
-            </tbody>
-          </table>
-        </div>
+        ${lowStockSection}
+        ${allInventorySection}
 
         <div class="report-actions">
           <button class="report-btn btn-pdf"  onclick="window.__inv_exportToPDF()">📄 Export to PDF</button>
           <button class="report-btn btn-print" onclick="window.__inv_printReport()">🖨️ Print Report</button>
-          <button class="report-btn btn-json"  onclick="window.__inv_downloadJSON()">📊 Download JSON</button>
         </div>`;
     }
 
@@ -251,71 +306,164 @@ export default function ItemInventory() {
       if (m) m.style.display = "none";
     }
 
-    // ===== Export/Print/JSON =====
-    function exportToPDF() {
-      try {
-        const btn = document.querySelector(".btn-pdf");
-        if (!window.jspdf || !window.html2canvas) {
-          alert("PDF tools not found. Add jsPDF and html2canvas to public/index.html.");
-          return;
-        }
-        const txt = btn?.innerHTML;
-        if (btn) { btn.innerHTML = "⏳ Generating PDF..."; btn.disabled = true; }
+    /* ====== ICON HELPERS (vector, avoid emoji fonts in PDF) ====== */
+    function drawReceiptIcon(doc, x, y) {
+      doc.setDrawColor(53, 99, 255);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(x, y, 8, 8, 1.5, 1.5);
+      doc.line(x+1, y+8, x+2, y+7);
+      doc.line(x+3, y+8, x+4, y+7);
+      doc.line(x+5, y+8, x+6, y+7);
+      doc.setDrawColor(120, 130, 150);
+      doc.line(x+2, y+3, x+6, y+3);
+      doc.line(x+2, y+5, x+6, y+5);
+    }
+    function drawWarningIcon(doc, x, y) {
+      doc.setFillColor(244, 143, 64);
+      doc.circle(x+4, y+4, 4, "F");
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.7);
+      doc.line(x+4, y+2.5, x+4, y+5.5);
+      doc.circle(x+4, y+6.6, 0.45, "F");
+    }
+    function drawBoxIcon(doc, x, y) {
+      doc.setDrawColor(53, 99, 255);
+      doc.setLineWidth(0.4);
+      doc.rect(x+1, y+2, 6, 6);
+      doc.line(x+1, y+4, x+7, y+4);
+      doc.line(x+4, y+2, x+4, y+4);
+    }
 
-        const temp = document.createElement("div");
-        temp.style.position = "absolute";
-        temp.style.left = "-9999px";
-        temp.style.top = "0";
-        temp.style.width = "794px";
-        temp.style.padding = "40px";
-        temp.style.fontFamily = "Arial, sans-serif";
-        temp.style.fontSize = "14px";
-        temp.style.lineHeight = "1.4";
-        temp.style.color = "#333";
-        temp.style.background = "#fff";
+    /* ===== Export (styled, vector icons) ===== */
+    async function exportToPDF() {
+      try {
+        await ensurePdfTools();
 
         const data = buildInventoryReport();
-        const contentHTML = inventoryReportHTML(data)
-          .replace(/class="report-actions"[\s\S]*<\/div>\s*$/, "");
+        const jsPDF = getJsPDFCtor();
+        const doc = new jsPDF("p", "mm", "a4");
 
-        temp.innerHTML = `
-          <div style="text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #667eea;">
-            <h1 style="color:#2c3e50;font-size:28px;margin-bottom:10px;font-weight:bold;">📋 Inventory Management Report</h1>
-            <p style="color:#7f8c8d;font-size:16px;margin:0;">Generated on ${data.summary.reportDate}</p>
-          </div>
-          ${contentHTML}`;
+        // Colors
+        const BLUE = [53, 99, 255];
+        const BLUE_HEAD = [64, 97, 239];
+        const GREY = [110, 119, 129];
+        const ORANGE = [244, 143, 64];
+        const RED = [231, 76, 60];
 
-        document.body.appendChild(temp);
+        // Header (icon + title)
+        drawReceiptIcon(doc, 14, 9);
+        doc.setFontSize(16);
+        doc.setTextColor(40, 40, 40);
+        doc.text(" Inventory Management Report", 24, 16);
+        doc.setFontSize(10);
+        doc.setTextColor(...GREY);
+        doc.text(`Generated on ${data.summary.reportDate}`, 24, 22);
 
-        window.html2canvas(temp, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", width: 794, height: temp.scrollHeight })
-          .then((canvas) => {
-            document.body.removeChild(temp);
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF("p", "mm", "a4");
-            const img = canvas.toDataURL("image/png");
-            const imgW = 210, pageH = 297;
-            const imgH = (canvas.height * imgW) / canvas.width;
-            let hLeft = imgH, pos = 0;
-            pdf.addImage(img, "PNG", 0, pos, imgW, imgH);
-            hLeft -= pageH;
-            while (hLeft >= 0) {
-              pos = hLeft - imgH;
-              pdf.addPage();
-              pdf.addImage(img, "PNG", 0, pos, imgW, imgH);
-              hLeft -= pageH;
-            }
-            pdf.save(`inventory_report_${new Date().toISOString().split("T")[0]}.pdf`);
-            if (btn) { btn.innerHTML = txt; btn.disabled = false; }
-          })
-          .catch((err) => {
-            if (document.body.contains(temp)) document.body.removeChild(temp);
-            if (btn) { btn.innerHTML = txt; btn.disabled = false; }
-            console.error(err);
-            alert("PDF generation failed. Please try again.");
+        // Stat cards (3 x 2 grid)
+        const cards = [
+          [String(data.summary.totalItems), "TOTAL ITEMS"],
+          [data.summary.totalQuantity.toLocaleString(), "TOTAL QUANTITY"],
+          [`LKR ${data.summary.totalValue.toLocaleString()}`, "TOTAL VALUE"],
+          [String(data.summary.lowStockCount), "LOW STOCK ITEMS", true],
+          [`LKR ${Number(data.summary.avgUnitPrice).toFixed(2)}`, "AVG UNIT PRICE"],
+          [String(data.summary.fixedSafetyStock), "SAFETY STOCK"],
+        ];
+        let cx = 14, cy = 30;
+        const cw = 60, ch = 22, r = 3, gapX = 6, gapY = 6;
+
+        cards.forEach(([num, label, danger], i) => {
+          const stroke = danger ? RED : BLUE;
+          doc.setDrawColor(...stroke);
+          doc.setLineWidth(0.5);
+          doc.roundedRect(cx, cy, cw, ch, r, r);
+          doc.setFontSize(12);
+          doc.setTextColor(...(danger ? RED : BLUE));
+          doc.text(num, cx + 4, cy + 9);
+          doc.setFontSize(9.5);
+          doc.setTextColor(90, 96, 106);
+          doc.text(label, cx + 4, cy + 17);
+
+          cx += cw + gapX;
+          if ((i + 1) % 3 === 0) {
+            cx = 14;
+            cy += ch + gapY;
+          }
+        });
+
+        // Low Stock section
+        let y = cy + 6;
+        drawWarningIcon(doc, 14, y - 8);
+        doc.setTextColor(40, 40, 40);
+        doc.setFontSize(14);
+        doc.text("Low Stock Alert", 24, y);
+        y += 2;
+        doc.setDrawColor(...ORANGE);
+        doc.line(14, y, 196, y);
+        y += 4;
+
+        if (data.lowStockItems.length) {
+          doc.autoTable({
+            startY: y,
+            head: [["ITEM ID", "ITEM NAME", "CURRENT QTY", "REORDER LEVEL", "SHORTAGE", "UNIT PRICE"]],
+            body: data.lowStockItems.map((i) => [
+              i.id,
+              i.name,
+              i.quantity,
+              i.reorderLevel,
+              Math.max(0, i.reorderLevel - i.quantity),
+              `LKR ${Number(i.unitPrice).toFixed(2)}`,
+            ]),
+            styles: { fontSize: 10, cellPadding: 3 },
+            headStyles: { fillColor: RED, textColor: 255, halign: "left" },
+            theme: "grid",
+            margin: { left: 14, right: 14 },
           });
+          y = doc.lastAutoTable.finalY + 20;
+        } else {
+          doc.setFontSize(10);
+          doc.setTextColor(100, 100, 100);
+          doc.text("Great news — no items are currently below their reorder level.", 14, y);
+          y += 20;
+        }
+
+        // Complete Inventory section
+        drawBoxIcon(doc, 14, y - 8);
+        doc.setTextColor(40, 40, 40);
+        doc.setFontSize(14);
+        doc.text("Complete Inventory", 24, y);
+        y += 2;
+        doc.setDrawColor(...BLUE);
+        doc.line(14, y, 196, y);
+        y += 4;
+
+        doc.autoTable({
+          startY: y,
+          head: [["ITEM ID", "ITEM NAME", "DESCRIPTION", "QUANTITY", "REORDER LEVEL", "UNIT PRICE", "TOTAL VALUE"]],
+          body: data.inventory.map((i) => [
+            i.id,
+            i.name,
+            i.description,
+            i.quantity,
+            i.reorderLevel,
+            `LKR ${Number(i.unitPrice).toFixed(2)}`,
+            `LKR ${i.totalPrice.toLocaleString()}`,
+          ]),
+          styles: { fontSize: 10, cellPadding: 3 },
+          headStyles: { fillColor: BLUE_HEAD, textColor: 255, halign: "left" },
+          theme: "grid",
+          margin: { left: 14, right: 14 },
+          columnStyles: { 2: { cellWidth: 52 } },
+          didParseCell: function (hook) {
+            if (hook.section === "body" && hook.row.index % 2 === 0) {
+              hook.cell.styles.fillColor = [247, 248, 255];
+            }
+          },
+        });
+
+        doc.save(`inventory_report_${new Date().toISOString().split("T")[0]}.pdf`);
       } catch (err) {
         console.error(err);
-        alert("Export failed.");
+        alert("PDF generation failed. Check console for details.");
       }
     }
 
@@ -335,7 +483,6 @@ export default function ItemInventory() {
           .report-table{width:100%;border-collapse:collapse;margin:15px 0}
           .report-table th{background:#f0f0f0;padding:8px;text-align:left;border:1px solid #333}
           .report-table td{padding:6px 8px;border:1px solid #333}
-          .low-stock-highlight{background:#f9e3e3}
           .report-actions{display:none}
           @media print{ @page{ margin:16mm } }
         </style></head><body>${src}</body></html>`;
@@ -345,7 +492,7 @@ export default function ItemInventory() {
     function downloadJSON() {
       const data = buildInventoryReport();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const urlObj = window.URL.createObjectURL(blob); // avoid shadowing global URL
+      const urlObj = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = urlObj;
       a.download = `inventory_report_${new Date().toISOString().split("T")[0]}.json`;
@@ -401,8 +548,8 @@ export default function ItemInventory() {
           <td>${item.description}</td>
           <td class="quantity">${item.quantity}</td>
           <td class="reorder-level">${rop}</td>
-          <td class="price">LKR ${totalPriceOf(item).toLocaleString()}</td>
-          <td class="unit-price">LKR ${toNum(item.unitPrice).toFixed(2)}</td>
+          <td class="price">${asLKR(toNum(item.unitPrice)*toNum(item.quantity))}</td>
+          <td class="unit-price">${Number(toNum(item.unitPrice)).toFixed(2)}</td>
           <td>
             <div class="action-cell">
               <button class="btn-edit"   onclick="window.__inv_editItem(${index})">Edit</button>
@@ -431,11 +578,8 @@ export default function ItemInventory() {
       if (dupIndex !== -1) { alert(`Item ID ${data.id} already exists.`); return; }
 
       try {
-        if (editingIndexRef.current === -1) {
-          await apiInv.create(data);
-        } else {
-          await apiInv.update(list[editingIndexRef.current].id, data);
-        }
+        if (editingIndexRef.current === -1) await apiInv.create(data);
+        else await apiInv.update(list[editingIndexRef.current].id, data);
 
         const res = await apiInv.list();
         const items = Array.isArray(res?.data?.items) ? res.data.items : [];
@@ -499,7 +643,6 @@ export default function ItemInventory() {
         }));
         renderTable();
       } catch (err) {
-        // If backend is down, keep seed data—UI still works
         console.warn("Initial fetch failed (using seed data):", err?.message || err);
       }
     }
@@ -597,7 +740,7 @@ export default function ItemInventory() {
                 </div>
               </div>
               <div className="form-actions">
-                <button type="submit" className="btn btn-primary">Save Item</button>
+                <button type="submit" className="btn btn-pri">Save Item</button>
                 <button type="button" className="btn btn-light" id="clearBtn">Clear</button>
               </div>
             </form>
@@ -640,7 +783,10 @@ export default function ItemInventory() {
 
           {/* Generate report */}
           <div className="report-section">
-            <button className="generate-report-btn" onClick={() => window.__inv_generateReport && window.__inv_generateReport()}>
+            <button
+              className="generate-repo-btn"
+              onClick={() => window.__inv_generateReport && window.__inv_generateReport()}
+            >
               📊 Generate Report
             </button>
           </div>

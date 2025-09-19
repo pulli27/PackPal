@@ -58,7 +58,7 @@
 .form-group input:focus { outline: none; border-color: #667eea; }
 .form-actions { display: flex; gap: 12px; margin-top: 14px; }
 .btn { padding: 12px 18px; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; }
-.btn-primary { background: linear-gradient(135deg,#158342,#158342); color: #fff; }
+.btn-pri { background: linear-gradient(135deg,#354fc5, #15122f); color: #fff; }
 .btn-light { background: #f3f4f6; color: #111827; }
 .hint { color: #64748b; font-size: 13px; margin-top: 6px; }
 
@@ -82,15 +82,15 @@ tbody tr:hover { background: linear-gradient(135deg,rgba(102,126,234,.05),rgba(1
 td { padding: 14px 12px; font-size: 15px; color: #2c3e50; }
 .item-id { font-weight: 600; color: #667eea; }
 .item-name { font-weight: 600; }
-.quantity { font-weight: 600; color: #27ae60; }
+.quantity { font-weight: 600; color: #2c3e50; }
 .reorder-level { font-weight: 600; color: #e74c3c; }
-.price { font-weight: 600; color: #2980b9; }
-.unit-price { font-weight: 600; color: #8e44ad; }
+.price { font-weight: 600; color: #2c3e50; }
+.unit-price { font-weight: 600; color: #2c3e50; }
 
 /* Action buttons */
 .action-cell { display: flex; gap: 12px; align-items: center; }
 .btn-edit {
-  background: linear-gradient(135deg,#6a5af9,#7b67ff);
+  background: linear-gradient(135deg,#6a5af9,#15122f);
   border: none; border-radius: 12px; color: #fff; padding: 8px 16px; font-weight: 700; cursor: pointer;
   box-shadow: 0 6px 14px rgba(106,90,249,.25); transition: transform .15s, box-shadow .15s;
 }
@@ -106,8 +106,8 @@ td { padding: 14px 12px; font-size: 15px; color: #2c3e50; }
 
 /* Report */
 .report-section { text-align: center; padding: 20px; }
-.generate-report-btn {
-  background: linear-gradient(135deg,#158342,#158342); color: #fff; border: none; padding: 15px 40px; border-radius: 30px;
+.generate-repo-btn {
+  background: linear-gradient(135deg,#6a5af9,#15122f); color: #fff; border: none; padding: 15px 40px; border-radius: 30px;
   font-size: 18px; font-weight: 600; cursor: pointer; transition: .3s; box-shadow: 0 8px 25px rgba(39,174,96,.3);
 }
 .generate-report-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 35px rgba(39,174,96,.4); }

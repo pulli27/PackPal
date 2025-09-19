@@ -1,11 +1,15 @@
+// src/Components/PurchaseItems/PurchaseItems.js
 import React, { useEffect, useRef } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import "./PurchaseItems.css";
+import { purchases } from "../../lib/purchases";
+
+// PDF libs
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export default function PurchaseItems() {
-  // ===== Stable data (no re-renders) =====
   const settingsRef = useRef({ currency: "USD", autoApprove: "off" });
-
   const suppliersRef = useRef([
     { name: "Premium Leather Co." },
     { name: "Canvas Works Ltd." },
@@ -14,57 +18,13 @@ export default function PurchaseItems() {
     { name: "Ceylon Leather Crafts (Pvt) Ltd." },
     { name: "Precision Accessories" },
   ]);
+  const purchaseOrdersRef = useRef([]);
 
-  // Use a ref so we can mutate (your current approach) without re-rendering
-  const purchaseOrdersRef = useRef([
-    {
-      id: "O-001",
-      supplier: "Premium Leather Co.",
-      items: "Full-grain leather (50), Top-grain leather (30)",
-      orderDate: "2025-08-25",
-      deliveryDate: "2025-09-05",
-      status: "pending",
-    },
-    {
-      id: "O-002",
-      supplier: "Canvas Works Ltd.",
-      items: "cotton canvas (100)",
-      orderDate: "2025-08-22",
-      deliveryDate: "2025-09-01",
-      status: "approved",
-    },
-    {
-      id: "O-003",
-      supplier: "Artisan Crafts Inc.",
-      items: "Zippers (25), Buckles & rings (40)",
-      orderDate: "2025-08-20",
-      deliveryDate: "2025-08-30",
-      status: "delivered",
-    },
-    {
-      id: "O-004",
-      supplier: "Modern Bag Solutions",
-      items: "Bonded nylon Tex 70 (V-69) (10), Paper Supplies",
-      orderDate: "2025-08-28",
-      deliveryDate: "2025-09-10",
-      status: "pending",
-    },
-    {
-      id: "O-005",
-      supplier: "Ceylon Leather Crafts (Pvt) Ltd.",
-      items: "Double-sided basting tape (15), PVA fabric glue (20)",
-      orderDate: "2025-08-15",
-      deliveryDate: "2025-08-25",
-      status: "cancelled",
-    },
-  ]);
-
-  // ===== One-time wiring without missing-deps warning =====
   useEffect(() => {
-    // ---- Helpers (scoped to effect) ----
+    // ---------- helpers ----------
     const $ = (sel) => document.querySelector(sel);
     const $all = (sel) => Array.from(document.querySelectorAll(sel));
-    const formatDate = (d) =>
+    const fmt = (d) =>
       new Date(d).toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
@@ -76,267 +36,243 @@ export default function PurchaseItems() {
       if (!el) return;
       el.textContent = msg;
       el.classList.add("show");
-      setTimeout(() => el.classList.remove("show"), 1800);
+      setTimeout(() => el.classList.remove("show"), 1400);
     };
 
-    // ---- PDF tools loader (jsPDF + html2canvas) ----
-    function loadScript(src) {
-      return new Promise((res, rej) => {
-        const s = document.createElement("script");
-        s.src = src;
-        s.onload = res;
-        s.onerror = rej;
-        document.body.appendChild(s);
-      });
-    }
-    async function ensurePDFTools() {
-      if (!window.jspdf?.jsPDF) {
-        await loadScript(
-          "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
-        );
-      }
-      if (!window.html2canvas) {
-        await loadScript(
-          "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
-        );
-      }
-      return { jsPDF: window.jspdf.jsPDF, html2canvas: window.html2canvas };
-    }
-
-    // Next ID in O-001 style by scanning current orders
-    const nextOrderId = () => {
-      const nums = purchaseOrdersRef.current
-        .map((o) => (typeof o.id === "string" ? o.id.trim() : ""))
-        .map((id) => {
-          const m = id.match(/^O-(\d{3,})$/);
-          return m ? parseInt(m[1], 10) : null;
-        })
-        .filter((n) => n !== null);
-      const max = nums.length ? Math.max(...nums) : 0;
-      return `O-${String(max + 1).padStart(3, "0")}`;
-    };
-
-    // ===== UI Logic =====
-    const refreshPoMetrics = () => {
-      const dateEl = $("#poDate");
-      if (dateEl) dateEl.textContent = "Last Updated: " + new Date().toLocaleString();
-
+    const refreshMetrics = () => {
       const list = purchaseOrdersRef.current;
-      const p = list.filter((o) => o.status === "pending").length;
-      const c = list.filter((o) => o.status === "delivered" || o.status === "approved")
-        .length;
-      const x = list.filter((o) => o.status === "cancelled").length;
+      const pending = list.filter((o) => o.status === "pending").length;
+      const completed = list.filter((o) =>
+        ["approved", "delivered"].includes(o.status)
+      ).length;
+      const cancelled = list.filter((o) => o.status === "cancelled").length;
 
       const setText = (id, v) => {
         const el = document.getElementById(id);
         if (el) el.textContent = v;
       };
-      setText("poPending", p);
-      setText("poCompleted", c);
-      setText("poCancelled", x);
+      setText("poPending", pending);
+      setText("poCompleted", completed);
+      setText("poCancelled", cancelled);
+
+      const dateEl = document.getElementById("poDate");
+      if (dateEl) dateEl.textContent = "Last Updated: " + new Date().toLocaleString();
     };
 
     const renderTable = () => {
-      const tbody = $("#purchaseTableBody");
+      const tbody = document.getElementById("purchaseTableBody");
       if (!tbody) return;
       tbody.innerHTML = "";
-
       purchaseOrdersRef.current.forEach((o) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td><strong>${o.id}</strong></td>
           <td>${o.supplier}</td>
           <td>${o.items}</td>
-          <td>${formatDate(o.orderDate)}</td>
-          <td>${formatDate(o.deliveryDate)}</td>
+          <td>${fmt(o.orderDate)}</td>
+          <td>${o.deliveryDate ? fmt(o.deliveryDate) : "-"}</td>
           <td><span class="status ${o.status}">${o.status}</span></td>
           <td>
-            <button class="btn btn-secondary" data-action="view" data-id="${o.id}">View</button>
+            <button class="btn btn-sec" data-action="view" data-id="${o.id}">View</button>
             ${
               o.status === "pending"
-                ? `<button class="btn btn-success" data-action="approve" data-id="${o.id}">Approve</button>`
+                ? `<button class="btn btn-suc" data-action="approve" data-id="${o.id}">Approve</button>`
                 : ""
             }
-            <button class="btn btn-secondary" data-action="edit" data-id="${o.id}">Edit</button>
+            <button class="btn btn-secon" data-action="edit" data-id="${o.id}">Edit</button>
+            <button class="btn btn-danger" data-action="delete" data-id="${o.id}">Delete</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
     };
 
-    // ===== Report (PDF) =====
-    function buildPoReportData() {
-      const list = purchaseOrdersRef.current;
-      const summary = {
-        totalOrders: list.length,
-        pending: list.filter((o) => o.status === "pending").length,
-        approved: list.filter((o) => o.status === "approved").length,
-        delivered: list.filter((o) => o.status === "delivered").length,
-        cancelled: list.filter((o) => o.status === "cancelled").length,
-        reportDate: new Date().toLocaleString(),
-      };
-      const rows = list.map((o) => ({
-        ...o,
-        orderDateFmt: formatDate(o.orderDate),
-        deliveryDateFmt: formatDate(o.deliveryDate),
-      }));
-      return { summary, rows };
-    }
-
-    function poReportHTML({ summary, rows }) {
-      const statCard = (label, value) => `
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:12px;text-align:center">
-          <div style="font-size:18px;font-weight:800;color:#111827">${value}</div>
-          <div style="font-size:12px;color:#6b7280;margin-top:6px">${label}</div>
-        </div>`;
-
-      const statsHTML = `
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0 18px">
-          ${statCard("Total Orders", summary.totalOrders)}
-          ${statCard("Pending", summary.pending)}
-          ${statCard("Approved", summary.approved)}
-          ${statCard("Delivered", summary.delivered)}
-          ${statCard("Cancelled", summary.cancelled)}
-          ${statCard("Generated", summary.reportDate)}
-        </div>`;
-
-      const tableRows = rows
-        .map(
-          (r) => `
-          <tr>
-            <td>${r.id}</td>
-            <td>${r.supplier}</td>
-            <td>${r.items}</td>
-            <td style="text-align:center">${r.orderDateFmt}</td>
-            <td style="text-align:center">${r.deliveryDateFmt}</td>
-            <td style="text-align:center;text-transform:capitalize">${r.status}</td>
-          </tr>`
-        )
-        .join("");
-
-      return `
-        <div style="font-family:Inter, Arial, sans-serif;color:#111827;font-size:14px;line-height:1.45">
-          <div style="text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid #2563eb">
-            <div style="display:inline-flex;align-items:center;gap:10px">
-              <div style="width:44px;height:44px;border-radius:10px;background:#2563eb;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff">🧾</div>
-              <div style="text-align:left">
-                <div style="font-weight:800;color:#111827;font-size:22px;margin:0">PackPal — Purchase Orders Summary</div>
-                <div style="color:#6b7280;font-size:12px;margin-top:4px">Generated on ${summary.reportDate}</div>
-              </div>
-            </div>
-          </div>
-
-          ${statsHTML}
-
-          <div style="margin:16px 0 6px">
-            <h3 style="color:#334155;margin:0 0 8px 0">📋 Orders</h3>
-            <table style="width:100%;border-collapse:collapse">
-              <thead>
-                <tr style="background:#2563eb;color:#fff">
-                  <th style="padding:8px;border:1px solid #e5e7eb;text-align:left">Order ID</th>
-                  <th style="padding:8px;border:1px solid #e5e7eb;text-align:left">Supplier</th>
-                  <th style="padding:8px;border:1px solid #e5e7eb;text-align:left">Items</th>
-                  <th style="padding:8px;border:1px solid #e5e7eb">Order Date</th>
-                  <th style="padding:8px;border:1px solid #e5e7eb">Delivery</th>
-                  <th style="padding:8px;border:1px solid #e5e7eb">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${tableRows}
-              </tbody>
-            </table>
-          </div>
-        </div>`;
-    }
-
-    async function exportOrdersPDF() {
+    async function loadOrders() {
       try {
-        const { jsPDF, html2canvas } = await ensurePDFTools();
-
-        // Build report content (A4-friendly)
-        const data = buildPoReportData();
-        const contentHTML = poReportHTML(data);
-
-        const temp = document.createElement("div");
-        temp.style.position = "absolute";
-        temp.style.left = "-9999px";
-        temp.style.top = "0";
-        temp.style.width = "794px"; // A4 width @ ~96dpi
-        temp.style.padding = "40px";
-        temp.style.background = "#ffffff";
-        temp.innerHTML = contentHTML;
-        document.body.appendChild(temp);
-
-        const canvas = await html2canvas(temp, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: "#ffffff",
-          width: 794,
-          height: temp.scrollHeight,
-        });
-        document.body.removeChild(temp);
-
-        const img = canvas.toDataURL("image/png");
-        const pdf = new jsPDF("p", "mm", "a4");
-        const imgW = 210;
-        const pageH = 297;
-        const imgH = (canvas.height * imgW) / canvas.width;
-
-        let hLeft = imgH;
-        let pos = 0;
-        pdf.addImage(img, "PNG", 0, pos, imgW, imgH);
-        hLeft -= pageH;
-        while (hLeft > 0) {
-          pos = hLeft - imgH;
-          pdf.addPage();
-          pdf.addImage(img, "PNG", 0, pos, imgW, imgH);
-          hLeft -= pageH;
-        }
-        pdf.save(`purchase_orders_${new Date().toISOString().split("T")[0]}.pdf`);
+        const res = await purchases.list();
+        const rows = Array.isArray(res?.data?.orders) ? res.data.orders : [];
+        purchaseOrdersRef.current = rows.map((o) => ({
+          id: o.id,
+          supplier: o.supplier,
+          items: o.items || "",
+          orderDate: o.orderDate
+            ? String(o.orderDate).slice(0, 10)
+            : new Date().toISOString().slice(0, 10),
+          deliveryDate: o.deliveryDate ? String(o.deliveryDate).slice(0, 10) : "",
+          status: o.status || "pending",
+          priority: o.priority || "normal",
+          notes: o.notes || "",
+        }));
+        renderTable();
+        refreshMetrics();
       } catch (e) {
-        console.error(e);
-        alert("PDF export failed. Please try again.");
+        console.warn("Failed to load purchases:", e?.message || e);
       }
     }
 
-    // ===== Modal + Actions =====
+    // ---------- PDF export (styled like screenshot) ----------
+    const exportPDF = () => {
+      const doc = new jsPDF("p", "pt");
+      const orders = purchaseOrdersRef.current;
+
+      // Header title + generated line
+      doc.setFontSize(20);
+      doc.setTextColor(40);
+      doc.text("PackPal — Purchase Orders Summary", 40, 40);
+
+      // thin divider
+      doc.setDrawColor(37, 99, 235);
+      doc.setLineWidth(2);
+      doc.line(40, 48, 555, 48);
+
+      doc.setFontSize(10);
+      doc.setTextColor(80);
+      doc.text("Generated on " + new Date().toLocaleString(), 40, 66);
+
+      // Metrics
+      const total = orders.length;
+      const pending = orders.filter((o) => o.status === "pending").length;
+      const approved = orders.filter((o) => o.status === "approved").length;
+      const delivered = orders.filter((o) => o.status === "delivered").length;
+      
+
+      const metrics = [
+        { label: "Total Orders", value: total },
+        { label: "Pending", value: pending },
+        { label: "Approved", value: approved },
+        { label: "Delivered", value: delivered },
+       
+      ];
+
+      // Card grid (3 per row)
+      const startX = 40;
+      const startY = 90;
+      const cardW = 160;
+      const cardH = 70;
+      const gap = 15;
+
+      let x = startX;
+      let y = startY;
+
+      metrics.forEach((m, i) => {
+        // light card background
+        doc.setDrawColor(225);
+        doc.setFillColor(246, 248, 252); // subtle light
+        doc.roundedRect(x, y, cardW, cardH, 10, 10, "F");
+
+        // value
+        doc.setTextColor(0);
+        doc.setFontSize(m.bold ? 14 : 16);
+        doc.setFont("helvetica", m.bold ? "bold" : "normal");
+        doc.text(String(m.value), x + cardW / 2, y + 28, { align: "center" });
+
+        // label
+        doc.setTextColor(110);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(m.label, x + cardW / 2, y + 48, { align: "center" });
+
+        // advance to next position
+        x += cardW + gap;
+        if ((i + 1) % 3 === 0) {
+          x = startX;
+          y += cardH + gap;
+        }
+      });
+
+      // Section title "Orders" with small icon
+      let tableStartY = y + cardH + 25;
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(214, 48, 49); // small red icon color
+      doc.text("", 40, tableStartY); // emoji icon
+      doc.setTextColor(33);
+      doc.text("Orders", 60, tableStartY);
+
+      // table
+      const tableData = orders.map((o) => [
+        o.id,
+        o.supplier,
+        o.items,
+        o.orderDate,
+        o.deliveryDate || "-",
+        o.status.charAt(0).toUpperCase() + o.status.slice(1),
+      ]);
+
+      autoTable(doc, {
+        head: [["ORDER ID", "SUPPLIER", "ITEMS", "ORDER DATE", "DELIVERY", "STATUS"]],
+        body: tableData,
+        startY: tableStartY + 10,
+        styles: { fontSize: 11, cellPadding: 9, textColor: 30 },
+        headStyles: {
+          fillColor: [237, 242, 255], // light indigo
+          textColor: 30,
+          lineWidth: 0.5,
+          lineColor: [203, 213, 225],
+          fontStyle: "bold",
+        },
+        bodyStyles: { lineColor: [229, 231, 235], lineWidth: 0.2 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { cellWidth: 60 },
+          1: { cellWidth: 120 },
+          2: { cellWidth: 150 },
+          3: { cellWidth: 70 },
+          4: { cellWidth: 70 },
+          5: { cellWidth: 65 },
+        },
+        didDrawPage: (data) => {
+          // optional footer page number
+          const str = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(9);
+          doc.setTextColor(120);
+          doc.text(str, 555, 820, { align: "right" });
+        },
+      });
+
+      doc.save("PurchaseOrdersSummary.pdf");
+    };
+
+    // ---------- modal helpers ----------
     const openCreateModal = () => {
-      const sel = $("#modalSupplier");
-      if (sel)
+      const sel = document.getElementById("modalSupplier");
+      if (sel) {
         sel.innerHTML =
           '<option value="">Select Supplier</option>' +
           suppliersRef.current.map((s) => `<option>${s.name}</option>`).join("");
-      $("#poEditId").value = "";
-      $("#purchaseForm").reset();
-      $("#poModalTitle").textContent = "Create New Purchase Order";
-      $("#poSubmitBtn").textContent = "Create Order";
+      }
+      document.getElementById("poEditId").value = "";
+      document.getElementById("purchaseForm").reset();
+      document.getElementById("poModalTitle").textContent = "Create New Purchase Order";
+      document.getElementById("poSubmitBtn").textContent = "Create Order";
       const d = new Date();
       d.setDate(d.getDate() + 14);
-      $("#modalDelivery").value = d.toISOString().split("T")[0];
-      $("#purchaseModal").classList.add("show");
-      $("#purchaseModal").setAttribute("aria-hidden", "false");
+      document.getElementById("modalDelivery").value = d.toISOString().split("T")[0];
+      document.getElementById("purchaseModal").classList.add("show");
+      document.getElementById("purchaseModal").setAttribute("aria-hidden", "false");
     };
 
     const openEditModal = (order) => {
-      const sel = $("#modalSupplier");
-      if (sel)
+      const sel = document.getElementById("modalSupplier");
+      if (sel) {
         sel.innerHTML =
           '<option value="">Select Supplier</option>' +
           suppliersRef.current.map((s) => `<option>${s.name}</option>`).join("");
-      $("#poEditId").value = order.id;
-      $("#modalSupplier").value = order.supplier;
-      $("#modalItems").value = order.items;
-      $("#modalDelivery").value = order.deliveryDate;
-      $("#modalPriority").value = "normal";
-      $("#poModalTitle").textContent = "Edit Purchase Order";
-      $("#poSubmitBtn").textContent = "Update";
-      $("#purchaseModal").classList.add("show");
-      $("#purchaseModal").setAttribute("aria-hidden", "false");
+      }
+      document.getElementById("poEditId").value = order.id;
+      document.getElementById("modalSupplier").value = order.supplier;
+      document.getElementById("modalItems").value = order.items;
+      document.getElementById("modalDelivery").value = order.deliveryDate || "";
+      document.getElementById("modalPriority").value = order.priority || "normal";
+      document.getElementById("poModalTitle").textContent = "Edit Purchase Order";
+      document.getElementById("poSubmitBtn").textContent = "Update";
+      document.getElementById("purchaseModal").classList.add("show");
+      document.getElementById("purchaseModal").setAttribute("aria-hidden", "false");
     };
 
     const closeModal = () => {
-      $("#purchaseModal").classList.remove("show");
-      $("#purchaseModal").setAttribute("aria-hidden", "true");
+      document.getElementById("purchaseModal").classList.remove("show");
+      document.getElementById("purchaseModal").setAttribute("aria-hidden", "true");
     };
 
     const viewOrder = (id) => {
@@ -347,21 +283,48 @@ ID: ${o.id}
 Supplier: ${o.supplier}
 Items: ${o.items}
 Status: ${o.status}
-Order Date: ${formatDate(o.orderDate)}
-Delivery: ${formatDate(o.deliveryDate)}`);
+Order Date: ${fmt(o.orderDate)}
+Delivery: ${o.deliveryDate ? fmt(o.deliveryDate) : "-"}`);
     };
 
-    const approveOrder = (id) => {
+    const approveOrder = async (id) => {
       const o = purchaseOrdersRef.current.find((x) => x.id === id);
       if (!o) return;
-      if (
-        settingsRef.current.autoApprove === "on" ||
-        window.confirm("Approve this order?")
-      ) {
-        o.status = "approved";
-        toast("Order approved");
+      try {
+        if (
+          settingsRef.current.autoApprove === "on" ||
+          window.confirm("Approve this order?")
+        ) {
+          o.status = "approved"; // optimistic
+          renderTable();
+          refreshMetrics();
+          await purchases.setStatus(id, "approved");
+          toast("Order approved");
+        }
+      } catch (e) {
+        o.status = "pending"; // revert
         renderTable();
-        refreshPoMetrics();
+        refreshMetrics();
+        alert(
+          "Approve failed: " +
+            (e?.response?.data?.message || e?.message || "Network Error")
+        );
+      } finally {
+        await loadOrders();
+      }
+    };
+
+    const deleteOrder = async (id) => {
+      if (!window.confirm(`Delete order ${id}?`)) return;
+      try {
+        await purchases.remove(id);
+        toast(`Order ${id} deleted`);
+        await loadOrders();
+      } catch (e) {
+        alert(
+          "Delete failed: " +
+            (e?.response?.data?.message || e?.message || "Network Error")
+        );
       }
     };
 
@@ -371,87 +334,68 @@ Delivery: ${formatDate(o.deliveryDate)}`);
       openEditModal(o);
     };
 
-    const bulkApprove = () => {
-      if (!window.confirm("Approve all pending orders?")) return;
-      purchaseOrdersRef.current.forEach((o) => {
-        if (o.status === "pending") o.status = "approved";
-      });
-      toast("All pending orders approved");
-      renderTable();
-      refreshPoMetrics();
-    };
-
-    // ===== Form/Search/Filter Handlers =====
-    const onSearchInput = () => {
-      const q = $("#purchaseSearch").value.toLowerCase();
-      $all("#purchaseTableBody tr").forEach((r) => {
-        r.style.display = r.textContent.toLowerCase().includes(q) ? "" : "none";
-      });
-    };
-
-    const onFilterChange = () => {
-      const v = $("#statusFilter").value;
-      $all("#purchaseTableBody tr").forEach((r) => {
-        const st = r.querySelector(".status")?.textContent.trim();
-        r.style.display = !v || st === v ? "" : "none";
-      });
-    };
-
-    const onFormSubmit = (e) => {
+    const onFormSubmit = async (e) => {
       e.preventDefault();
-      const editId = $("#poEditId").value;
+      const editId = document.getElementById("poEditId").value;
       const data = {
-        supplier: $("#modalSupplier").value,
-        items: $("#modalItems").value.trim(),
-        deliveryDate: $("#modalDelivery").value,
+        supplier: document.getElementById("modalSupplier").value,
+        items: document.getElementById("modalItems").value.trim(),
+        deliveryDate: document.getElementById("modalDelivery").value || undefined,
+        priority: document.getElementById("modalPriority").value || "normal",
         status: "pending",
       };
       if (!data.supplier || !data.items)
-        return alert("Please fill supplier, items");
+        return alert("Please fill supplier and items");
 
-      if (!editId) {
-        // create new with O-xxx ID
-        const newId = nextOrderId();
-        purchaseOrdersRef.current.unshift({
-          id: newId,
-          orderDate: new Date().toISOString().split("T")[0],
-          ...data,
-        });
-        toast(`Order ${newId} created`);
-      } else {
-        // update existing
-        const i = purchaseOrdersRef.current.findIndex((o) => o.id === editId);
-        if (i !== -1) {
-          purchaseOrdersRef.current[i] = {
-            ...purchaseOrdersRef.current[i],
+      try {
+        if (!editId) {
+          await purchases.create({
             ...data,
-          };
+            orderDate: new Date().toISOString().slice(0, 10),
+          });
+          toast("Order created");
+        } else {
+          await purchases.update(editId, data);
           toast(`Order ${editId} updated`);
         }
+        closeModal();
+        await loadOrders();
+      } catch (e2) {
+        alert(
+          "Save failed: " +
+            (e2?.response?.data?.message || e2?.message || "Network Error")
+        );
       }
-      closeModal();
-      renderTable();
-      refreshPoMetrics();
     };
 
-    // ===== Initial paint & listeners =====
-    refreshPoMetrics();
-    renderTable();
+    const onBulkClick = async () => {
+      if (!window.confirm("Approve all pending orders?")) return;
+      const pending = purchaseOrdersRef.current.filter(
+        (o) => o.status === "pending"
+      );
+      if (!pending.length) return;
 
-    const btnCreate = $("#btnCreate");
-    const btnExport = $("#btnExport");
-    const btnBulkApprove = $("#btnBulkApprove");
-    const tableBody = $("#purchaseTableBody");
+      // optimistic
+      pending.forEach((o) => (o.status = "approved"));
+      renderTable();
+      refreshMetrics();
 
-    const onCreateClick = () => openCreateModal();
-    const onExportClick = () => exportOrdersPDF();
-    const onBulkClick = () => bulkApprove();
+      const results = await Promise.allSettled(
+        pending.map((o) => purchases.setStatus(o.id, "approved"))
+      );
+      const rejected = results.filter((r) => r.status === "rejected");
+      if (rejected.length) {
+        alert(`Bulk approve finished with ${rejected.length} error(s).`);
+      } else {
+        toast("All pending orders approved");
+      }
+      await loadOrders();
+    };
 
-    btnCreate?.addEventListener("click", onCreateClick);
-    btnExport?.addEventListener("click", onExportClick);
-    btnBulkApprove?.addEventListener("click", onBulkClick);
+    // ---------- initial load ----------
+    loadOrders();
 
-    // Delegate table button clicks (view/approve/edit)
+    // ---------- table/search/filter listeners ----------
     const onTableClick = (e) => {
       const btn = e.target.closest("button[data-action]");
       if (!btn) return;
@@ -460,50 +404,57 @@ Delivery: ${formatDate(o.deliveryDate)}`);
       if (action === "view") return viewOrder(id);
       if (action === "approve") return approveOrder(id);
       if (action === "edit") return editOrder(id);
+      if (action === "delete") return deleteOrder(id);
     };
-    tableBody?.addEventListener("click", onTableClick);
 
-    // Modal close handlers
-    const onEsc = (e) => {
-      if (e.key === "Escape") closeModal();
+    const onSearchInput = () => {
+      const q = document.getElementById("purchaseSearch").value.toLowerCase();
+      $all("#purchaseTableBody tr").forEach((r) => {
+        r.style.display = r.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
     };
-    const onClickOutside = (e) => {
-      if (e.target.id === "purchaseModal") closeModal();
+
+    const onFilterChange = () => {
+      const v = document.getElementById("statusFilter").value;
+      $all("#purchaseTableBody tr").forEach((r) => {
+        const st = r.querySelector(".status")?.textContent.trim();
+        r.style.display = !v || st === v ? "" : "none";
+      });
     };
+
+    const closeModalFn = () => closeModal();
+    const onEsc = (ev) => { if (ev.key === "Escape") closeModalFn(); };
+    const onClickOutside = (ev) => { if (ev.target.id === "purchaseModal") closeModalFn(); };
+
+    document.getElementById("btnCreate")?.addEventListener("click", openCreateModal);
+    document.getElementById("btnExport")?.addEventListener("click", exportPDF);
+    document.getElementById("btnBulkApprove")?.addEventListener("click", onBulkClick);
+    document.getElementById("purchaseTableBody")?.addEventListener("click", onTableClick);
+    document.getElementById("purchaseForm")?.addEventListener("submit", onFormSubmit);
+    document.getElementById("purchaseSearch")?.addEventListener("input", onSearchInput);
+    document.getElementById("statusFilter")?.addEventListener("change", onFilterChange);
+    document.getElementById("poCloseBtn")?.addEventListener("click", closeModalFn);
+    document.getElementById("btnCancel")?.addEventListener("click", closeModalFn);
     document.addEventListener("keydown", onEsc);
     document.addEventListener("click", onClickOutside);
 
-    // Form, search, filter
-    const form = $("#purchaseForm");
-    form?.addEventListener("submit", onFormSubmit);
-    const search = $("#purchaseSearch");
-    const filter = $("#statusFilter");
-    search?.addEventListener("input", onSearchInput);
-    filter?.addEventListener("change", onFilterChange);
-
-    // Modal close buttons
-    const btnClose = $("#poCloseBtn");
-    const btnCancel = $("#btnCancel");
-    const onCloseClick = () => closeModal();
-    btnClose?.addEventListener("click", onCloseClick);
-    btnCancel?.addEventListener("click", onCloseClick);
-
-    // Cleanup
+    // ---------- cleanup ----------
     return () => {
-      btnCreate?.removeEventListener("click", onCreateClick);
-      btnExport?.removeEventListener("click", onExportClick);
-      btnBulkApprove?.removeEventListener("click", onBulkClick);
-      tableBody?.removeEventListener("click", onTableClick);
+      document.getElementById("btnCreate")?.removeEventListener("click", openCreateModal);
+      document.getElementById("btnExport")?.removeEventListener("click", exportPDF);
+      document.getElementById("btnBulkApprove")?.removeEventListener("click", onBulkClick);
+      document.getElementById("purchaseTableBody")?.removeEventListener("click", onTableClick);
+      document.getElementById("purchaseForm")?.removeEventListener("submit", onFormSubmit);
+      document.getElementById("purchaseSearch")?.removeEventListener("input", onSearchInput);
+      document.getElementById("statusFilter")?.removeEventListener("change", onFilterChange);
+      document.getElementById("poCloseBtn")?.removeEventListener("click", closeModalFn);
+      document.getElementById("btnCancel")?.removeEventListener("click", closeModalFn);
       document.removeEventListener("keydown", onEsc);
       document.removeEventListener("click", onClickOutside);
-      form?.removeEventListener("submit", onFormSubmit);
-      search?.removeEventListener("input", onSearchInput);
-      filter?.removeEventListener("change", onFilterChange);
-      btnClose?.removeEventListener("click", onCloseClick);
-      btnCancel?.removeEventListener("click", onCloseClick);
     };
-  }, []); // ✅ runs once, no missing-deps warning
+  }, []);
 
+  // ---------- UI ----------
   return (
     <div className="dashboard-layout">
       <Sidebar />
@@ -516,44 +467,31 @@ Delivery: ${formatDate(o.deliveryDate)}`);
 
           <div className="metrics-row">
             <div className="metric-card">
-              <div className="metric-change">+15%</div>
               <div className="metric-value" id="poPending">0</div>
               <div className="metric-label">Pending Orders</div>
             </div>
             <div className="metric-card">
-              <div className="metric-change">+22%</div>
               <div className="metric-value" id="poCompleted">0</div>
               <div className="metric-label">Completed Orders</div>
             </div>
+            {/* If you want to show cancelled on page too, add another card:
             <div className="metric-card">
-              <div className="metric-change">-3%</div>
               <div className="metric-value" id="poCancelled">0</div>
-              <div className="metric-label">Cancelled Orders</div>
-            </div>
+              <div className="metric-label">Cancelled</div>
+            </div> */}
           </div>
 
           <div className="action-bar">
-            <button className="btn btn-primary" id="btnCreate">
-              <span>＋</span>Create New Order
-            </button>
-            <button className="btn btn-secondary" id="btnExport">
-              <span>📄</span>Export Orders (PDF)
-            </button>
-            <button className="btn btn-success" id="btnBulkApprove">
-              <span>✓</span>Bulk Approve
-            </button>
+            <button className="btn btn-pr" id="btnCreate"><span>＋</span>Create New Order</button>
+            <button className="btn btn-secondary" id="btnExport"><span>📄</span>Export Orders (PDF)</button>
+            <button className="btn btn-success" id="btnBulkApprove"><span>✓</span>Bulk Approve</button>
           </div>
 
           <div className="table-container">
             <div className="table-header">
               <div className="table-title">📋 Purchase Orders</div>
               <div className="search-filter-bar">
-                <input
-                  type="text"
-                  className="search-box"
-                  id="purchaseSearch"
-                  placeholder="Search orders..."
-                />
+                <input type="text" className="search-box" id="purchaseSearch" placeholder="Search orders..." />
                 <select className="filter-select" id="statusFilter">
                   <option value="">All Status</option>
                   <option value="pending">Pending</option>
@@ -585,12 +523,8 @@ Delivery: ${formatDate(o.deliveryDate)}`);
         <div className="modal" id="purchaseModal" aria-hidden="true" role="dialog">
           <div className="modal-content">
             <div className="modal-header">
-              <h2 className="modal-title" id="poModalTitle">
-                Create New Purchase Order
-              </h2>
-              <button className="close-modal" id="poCloseBtn" aria-label="Close">
-                &times;
-              </button>
+              <h2 className="modal-title" id="poModalTitle">Create New Purchase Order</h2>
+              <button className="close-modal" id="poCloseBtn" aria-label="Close">&times;</button>
             </div>
             <form id="purchaseForm">
               <input type="hidden" id="poEditId" defaultValue="" />
@@ -602,12 +536,7 @@ Delivery: ${formatDate(o.deliveryDate)}`);
               </div>
               <div className="form-group">
                 <label className="form-label">Items</label>
-                <textarea
-                  className="form-control"
-                  id="modalItems"
-                  rows="3"
-                  placeholder="Enter items (one per line)"
-                ></textarea>
+                <textarea className="form-control" id="modalItems" rows="3" placeholder="Enter items (one per line)"></textarea>
               </div>
               <div className="form-group">
                 <label className="form-label">Expected Delivery Date</label>
@@ -622,12 +551,8 @@ Delivery: ${formatDate(o.deliveryDate)}`);
                 </select>
               </div>
               <div className="form-actions">
-                <button type="button" className="btn btn-secondary" id="btnCancel">
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" id="poSubmitBtn">
-                  Create Order
-                </button>
+                <button type="button" className="btn btn-secondary" id="btnCancel">Cancel</button>
+                <button type="submit" className="btn btn-pri" id="poSubmitBtn">Create Order</button>
               </div>
             </form>
           </div>

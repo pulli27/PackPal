@@ -8,38 +8,40 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 
 const inventoryRoutes = require("./Route/InventoryRoute");
+const purchaseRoutes  = require("./Route/PurchaseRoute");
 
-// ---- sanity check for env ----
 if (!process.env.MONGO_URI) {
   console.error("FATAL: MONGO_URI is missing in BackEnd/.env");
   process.exit(1);
 }
 const PORT = process.env.PORT || 5000;
 
-// ---- express app ----
 const app = express();
 
-// allow your local FE origins (3000 = CRA, 5173 = Vite, etc.)
+// ✅ allow PATCH + common headers for preflight
 const devLocalhost = new Set([
   "http://localhost:3000","http://127.0.0.1:3000",
   "http://localhost:3004","http://127.0.0.1:3004",
   "http://localhost:3005","http://127.0.0.1:3005",
   "http://localhost:5173","http://127.0.0.1:5173",
 ]);
+
 app.use(
   cors({
     origin: (origin, cb) => (!origin || devLocalhost.has(origin)) ? cb(null, true) : cb(null, false),
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     credentials: true,
   })
 );
+// also respond to all preflights
 app.options("*", cors());
 
 app.use(express.json());
 
 // routes
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/purchases", purchaseRoutes);
 
 // health
 app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -50,11 +52,11 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-// ---- start ----
+// start
 (async () => {
   try {
     mongoose.set("strictQuery", true);
-    await mongoose.connect(process.env.MONGO_URI); // ✅ correct var name
+    await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB connected");
     app.listen(PORT, () => console.log(`🚀 Server http://localhost:${PORT}`));
   } catch (e) {
