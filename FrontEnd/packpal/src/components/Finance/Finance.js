@@ -2,31 +2,40 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./Finance.css";
-import TransactionsTable from "../TransactionsTable/TransactionsTable";
 
-
-/* ===== BACKEND ROUTES ===== */
-const PRODUCTS_URL = "http://localhost:5000/carts";
 const TX_URL = "http://localhost:5000/transactions";
 
-/* ===== Helpers ===== */
 const money = (n) =>
   "LKR" +
   Number(n || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-
 const nowISO = () => new Date().toISOString().slice(0, 10);
 
-const effectivePrice = (p) => {
-  const price = Number(p?.price || 0);
-  const dv = Number(p?.discountValue || 0);
-  if (p?.discountType === "percentage") return Math.max(0, price * (1 - dv / 100));
-  if (p?.discountType === "fixed") return Math.max(0, price - dv);
-  return price;
-};
-const saving = (p) => Math.max(0, Number(p?.price || 0) - effectivePrice(p));
+const unpackList = (payload) =>
+  Array.isArray(payload)
+    ? payload
+    : payload?.transactions ?? payload?.items ?? payload?.data ?? [];
+
+const toTx = (row) => ({
+  id: String(
+    row?.id ??
+      row?._id ??
+      row?.txId ??
+      row?.transactionId ??
+      Math.random().toString(36).slice(2, 10)
+  ),
+  date: row?.date ? String(row.date).slice(0, 10) : nowISO(),
+  customer: row?.customer ?? "",
+  productName: row?.productName ?? row?.product?.name ?? "",
+  qty: Number(row?.qty ?? 1),
+  unitPrice: Number(row?.unitPrice ?? 0),
+  discountPerUnit: Number(row?.discountPerUnit ?? 0),
+  total: Number(row?.total ?? 0),
+  method: row?.method ?? "Card",
+  // status deliberately omitted in Finance page
+});
 
 const csvEscape = (v) => {
   if (v == null) return "";
@@ -57,348 +66,298 @@ const printHtml = (inner) => {
       th,td{border:1px solid #ddd;padding:8px}
       thead th{background:#f3f4f6}
       .right{text-align:right}
+      .center{text-align:center}
     </style>
   </head><body>${inner}</body></html>`);
   w.document.close();
   w.print();
 };
 
-/* ===== Normalizers ===== */
-const unpackList = (payload) =>
-  Array.isArray(payload)
-    ? payload
-    : payload?.transactions ?? payload?.products ?? payload?.items ?? payload?.data ?? [];
-
-const toProduct = (row) => ({
-  id: String(row?.id ?? row?._id ?? row?.productId ?? Math.random().toString(36).slice(2, 10)),
-  name: row?.name ?? "Unnamed",
-  price: Number(row?.price ?? 0),
-  discountType: row?.discountType ?? "none",
-  discountValue: Number(row?.discountValue ?? 0),
-});
-
-// ✅ Updated here → Ensure only YYYY-MM-DD is shown
-const toTx = (row) => ({
-  id: String(row?.id ?? row?._id ?? row?.txId ?? row?.transactionId ?? Math.random().toString(36).slice(2, 10)),
-  date: row?.date ? row.date.slice(0, 10) : nowISO(), // ✅ Remove time
-  customer: row?.customer ?? "",
-  customerId: row?.customerId ?? "",
-  fmc: Boolean(row?.fmc),
-  productId: String(row?.productId ?? row?.product?._id ?? ""),
-  productName: row?.productName ?? row?.product?.name ?? "",
-  qty: Number(row?.qty ?? 1),
-  unitPrice: Number(row?.unitPrice ?? 0),
-  discountPerUnit: Number(row?.discountPerUnit ?? 0),
-  total: Number(row?.total ?? 0),
-  method: row?.method ?? "Cash",
-  status: row?.status ?? "Paid",
-  notes: row?.notes ?? "",
-});
-
-/* ===== fetchHandler (axios) ===== */
-const fetchHandler = {
-  getProducts: async () => {
-    const res = await axios.get(PRODUCTS_URL);
-    return unpackList(res.data).map(toProduct);
-  },
-  getTransactions: async () => {
-    const res = await axios.get(TX_URL);
-    return unpackList(res.data).map(toTx);
-  },
-};
-
 export default function FinancePage() {
-  const [products, setProducts] = useState([]);
   const [txs, setTxs] = useState([]);
-  const [form, setForm] = useState({
-    customer: "",
-    customerId: "",
-    fmc: "true",
-    productId: "",
-    qty: 1,
-    date: nowISO(),
-    method: "Cash",
-    status: "Paid",
-    notes: "",
-  });
-
-  const [filter, setFilter] = useState("");
-  const [query, setQuery] = useState("");
-  const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
+  const [q, setQ] = useState("");
 
-  /* ===== Load from DB ===== */
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setErr("");
-      try {
-        const [p, t] = await Promise.all([
-          fetchHandler.getProducts(),
-          fetchHandler.getTransactions(),
-        ]);
-        setProducts(p);
-        setTxs(t);
-      } catch (e) {
-        setErr(e?.response?.data?.message || e.message || "Failed to connect to backend");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  // edit modal
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  /* ===== CRUD ===== */
-  const refreshTransactions = async () => {
-    const fresh = await fetchHandler.getTransactions();
-    setTxs(fresh);
-    window.dispatchEvent(new Event("tx:changed"));
-  };
-
-  const addTx = async () => {
-    const pid = String(form.productId);
-    const qty = parseInt(form.qty || "1", 10);
-    const product = products.find((x) => x.id === pid);
-
-    if (!form.customer.trim() || !product || qty <= 0) {
-      alert("Fill all transaction fields correctly.");
-      return;
-    }
-
-    const unit = effectivePrice(product);
-    const disc = saving(product);
-
-    const payload = {
-      date: form.date || nowISO(),
-      customer: form.customer.trim(),
-      customerId: form.customerId.trim(),
-      fmc: form.fmc === "true",
-      productId: product.id,
-      productName: product.name,
-      qty,
-      unitPrice: unit,
-      discountPerUnit: disc,
-      total: unit * qty,
-      method: form.method,
-      status: form.status,
-      notes: form.notes || "",
-    };
-
+  const fetchTx = async () => {
+    setLoading(true);
+    setErr("");
     try {
-      await axios.post(TX_URL, payload, { headers: { "Content-Type": "application/json" } });
-      await refreshTransactions();
-      setForm({
-        customer: "", customerId: "", fmc: "true", productId: "", qty: 1,
-        date: nowISO(), method: "Cash", status: "Paid", notes: "",
-      });
+      const res = await axios.get(TX_URL);
+      setTxs(unpackList(res.data).map(toTx));
     } catch (e) {
-      alert(e?.response?.data?.message || e.message || "Failed to add transaction");
+      setErr(e?.response?.data?.message || e.message || "Failed to load transactions");
+    } finally {
+      setLoading(false);
     }
   };
+  useEffect(() => { fetchTx(); }, []);
 
-  const deleteTx = async (realId) => {
-    if (!window.confirm("Delete transaction " + realId + "?")) return;
-    try {
-      await axios.delete(`${TX_URL}/${realId}`);
-      await refreshTransactions();
-    } catch (e) {
-      alert(e?.response?.data?.message || e.message || "Delete failed");
-    }
-  };
+  /** base rows (newest first) */
+  const rawRows = useMemo(() => {
+    return txs.slice().reverse();
+  }, [txs]);
 
-  const cycleStatus = async (realId) => {
-    const current = txs.find((t) => t.id === realId);
-    if (!current) return;
-    const next = current.status === "Paid" ? "Pending" : current.status === "Pending" ? "Refund" : "Paid";
-    try {
-      await axios.put(`${TX_URL}/${realId}`, { ...current, status: next }, { headers: { "Content-Type": "application/json" } });
-      await refreshTransactions();
-    } catch (e) {
-      alert(e?.response?.data?.message || e.message || "Update failed");
-    }
-  };
-
-  /* ===== Filters ===== */
-  const filtered = useMemo(() => {
-    let list = txs.slice().reverse();
-    if (filter === "Paid" || filter === "Pending" || filter === "Refund") {
-      list = list.filter((t) => t.status === filter);
-    } else if (filter === "FMC") {
-      list = list.filter((t) => t.fmc);
-    }
-    const q = (query || "").toLowerCase();
-    if (q) {
-      list = list.filter(
-        (t) =>
-          (t.id || "").toLowerCase().includes(q) ||
-          (t.customer || "").toLowerCase().includes(q)
+  /** filter + add sequential display id and keep real id as rid */
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const filtered = rawRows.filter((t, i) => {
+      const displayId = String(i + 1);
+      if (!term) return true;
+      return (
+        displayId.includes(term) ||
+        t.id.toLowerCase().includes(term) ||
+        (t.customer || "").toLowerCase().includes(term) ||
+        (t.productName || "").toLowerCase().includes(term)
       );
-    }
-    return list;
-  }, [txs, filter, query]);
+    });
 
-  /* ===== Create display rows with sequential TX ID ===== */
-  const rowsWithSeq = useMemo(() => {
+    // now map to include displayId (1..n) and rid (real backend id)
     return filtered.map((t, i) => ({
       ...t,
-      rid: t.id,
-      id: String(i + 1)
+      rid: t.id,               // real backend id
+      displayId: String(i + 1) // what we show in TX ID column
     }));
-  }, [filtered]);
+  }, [rawRows, q]);
 
-  const realIdFromDisplay = (displayId) => {
-    const row = rowsWithSeq.find(r => String(r.id) === String(displayId));
-    return row?.rid;
-  };
+  const doExport = () =>
+    exportCsv(
+      "transactions",
+      rows.map((r) => ({
+        txId: r.displayId, // export the same TX ID users see
+        date: r.date,
+        customer: r.customer,
+        product: r.productName,
+        qty: r.qty,
+        unitPrice: r.unitPrice,
+        discount: r.discountPerUnit,
+        total: r.total,
+        method: r.method,
+      })),
+      ["txId", "date", "customer", "product", "qty", "unitPrice", "discount", "total", "method"]
+    );
 
-  const handleCycleStatus = (displayId) => {
-    const real = realIdFromDisplay(displayId);
-    if (real) cycleStatus(real);
-  };
-  const handleDelete = (displayId) => {
-    const real = realIdFromDisplay(displayId);
-    if (real) deleteTx(real);
-  };
-
-  /* ===== Exports/Print use the same sequential IDs ===== */
-  const exportTxCsv = () =>
-    exportCsv("transactions", rowsWithSeq, [
-      "id", "date", "customer", "customerId", "fmc", "productName", "qty",
-      "unitPrice", "discountPerUnit", "total", "method", "status", "notes",
-    ]);
-
-  const printTx = () => {
-    const rows = rowsWithSeq
+  const doPrint = () => {
+    const body = rows
       .map(
-        (t) => `<tr>
-          <td>${t.id}</td><td>${t.date}</td><td>${t.customer || ""}</td>
-          <td>${t.fmc ? "FMC" : "Regular"}</td><td>${t.productName || ""}</td>
-          <td>${t.qty}</td><td class="right">${money(t.unitPrice)}</td>
-          <td class="right">${t.discountPerUnit > 0 ? money(t.discountPerUnit) : "—"}</td>
-          <td class="right">${money(t.total)}</td><td>${t.status}</td>
+        (r) => `<tr>
+          <td class="center">${r.displayId}</td>
+          <td>${r.date}</td>
+          <td>${r.customer || ""}</td>
+          <td>${r.productName || ""}</td>
+          <td class="right">${r.qty}</td>
+          <td class="right">${money(r.unitPrice)}</td>
+          <td class="right">${r.discountPerUnit ? money(r.discountPerUnit) : "—"}</td>
+          <td class="right">${money(r.total)}</td>
+          <td>${r.method}</td>
         </tr>`
       )
       .join("");
-    printHtml(
-      `<h2>Transactions</h2>
-       <table>
-         <thead>
-           <tr><th>TX ID</th><th>Date</th><th>Customer</th><th>Type</th><th>Product</th><th>Qty</th><th>Unit</th><th>Discount</th><th>Total</th><th>Status</th></tr>
-         </thead>
-         <tbody>${rows}</tbody>
-       </table>`
-    );
+    printHtml(`
+      <h2>Transactions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>TX ID</th><th>Date</th><th>Customer</th><th>Product</th>
+            <th>Qty</th><th>Unit</th><th>Discount</th><th>Total</th><th>Method</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    `);
+  };
+
+  /* ====== ACTIONS: EDIT (modal) / DELETE ====== */
+  const openEdit = (row) =>
+    setEditing({
+      ...row,
+      id: row.rid, // make sure we save with the real backend id
+    });
+  const closeEdit = () => setEditing(null);
+
+  const setEdit = (k, v) => {
+    setEditing((e) => {
+      if (!e) return e;
+      const next = { ...e, [k]: v };
+      const qty = Number(k === "qty" ? v : next.qty || 1);
+      const unit = Number(k === "unitPrice" ? v : next.unitPrice || 0);
+      next.total = qty * unit;
+      return next;
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setSaving(true);
+    setErr(""); setOk("");
+    try {
+      const payload = {
+        date: editing.date,
+        customer: editing.customer,
+        productName: editing.productName,
+        qty: Number(editing.qty || 1),
+        unitPrice: Number(editing.unitPrice || 0),
+        discountPerUnit: Number(editing.discountPerUnit || 0),
+        total: Number(editing.unitPrice || 0) * Number(editing.qty || 1),
+        method: editing.method || "Card",
+      };
+      await axios.put(`${TX_URL}/${editing.id}`, payload, {
+        headers: { "Content-Type": "application/json" },
+      });
+      setOk("Updated.");
+      setEditing(null);
+      await fetchTx();
+      setTimeout(() => setOk(""), 1800);
+    } catch (e) {
+      setErr(e?.response?.data?.message || e.message || "Update failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteTx = async (rowId) => {
+    if (!window.confirm("Delete this transaction?")) return;
+    setErr(""); setOk("");
+    try {
+      await axios.delete(`${TX_URL}/${rowId}`);
+      await fetchTx();
+      setOk("Deleted.");
+      setTimeout(() => setOk(""), 1800);
+    } catch (e) {
+      setErr(e?.response?.data?.message || e.message || "Delete failed");
+    }
   };
 
   return (
     <div className="content finance-page">
       <h1 className="page-title">Finance</h1>
-      <p className="muted">Financial transactions including FMC customers.</p>
+      <p className="muted">Payments recorded from checkout.</p>
 
-      {loading && <div className="muted">Connecting to backend…</div>}
-      {err && <div className="error" style={{ color: "#b91c1c", marginBottom: 8 }}>{err}</div>}
+      {err && <div className="error" style={{ marginBottom: 12 }}>{err}</div>}
+      {ok && <div className="ok" style={{ marginBottom: 12 }}>{ok}</div>}
 
-      {/* Add Transaction */}
-      <section className="section">
-        <div className="head"><h3>Add Transaction</h3></div>
-        <div className="body">
-          <div className="grid grid-3">
-            <div>
-              <label>Customer Name</label>
-              <input value={form.customer} onChange={(e) => setForm(f => ({ ...f, customer: e.target.value }))} placeholder="e.g., Jane Doe" />
-            </div>
-            <div>
-              <label>Customer ID</label>
-              <input value={form.customerId} onChange={(e) => setForm(f => ({ ...f, customerId: e.target.value }))} placeholder="e.g., FMC-001" />
-            </div>
-            <div>
-              <label>Finance Managed Customer?</label>
-              <select value={form.fmc} onChange={(e) => setForm(f => ({ ...f, fmc: e.target.value }))}>
-                <option value="true">Yes (FMC)</option>
-                <option value="false">No (Regular)</option>
-              </select>
-            </div>
-            <div>
-              <label>Product</label>
-              <select value={form.productId} onChange={(e) => setForm(f => ({ ...f, productId: e.target.value }))}>
-                <option value="">Select a product</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {money(effectivePrice(p))}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label>Quantity</label>
-              <input type="number" min="1" value={form.qty} onChange={(e) => setForm(f => ({ ...f, qty: e.target.value }))} />
-            </div>
-            <div>
-              <label>Date</label>
-              <input type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))} />
-            </div>
-            <div>
-              <label>Payment Method</label>
-              <select value={form.method} onChange={(e) => setForm(f => ({ ...f, method: e.target.value }))}>
-                <option>Cash</option><option>Card</option><option>Bank Transfer</option><option>Invoice</option>
-              </select>
-            </div>
-            <div>
-              <label>Status</label>
-              <select value={form.status} onChange={(e) => setForm(f => ({ ...f, status: e.target.value }))}>
-                <option>Paid</option><option>Pending</option><option>Refund</option>
-              </select>
-            </div>
-            <div>
-              <label>Notes</label>
-              <input value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
-            </div>
-          </div>
-
-          <div className="actions" style={{ marginTop: 10 }}>
-            <button className="btn primary" onClick={addTx}>➕ Add Transaction</button>
-            <button
-              className="btn"
-              onClick={() => setForm({
-                customer: "", customerId: "", fmc: "true", productId: "", qty: 1,
-                date: nowISO(), method: "Cash", status: "Paid", notes: ""
-              })}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Transactions */}
       <section className="section">
         <div className="head">
           <h3>Transactions</h3>
           <div className="actions">
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="">All</option>
-              <option value="Paid">Paid</option>
-              <option value="Pending">Pending</option>
-              <option value="Refund">Refund</option>
-              <option value="FMC">FMC Only</option>
-            </select>
             <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search customer / TX ID"
-              style={{ minWidth: 220 }}
+              placeholder="Search by TX ID / customer / product"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              style={{ minWidth: 260 }}
             />
-            <button className="btn" onClick={exportTxCsv}>Export CSV</button>
-            <button className="btn" onClick={printTx}>Print</button>
+            <button className="btn" onClick={fetchTx}>Refresh</button>
+            <button className="btn" onClick={doExport}>Export CSV</button>
+            <button className="btn" onClick={doPrint}>Print</button>
           </div>
         </div>
 
-        <TransactionsTable
-          rows={rowsWithSeq}
-          onCycleStatus={handleCycleStatus}
-          onDelete={handleDelete}
-          showActions={true}
-        />
+        <div className="body">
+          {loading ? (
+            <div className="muted">Loading transactions…</div>
+          ) : rows.length === 0 ? (
+            <div className="muted">No transactions yet.</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="tx-table">
+                <thead>
+                  <tr>
+                    <th>TX ID</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Product</th>
+                    <th className="right">Qty</th>
+                    <th className="right">Unit</th>
+                    <th className="right">Discount</th>
+                    <th className="right">Total</th>
+                    <th>Method</th>
+                    <th className="center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.rid}>
+                      <td className="center">{r.displayId}</td>
+                      <td>{r.date}</td>
+                      <td>{r.customer}</td>
+                      <td>{r.productName}</td>
+                      <td className="right">{r.qty}</td>
+                      <td className="right">{money(r.unitPrice)}</td>
+                      <td className="right">{r.discountPerUnit ? money(r.discountPerUnit) : "—"}</td>
+                      <td className="right">{money(r.total)}</td>
+                      <td>{r.method}</td>
+                      <td className="center">
+                        <button className="btn small warning" onClick={() => openEdit(r)}>✏️ Edit</button>
+                        <button className="btn small danger" onClick={() => deleteTx(r.rid)}>🗑 Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </section>
+
+      {/* EDIT MODAL */}
+      {editing && (
+        <div className="modal-backdrop" onClick={closeEdit} role="dialog" aria-modal="true">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Edit Transaction</h3>
+            <div className="modal-grid">
+              <div>
+                <label>Date</label>
+                <input type="date" value={editing.date} onChange={(e) => setEdit("date", e.target.value)} />
+              </div>
+              <div>
+                <label>Customer</label>
+                <input value={editing.customer} onChange={(e) => setEdit("customer", e.target.value)} />
+              </div>
+              <div>
+                <label>Product</label>
+                <input value={editing.productName} onChange={(e) => setEdit("productName", e.target.value)} />
+              </div>
+              <div>
+                <label>Qty</label>
+                <input type="number" min="1" value={editing.qty} onChange={(e) => setEdit("qty", e.target.value)} />
+              </div>
+              <div>
+                <label>Unit Price</label>
+                <input type="number" min="0" step="0.01" value={editing.unitPrice} onChange={(e) => setEdit("unitPrice", e.target.value)} />
+              </div>
+              <div>
+                <label>Discount / Unit</label>
+                <input type="number" min="0" step="0.01" value={editing.discountPerUnit} onChange={(e) => setEdit("discountPerUnit", e.target.value)} />
+              </div>
+              <div>
+                <label>Method</label>
+                <select value={editing.method} onChange={(e) => setEdit("method", e.target.value)}>
+                  <option>Card</option>
+                  <option>Cash</option>
+                  <option>Bank Transfer</option>
+                  <option>Invoice</option>
+                </select>
+              </div>
+              <div>
+                <label>Total (auto)</label>
+                <input value={money(editing.total)} readOnly />
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn" onClick={closeEdit} disabled={saving}>Cancel</button>
+              <button className="btn success" onClick={saveEdit} disabled={saving}>
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

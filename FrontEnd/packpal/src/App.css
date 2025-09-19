@@ -13,11 +13,11 @@ body{
   background: var(--bg);
   color: var(--text);
 
-  /* ✅ this line ensures nothing hides under the fixed sidebar */
+  /* ✅ Reserve space for the fixed sidebar by default */
   padding-left: var(--sidebar-w) !important;
 }
 
-/* Optional wrapper if you use it */
+/* Optional wrapper */
 .app{ min-height: 100vh; }
 .content{ padding: 24px; }
 
@@ -26,24 +26,57 @@ body{
   background:#fff; border:1px solid var(--border); border-radius:14px;
   overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.04); margin:22px 0;
 }
-.head{ display:flex; justify-content:space-between; align-items:center;
-  padding:16px 18px; border-bottom:1px solid var(--border); }
+.head{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:16px 18px; border-bottom:1px solid var(--border);
+}
 .body{ padding:18px; overflow-x:auto; }   /* ✅ horizontal scroll if needed */
 
 .stats{ display:grid; gap:16px; margin:16px 0; }
 @media(min-width:900px){ .stats{ grid-template-columns: repeat(4,1fr); } }
-.card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; }
+.card{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; padding:18px;
+}
 .stat .v{ font-size:28px; font-weight:800; }
 .stat .l{ color:var(--muted); text-transform:uppercase; font-size:12px; letter-spacing:.04em; }
 
-table{ width:100%; min-width: 1200px; border-collapse:collapse; } /* ✅ no clipping */
-thead th{ background:#f3f4f6; color:#374151; text-transform:uppercase; font-size:12px; letter-spacing:.04em; }
-th,td{ padding:12px 14px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; font-size:14px; }
+table{ width:100%; min-width: 1200px; border-collapse:collapse; }
+thead th{
+  background:#f3f4f6; color:#374151; text-transform:uppercase;
+  font-size:12px; letter-spacing:.04em;
+}
+th,td{
+  padding:12px 14px; border-bottom:1px solid var(--border);
+  text-align:left; vertical-align:top; font-size:14px;
+}
 tr:hover td{ background:#fafafa; }
 .right{ text-align:right; }
 
-.badge{ display:inline-flex; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+.badge{
+  display:inline-flex; padding:4px 10px; border-radius:999px;
+  font-size:12px; font-weight:700;
+}
 .b-green{ background:#d1fae5; color:#065f46; }
 .b-red{ background:#fee2e2; color:#7f1d1d; }
 .b-amber{ background:#fef3c7; color:#92400e; }
 .b-blue{ background:#dbeafe; color:#1e40af; }
+
+/* ===== Fix: remove left padding when sidebar is hidden ===== */
+body.sidebar-off,
+body.no-sidebar {
+  padding-left: 0 !important;
+}
+
+/* Optional progressive enhancement (works in modern browsers) */
+body:has(main.content.full) {
+  padding-left: 0 !important;
+}
+
+/* Make the no-sidebar page nicely centered and full-width */
+.content.full {
+  margin: 0 auto;
+  padding: 24px;
+  width: 100%;
+  max-width: 1280px;   /* tweak to your taste */
+}

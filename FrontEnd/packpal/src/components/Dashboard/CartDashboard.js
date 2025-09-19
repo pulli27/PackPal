@@ -1,4 +1,3 @@
-// src/components/CartDashboard/CartDashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./CartDashboard.css";
@@ -8,7 +7,8 @@ const PRODUCTS_URL = "http://localhost:5000/carts";
 const TX_URL = "http://localhost:5000/transactions";
 
 const money = (n) =>
-  "LKR" + Number(n || 0).toLocaleString(undefined, {
+  "LKR" +
+  Number(n || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -16,20 +16,36 @@ const money = (n) =>
 const unpackList = (payload) =>
   Array.isArray(payload)
     ? payload
-    : payload?.transactions ?? payload?.products ?? payload?.items ?? payload?.data ?? [];
+    : payload?.transactions ??
+      payload?.products ??
+      payload?.items ??
+      payload?.data ??
+      [];
 
+/** Normalize product */
 const toProduct = (row) => ({
-  id: String(row?.id ?? row?._id ?? row?.productId ?? Math.random().toString(36).slice(2, 10)),
+  id: String(
+    row?.id ??
+      row?._id ??
+      row?.productId ??
+      Math.random().toString(36).slice(2, 10)
+  ),
   name: row?.name ?? "Unnamed",
   price: Number(row?.price ?? 0),
   discountType: row?.discountType ?? "none",
   discountValue: Number(row?.discountValue ?? 0),
 });
 
-// ✅ Always format the transaction date as YYYY-MM-DD
+/** Normalize transaction */
 const toTx = (row) => ({
-  id: String(row?.id ?? row?._id ?? row?.txId ?? row?.transactionId ?? Math.random().toString(36).slice(2, 10)),
-  date: row?.date ? String(row.date).slice(0, 10) : "", // ✅ Only date
+  id: String(
+    row?.id ??
+      row?._id ??
+      row?.txId ??
+      row?.transactionId ??
+      Math.random().toString(36).slice(2, 10)
+  ),
+  date: row?.date ? String(row.date).slice(0, 10) : "",
   customer: row?.customer ?? "",
   fmc: Boolean(row?.fmc),
   productName: row?.productName ?? row?.product?.name ?? "",
@@ -37,6 +53,7 @@ const toTx = (row) => ({
   unitPrice: Number(row?.unitPrice ?? 0),
   discountPerUnit: Number(row?.discountPerUnit ?? 0),
   total: Number(row?.total ?? 0),
+  method: row?.method ?? "Card",
   status: row?.status ?? "Paid",
 });
 
@@ -59,6 +76,7 @@ export default function CartDashboard() {
 
   useEffect(() => {
     let mounted = true;
+
     const loadAll = async () => {
       setLoading(true);
       setErr("");
@@ -77,7 +95,9 @@ export default function CartDashboard() {
         if (mounted) setLoading(false);
       }
     };
+
     loadAll();
+
     const onTxChanged = () => loadAll();
     const onProductsChanged = () => loadAll();
     const onFocus = () => loadAll();
@@ -85,6 +105,7 @@ export default function CartDashboard() {
     window.addEventListener("tx:changed", onTxChanged);
     window.addEventListener("products:changed", onProductsChanged);
     window.addEventListener("focus", onFocus);
+
     return () => {
       mounted = false;
       window.removeEventListener("tx:changed", onTxChanged);
@@ -93,40 +114,53 @@ export default function CartDashboard() {
     };
   }, []);
 
-  // KPIs + Recent base list
-  const { productsCount, activeDiscounts, totalPaid, totalPending, recent } = useMemo(() => {
-    const p = Array.isArray(products) ? products : [];
-    const t = Array.isArray(txs) ? txs : [];
+  // KPIs + recent rows
+  const { productsCount, activeDiscounts, totalPaid, totalPending, recent } =
+    useMemo(() => {
+      const p = Array.isArray(products) ? products : [];
+      const t = Array.isArray(txs) ? txs : [];
 
-    const productsCount = p.length;
-    const activeDiscounts = p.filter(
-      (x) => (x?.discountType ?? "none") !== "none" && Number(x?.discountValue ?? 0) > 0
-    ).length;
+      const productsCount = p.length;
+      const activeDiscounts = p.filter(
+        (x) =>
+          (x?.discountType ?? "none") !== "none" &&
+          Number(x?.discountValue ?? 0) > 0
+      ).length;
 
-    const paidRows = t.filter((r) => (r?.status || "").toLowerCase() === "paid");
-    const pendRows = t.filter((r) => (r?.status || "").toLowerCase() === "pending");
-    const totalPaid = paidRows.reduce((s, r) => s + (Number(r?.total) || 0), 0);
-    const totalPending = pendRows.reduce((s, r) => s + (Number(r?.total) || 0), 0);
+      const paidRows = t.filter(
+        (r) => (r?.status || "Paid").toLowerCase() === "paid"
+      );
+      const pendRows = t.filter(
+        (r) => (r?.status || "").toLowerCase() === "pending"
+      );
 
-    const recent = [...t]
-      .sort(
-        (a, b) =>
-          String(b.date).localeCompare(String(a.date)) ||
-          String(b.id).localeCompare(String(a.id))
-      )
-      .slice(0, 10);
+      const totalPaid = paidRows.reduce(
+        (s, r) => s + (Number(r?.total) || 0),
+        0
+      );
+      const totalPending = pendRows.reduce(
+        (s, r) => s + (Number(r?.total) || 0),
+        0
+      );
 
-    return { productsCount, activeDiscounts, totalPaid, totalPending, recent };
-  }, [products, txs]);
+      const recent = [...t]
+        .sort(
+          (a, b) =>
+            String(b.date).localeCompare(String(a.date)) ||
+            String(b.id).localeCompare(String(a.id))
+        )
+        .slice(0, 10);
 
-  // ✅ Create table rows with formatted dates + sequential TX ID
+      return { productsCount, activeDiscounts, totalPaid, totalPending, recent };
+    }, [products, txs]);
+
+  /** Map to rows with sequential ID */
   const recentWithSeq = useMemo(
     () =>
       recent.map((t, i) => ({
         ...t,
-        date: t.date ? String(t.date).slice(0, 10) : "", // ✅ Force date-only
-        txId: t.id, // real backend id if needed
-        id: String(i + 1), // display sequential number
+        txId: t.id, // keep backend id if needed
+        id: String(i + 1), // show sequential number
       })),
     [recent]
   );
@@ -139,23 +173,42 @@ export default function CartDashboard() {
       </header>
 
       {loading && <div className="muted">Loading…</div>}
-      {err && <div className="error" style={{ color: "#b91c1c", marginBottom: 12 }}>{err}</div>}
+      {err && (
+        <div className="error" style={{ color: "#b91c1c", marginBottom: 12 }}>
+          {err}
+        </div>
+      )}
 
       <div className="stats">
-        <div className="card stat"><div className="v">{productsCount}</div><div className="l">Products</div></div>
-        <div className="card stat"><div className="v">{activeDiscounts}</div><div className="l">Active Discounts</div></div>
-        <div className="card stat"><div className="v">{money(totalPaid)}</div><div className="l">Total Sales (Paid)</div></div>
-        <div className="card stat"><div className="v">{money(totalPending)}</div><div className="l">Pending Invoices</div></div>
+        <div className="card stat">
+          <div className="v">{productsCount}</div>
+          <div className="l">Products</div>
+        </div>
+        <div className="card stat">
+          <div className="v">{activeDiscounts}</div>
+          <div className="l">Active Discounts</div>
+        </div>
+        <div className="card stat">
+          <div className="v">{money(totalPaid)}</div>
+          <div className="l">Total Sales (Paid)</div>
+        </div>
+        <div className="card stat">
+          <div className="v">{money(totalPending)}</div>
+          <div className="l">Pending Invoices</div>
+        </div>
       </div>
 
       <section className="section">
-        <div className="head"><h3>Recent Transactions</h3></div>
+        <div className="head">
+          <h3>Recent Transactions</h3>
+        </div>
         <TransactionsTable
-          rows={recentWithSeq}  // ✅ Now dates are always YYYY-MM-DD
+          rows={recentWithSeq}
           limit={10}
           showActions={false}
-          showDiscountCol={true}
-          compact
+          showFMC={false}       // 🚫 hide FMC col
+          showStatus={false}    // 🚫 hide Status col
+          useSequentialIds={true} // ✅ show 1,2,3,..
         />
       </section>
     </div>

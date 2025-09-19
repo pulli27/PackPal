@@ -1,72 +1,83 @@
-:root{
-  --bg:#f1f5f9; --card:#fff; --text:#0f172a; --muted:#637087; --border:#e5e7eb;
-  --primary:#2563eb; --danger:#ef4444; --ok:#16a34a; --amber:#f59e0b; --slate:#1f2937;
-  --sidebar-w: 260px;        /* match your Sidebar.css width */
-  --container-w: 1100px;     /* centered column width (like your HTML demo) */
+/* Layout */
+.content.finance-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #1f2937;
+}
+.page-title {
+  font-size: 2.2rem; font-weight: 800; margin: 0 0 8px;
+  background: linear-gradient(45deg, #080808, #764ba2);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.muted { color: #667085; }
+.error { background:#fee2e2; border:1px solid #fecaca; color:#991b1b; padding:10px 12px; border-radius:10px; }
+.ok { background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; padding:10px 12px; border-radius:10px; }
+
+/* Card section */
+.section {
+  background: rgba(255,255,255,.96); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.35);
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  border-radius: 18px; margin-top: 16px; overflow: hidden;
+}
+.section .head {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding: 16px 18px; border-bottom:1px solid #edf2f7; background: linear-gradient(90deg,#f8fafc,#fff);
+}
+.section .head h3 { margin:0; font-size:1.25rem; font-weight:700; color:#1f2937; }
+.section .body { padding: 18px; }
+.actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.actions input {
+  padding:10px 12px; border:2px solid #e2e8f0; border-radius:10px; font-size:.98rem;
+  background:#fff;
 }
 
-
-
-/* Center the page column */
-.content.finance-page > *{
-  max-width: var(--container-w);
-  margin-left: auto;
-  margin-right: auto;
+/* Buttons */
+.btn {
+  border:none; border-radius:12px; padding:10px 16px; font-weight:600; cursor:pointer;
+  transition: transform .15s, box-shadow .2s;
+  background: linear-gradient(135deg,#667eea,#764ba2); color:#fff;
+  box-shadow: 0 8px 20px rgba(102,126,234,.25);
 }
-
-.page-title{ margin:0 0 8px; font-size:48px; font-weight:900; letter-spacing:.01em; line-height:1.1; }
-.muted{ color:var(--muted); font-size:13px; }
-
-/* Card / section */
-.section{
-  background:#fff; border:1px solid var(--border); border-radius:16px;
-  overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.05); margin:18px 0;
-}
-.head{
-  display:flex; justify-content:space-between; align-items:center;
-  padding:16px 18px; border-bottom:1px solid var(--border);
-}
-.body{ padding:18px; }
-
-/* Form grid */
-.grid{ display:grid; gap:12px; }
-.grid.grid-3{ grid-template-columns: repeat(3, 1fr); }
-@media (max-width: 1024px){ .grid.grid-3{ grid-template-columns: 1fr; } }
-
-label{ display:block; font-size:12px; color:#475569; margin-bottom:6px; font-weight:700; }
-input,select{
-  width:100%; padding:10px 12px; border:1px solid var(--border);
-  border-radius:10px; outline:0; font:inherit; background:#fff;
-}
-
-/* Buttons & badges */
-.actions{ display:flex; gap:8px; flex-wrap:wrap; }
-.btn{
-  display:inline-flex; align-items:center; gap:8px; padding:8px 12px;
-  border-radius:10px; border:1px solid var(--border); background:#fff;
-  cursor:pointer; font-weight:600;
-}
-.btn.primary{ background:var(--primary); color:#fff; border-color:var(--primary); }
-.btn.red{ background:var(--danger); color:#fff; border-color:var(--danger); }
-.btn:hover{ filter:brightness(.97); }
-
-.badge{ display:inline-flex; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
-.b-green{ background:#d1fae5; color:#065f46; }
-.b-red{ background:#fee2e2; color:#7f1d1d; }
-.b-amber{ background:#fef3c7; color:#92400e; }
-.b-blue{ background:#dbeafe; color:#1e40af; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(102,126,234,.35); }
+.btn.small { padding: 6px 10px; border-radius: 10px; font-size: .9rem; margin-left: 6px; }
+.btn.warning { background: linear-gradient(135deg,#3be88c,#27edd0); box-shadow: 0 8px 18px rgba(245,158,11,.25); }
+.btn.danger  { background: linear-gradient(135deg,#ef4444,#dc2626); box-shadow: 0 8px 18px rgba(239,68,68,.25); }
+.btn.success { background: linear-gradient(135deg,#48bb78,#38a169); }
 
 /* Table */
-.table-wrap{ overflow-x:auto; }
-table{ width:100%; border-collapse:collapse; table-layout:fixed; }
-thead th{
-  background:#f3f4f6; color:#374151; text-transform:uppercase;
-  font-size:12px; letter-spacing:.04em;
+.table-wrap { width: 100%; overflow-x: auto; }
+.tx-table { width:100%; border-collapse: collapse; }
+.tx-table th, .tx-table td { padding: 10px 12px; border-bottom: 1px solid #eef2f7; }
+.tx-table thead th { background:#f8fafc; font-weight:700; color:#334155; }
+.tx-table td.right, .tx-table th.right { text-align: right; }
+.tx-table th.center, .tx-table td.center { text-align: center; }
+
+/* Make TX ID column compact */
+.tx-table th:first-child, .tx-table td:first-child {
+  white-space: nowrap;
+  max-width: 1%;
 }
-th,td{
-  padding:12px 14px; border-bottom:1px solid var(--border);
-  text-align:left; vertical-align:top; font-size:14px;
-  white-space:normal; word-break:break-word; overflow-wrap:anywhere;
+
+/* Modal */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  display:flex; align-items:center; justify-content:center; z-index: 1000;
 }
-tr:hover td{ background:#fafafa; }
-.right{ text-align:right; }
+.modal {
+  width: min(92vw, 760px); background: #fff; border-radius: 16px;
+  padding: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.modal h3 { margin: 0 0 12px; }
+.modal-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.modal-grid label { display:block; font-size:.92rem; font-weight:600; color:#334155; margin-bottom: 6px; }
+.modal-grid input, .modal-grid select {
+  width:100%; padding:10px 12px; border:2px solid #e2e8f0; border-radius:10px; font-size:.98rem;
+}
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top: 14px; }
+
+@media (max-width: 900px) {
+  .section .head { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
