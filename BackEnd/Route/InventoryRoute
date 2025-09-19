@@ -1,0 +1,19 @@
+// BackEnd/Route/InventoryRoute.js
+const express = require("express");
+const {
+  listInventory,
+  getByBusinessId,
+  createItem,
+  updateByBusinessId,
+  removeByBusinessId,
+} = require("../Controllers/InventoryController"); // ✅ new name
+
+const router = express.Router();
+
+router.get("/", listInventory);
+router.get("/:id", getByBusinessId);
+router.post("/", createItem);
+router.put("/:id", updateByBusinessId);
+router.delete("/:id", removeByBusinessId);
+
+module.exports = router;

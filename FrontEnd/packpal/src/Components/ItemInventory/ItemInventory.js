@@ -1,15 +1,12 @@
-// src/Components/ItemInventory/ItemInventory.jsx
+// src/Components/ItemInventory/ItemInventory.js
 import React, { useEffect, useRef } from "react";
 import "./ItemInventory.css";
 import Sidebar from "../Sidebar/Sidebar";
-import axios from "axios";
-
-/* ===== Backend config ===== */
-const USE_BACKEND = false; // set to true to load from API
-const URL = "http://localhost:5000/inventory"; // change to your endpoint (expects {items:[...]} response)
+// Use the same shared axios client you used in SalaryCal
+import { api } from "../../lib/api";
 
 export default function ItemInventory() {
-  // keep inventory & editing index in refs so handlers always read the latest values
+  // Seed data to render UI immediately; replaced by backend data after load
   const inventoryRef = useRef([
     { id: "1001", name: "Leather Backpack",  description: "Brown leather bag", quantity: 450, unitPrice: 80.0,  avgDailyUsage: 3, leadTimeDays: 3 },
     { id: "1002", name: "Canvas Tote",       description: "Beige shoulder bag", quantity: 300, unitPrice: 25.0,  avgDailyUsage: 2, leadTimeDays: 2 },
@@ -20,9 +17,7 @@ export default function ItemInventory() {
   const editingIndexRef = useRef(-1);
 
   useEffect(() => {
-    /* ===== Helpers & State ===== */
     const SAFETY_STOCK = 40;
-
     const $ = (id) => document.getElementById(id);
     const toNum = (v) => Number(v) || 0;
 
@@ -30,20 +25,17 @@ export default function ItemInventory() {
       Math.max(0, Math.round((toNum(item.avgDailyUsage) * toNum(item.leadTimeDays)) + SAFETY_STOCK));
     const totalPriceOf = (item) => (toNum(item.unitPrice) * toNum(item.quantity));
 
-    /* ===== UI Control ===== */
     function showInlineForm(show = true) {
       const c = $("inlineForm");
       if (c) c.style.display = show ? "block" : "none";
       if (show) $("itemId")?.focus();
     }
-
     function updateRopPreview() {
       const preview =
         (toNum($("avgDailyUsage")?.value) * toNum($("leadTimeDays")?.value)) + SAFETY_STOCK;
       if ($("reorderLevel")) $("reorderLevel").value = Math.max(0, Math.round(preview));
       if ($("safetyStock")) $("safetyStock").value = SAFETY_STOCK;
     }
-
     function resetForm() {
       $("itemForm")?.reset();
       if ($("formTitle")) $("formTitle").textContent = "Add New Item";
@@ -93,7 +85,15 @@ export default function ItemInventory() {
       updateStats();
     }
 
-    /* ===== CRUD (bound to window so row buttons work) ===== */
+    // ===== API helpers (using shared client like SalaryCal) =====
+    const apiInv = {
+      create: (item) => api.post("/api/inventory", item),
+      update: (id, item) => api.put(`/api/inventory/${encodeURIComponent(id)}`, item),
+      remove: (id) => api.delete(`/api/inventory/${encodeURIComponent(id)}`),
+      list:   () => api.get("/api/inventory"),
+    };
+
+    // ===== CRUD (bound to window so row buttons work) =====
     function editItem(index) {
       const it = inventoryRef.current[index];
       showInlineForm(true);
@@ -111,18 +111,38 @@ export default function ItemInventory() {
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
     }
 
-    function deleteItem(index) {
+    async function deleteItem(index) {
       const item = inventoryRef.current[index];
-      if (window.confirm(`Delete "${item.name}" (ID: ${item.id})?`)) {
-        inventoryRef.current.splice(index, 1);
+      if (!window.confirm(`Delete "${item.name}" (ID: ${item.id})?`)) return;
+      try {
+        await apiInv.remove(item.id);
+        const res = await apiInv.list();
+        const items = Array.isArray(res?.data?.items) ? res.data.items : [];
+        inventoryRef.current = items.map((it) => ({
+          id: String(it.id ?? it._id ?? ""),
+          name: it.name ?? "",
+          description: it.description ?? "",
+          quantity: Number(it.quantity ?? 0),
+          unitPrice: Number(it.unitPrice ?? 0),
+          avgDailyUsage: Number(it.avgDailyUsage ?? 0),
+          leadTimeDays: Number(it.leadTimeDays ?? 0),
+        }));
         renderTable();
+      } catch (err) {
+        console.error("DELETE ERROR:", err?.toJSON?.() || err);
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.statusText ||
+          err?.message ||
+          "Delete failed";
+        alert(`Delete failed: ${msg}`);
       }
     }
 
     window.__inv_editItem = editItem;
     window.__inv_deleteItem = deleteItem;
 
-    /* ===== Report builders ===== */
+    // ===== Report builders =====
     function buildInventoryReport() {
       const inventory = inventoryRef.current;
       const lowStockItems = inventory.filter((i) => toNum(i.quantity) <= computeReorderLevel(i));
@@ -219,28 +239,28 @@ export default function ItemInventory() {
 
     function generateReport() {
       const data = buildInventoryReport();
-      if ($("reportContent")) $("reportContent").innerHTML = inventoryReportHTML(data);
-      if ($("reportModal")) $("reportModal").style.display = "block";
+      const el = $("reportContent");
+      if (el) el.innerHTML = inventoryReportHTML(data);
+      const modal = $("reportModal");
+      if (modal) modal.style.display = "block";
     }
     window.__inv_generateReport = generateReport;
 
     function closeReportModal() {
-      if ($("reportModal")) $("reportModal").style.display = "none";
+      const m = $("reportModal");
+      if (m) m.style.display = "none";
     }
 
-    // PDF
+    // ===== Export/Print/JSON =====
     function exportToPDF() {
       try {
         const btn = document.querySelector(".btn-pdf");
         if (!window.jspdf || !window.html2canvas) {
-          alert("PDF tools not found. Add jsPDF and html2canvas scripts in public/index.html.");
+          alert("PDF tools not found. Add jsPDF and html2canvas to public/index.html.");
           return;
         }
         const txt = btn?.innerHTML;
-        if (btn) {
-          btn.innerHTML = "⏳ Generating PDF...";
-          btn.disabled = true;
-        }
+        if (btn) { btn.innerHTML = "⏳ Generating PDF..."; btn.disabled = true; }
 
         const temp = document.createElement("div");
         temp.style.position = "absolute";
@@ -267,14 +287,7 @@ export default function ItemInventory() {
 
         document.body.appendChild(temp);
 
-        window.html2canvas(temp, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          width: 794,
-          height: temp.scrollHeight
-        })
+        window.html2canvas(temp, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", width: 794, height: temp.scrollHeight })
           .then((canvas) => {
             document.body.removeChild(temp);
             const { jsPDF } = window.jspdf;
@@ -292,17 +305,11 @@ export default function ItemInventory() {
               hLeft -= pageH;
             }
             pdf.save(`inventory_report_${new Date().toISOString().split("T")[0]}.pdf`);
-            if (btn) {
-              btn.innerHTML = txt;
-              btn.disabled = false;
-            }
+            if (btn) { btn.innerHTML = txt; btn.disabled = false; }
           })
           .catch((err) => {
             if (document.body.contains(temp)) document.body.removeChild(temp);
-            if (btn) {
-              btn.innerHTML = txt;
-              btn.disabled = false;
-            }
+            if (btn) { btn.innerHTML = txt; btn.disabled = false; }
             console.error(err);
             alert("PDF generation failed. Please try again.");
           });
@@ -332,32 +339,27 @@ export default function ItemInventory() {
           .report-actions{display:none}
           @media print{ @page{ margin:16mm } }
         </style></head><body>${src}</body></html>`;
-      w.document.open();
-      w.document.write(doc);
-      w.document.close();
-      w.focus();
-      w.print();
+      w.document.open(); w.document.write(doc); w.document.close(); w.focus(); w.print();
     }
 
     function downloadJSON() {
       const data = buildInventoryReport();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
+      const urlObj = window.URL.createObjectURL(blob); // avoid shadowing global URL
       const a = document.createElement("a");
-      a.href = url;
+      a.href = urlObj;
       a.download = `inventory_report_${new Date().toISOString().split("T")[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(urlObj);
     }
 
-    // expose report actions on window for modal buttons
     window.__inv_exportToPDF = exportToPDF;
     window.__inv_printReport  = printReport;
     window.__inv_downloadJSON = downloadJSON;
 
-    /* ===== Named Listeners (attach once, remove on cleanup) ===== */
+    // ===== Listeners =====
     const addBtn = $("addBtn");
     const cancelBtn = $("cancelBtn");
     const clearBtn = $("clearBtn");
@@ -371,10 +373,7 @@ export default function ItemInventory() {
       showInlineForm(true);
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
     }
-    function onCancel() {
-      showInlineForm(false);
-      resetForm();
-    }
+    function onCancel() { showInlineForm(false); resetForm(); }
     function onClear() { resetForm(); }
     function onAvg() { updateRopPreview(); }
     function onLead() { updateRopPreview(); }
@@ -415,7 +414,7 @@ export default function ItemInventory() {
       updateStats();
     }
 
-    function onSubmit(e) {
+    async function onSubmit(e) {
       e.preventDefault();
       const data = {
         id: $("itemId").value.trim(),
@@ -428,20 +427,40 @@ export default function ItemInventory() {
       };
 
       const list = inventoryRef.current;
-
-      // Optional: prevent duplicate IDs (comment out if not needed)
       const dupIndex = list.findIndex((i) => i.id === data.id && editingIndexRef.current !== list.indexOf(i));
-      if (dupIndex !== -1) {
-        alert(`Item ID ${data.id} already exists.`);
-        return;
+      if (dupIndex !== -1) { alert(`Item ID ${data.id} already exists.`); return; }
+
+      try {
+        if (editingIndexRef.current === -1) {
+          await apiInv.create(data);
+        } else {
+          await apiInv.update(list[editingIndexRef.current].id, data);
+        }
+
+        const res = await apiInv.list();
+        const items = Array.isArray(res?.data?.items) ? res.data.items : [];
+        inventoryRef.current = items.map((it) => ({
+          id: String(it.id ?? it._id ?? ""),
+          name: it.name ?? "",
+          description: it.description ?? "",
+          quantity: Number(it.quantity ?? 0),
+          unitPrice: Number(it.unitPrice ?? 0),
+          avgDailyUsage: Number(it.avgDailyUsage ?? 0),
+          leadTimeDays: Number(it.leadTimeDays ?? 0),
+        }));
+
+        renderTable();
+        resetForm();
+        showInlineForm(false);
+      } catch (err) {
+        console.error("SAVE ERROR:", err?.toJSON?.() || err);
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.statusText ||
+          err?.message ||
+          "Save failed";
+        alert(`Save failed: ${msg}`);
       }
-
-      if (editingIndexRef.current === -1) list.push(data);
-      else list[editingIndexRef.current] = data;
-
-      renderTable();
-      resetForm();
-      showInlineForm(false);
     }
 
     // attach
@@ -453,24 +472,22 @@ export default function ItemInventory() {
     searchInput?.addEventListener("input", onSearch);
     form?.addEventListener("submit", onSubmit);
 
-    // Modal close (clicking outside)
+    // modal close by outside click
     function clickHandler(e) {
       const m = $("reportModal");
       if (e.target === m) closeReportModal();
     }
     window.addEventListener("click", clickHandler);
 
-    // Initial render & ensure form hidden initially (if your CSS doesn't already)
+    // initial
     showInlineForm(false);
     renderTable();
 
-    // ===== OPTIONAL: Load from backend after initial render =====
+    // load from backend after initial render
     async function loadFromBackend() {
-      if (!USE_BACKEND) return;
       try {
-        const res = await axios.get(URL);
+        const res = await apiInv.list();
         const items = Array.isArray(res?.data?.items) ? res.data.items : [];
-        // Normalize fields if needed
         inventoryRef.current = items.map((it) => ({
           id: String(it.id ?? it._id ?? ""),
           name: it.name ?? "",
@@ -482,13 +499,13 @@ export default function ItemInventory() {
         }));
         renderTable();
       } catch (err) {
-        console.error("Failed to fetch inventory:", err);
-        // keep seed data on failure
+        // If backend is down, keep seed data—UI still works
+        console.warn("Initial fetch failed (using seed data):", err?.message || err);
       }
     }
     loadFromBackend();
 
-    // Cleanup — remove listeners so Strict Mode dev double-mount won't double-bind
+    // cleanup
     return () => {
       addBtn?.removeEventListener("click", onAdd);
       cancelBtn?.removeEventListener("click", onCancel);
@@ -497,8 +514,8 @@ export default function ItemInventory() {
       lead?.removeEventListener("input", onLead);
       searchInput?.removeEventListener("input", onSearch);
       form?.removeEventListener("submit", onSubmit);
-
       window.removeEventListener("click", clickHandler);
+
       delete window.__inv_editItem;
       delete window.__inv_deleteItem;
       delete window.__inv_exportToPDF;
@@ -511,13 +528,11 @@ export default function ItemInventory() {
   return (
     <div className="page-shell">
       <Sidebar />
-
       <div className="main-content">
         <div className="container">
           {/* Header */}
           <div className="header">
             <h1>Item Inventory</h1>
-
             <div className="search">
               <input id="searchInput" type="text" placeholder=" 🔍 Search items..." />
             </div>
@@ -530,9 +545,9 @@ export default function ItemInventory() {
               <div>
                 <div className="form-title" id="formTitle">Add New Item</div>
                 <div className="hint">
-                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (fixed at 40)</b>.<br />
-                  The value updates automatically and is read-only.
-                  <br /><br /><b>Total price</b> is calculated automatically.
+                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (fixed at 40)</b>.
+                  <br/>The value updates automatically and is read-only.
+                  <br/><br/><b>Total price</b> is calculated automatically.
                 </div>
               </div>
               <button className="btn btn-light" id="cancelBtn" type="button">Cancel</button>
@@ -625,10 +640,7 @@ export default function ItemInventory() {
 
           {/* Generate report */}
           <div className="report-section">
-            <button
-              className="generate-report-btn"
-              onClick={() => window.__inv_generateReport && window.__inv_generateReport()}
-            >
+            <button className="generate-report-btn" onClick={() => window.__inv_generateReport && window.__inv_generateReport()}>
               📊 Generate Report
             </button>
           </div>
@@ -637,13 +649,7 @@ export default function ItemInventory() {
         {/* Report Modal */}
         <div id="reportModal" className="modal">
           <div className="modal-content">
-            <span
-              className="close"
-              onClick={() => {
-                const el = document.getElementById("reportModal");
-                if (el) el.style.display = "none";
-              }}
-            >
+            <span className="close" onClick={() => { const el = document.getElementById("reportModal"); if (el) el.style.display = "none"; }}>
               &times;
             </span>
             <div id="reportContent"></div>

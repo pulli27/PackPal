@@ -1,24 +1,64 @@
+// BackEnd/app.js
+const path = require("path");
+const dotenv = require("dotenv");
+dotenv.config({ path: path.join(__dirname, ".env") });
+
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
+const mongoose = require("mongoose");
 
-const router = require("./Route/InventoryItemRoute");
+const inventoryRoutes = require("./Route/InventoryRoute");
 
+// ---- sanity check for env ----
+if (!process.env.MONGO_URI) {
+  console.error("FATAL: MONGO_URI is missing in BackEnd/.env");
+  process.exit(1);
+}
+const PORT = process.env.PORT || 5000;
+
+// ---- express app ----
 const app = express();
 
-// Middleware
-app.use(cors());
+// allow your local FE origins (3000 = CRA, 5173 = Vite, etc.)
+const devLocalhost = new Set([
+  "http://localhost:3000","http://127.0.0.1:3000",
+  "http://localhost:3004","http://127.0.0.1:3004",
+  "http://localhost:3005","http://127.0.0.1:3005",
+  "http://localhost:5173","http://127.0.0.1:5173",
+]);
+app.use(
+  cors({
+    origin: (origin, cb) => (!origin || devLocalhost.has(origin)) ? cb(null, true) : cb(null, false),
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+app.options("*", cors());
+
 app.use(express.json());
 
-// Routes
-app.use("/inventories", router);
+// routes
+app.use("/api/inventory", inventoryRoutes);
 
-// ---- MongoDB connection (NOTE the DB name: PackPal) ----
-const MONGO_URI = "mongodb+srv://pulmivihansa27:H1234pul@cluster0.uowmnpn.mongodb.net/PackPal?retryWrites=true&w=majority";
+// health
+app.get("/health", (_req, res) => res.json({ ok: true }));
 
-mongoose.connect(MONGO_URI)
-  .then(() => {
-    console.log("Connected to MongoDB");
-    app.listen(5000, () => console.log("Server running on http://localhost:5000"));
-  })
-  .catch((err) => console.error("Mongo connect error:", err));
+// error handler
+app.use((err, _req, res, _next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({ message: "Internal server error" });
+});
+
+// ---- start ----
+(async () => {
+  try {
+    mongoose.set("strictQuery", true);
+    await mongoose.connect(process.env.MONGO_URI); // ✅ correct var name
+    console.log("✅ MongoDB connected");
+    app.listen(PORT, () => console.log(`🚀 Server http://localhost:${PORT}`));
+  } catch (e) {
+    console.error("❌ Mongo connect error:", e);
+    process.exit(1);
+  }
+})();

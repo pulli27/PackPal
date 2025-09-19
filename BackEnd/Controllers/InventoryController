@@ -1,0 +1,152 @@
+// BackEnd/Controllers/InventoryController.js
+const Inventory = require("../Model/InventoryModel");
+
+/* ---------- helpers ---------- */
+const toNum = (v, def = 0) => {
+  if (v === "" || v === null || v === undefined) return def;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
+};
+
+const sanitizeCreate = (body) => {
+  // full payload for CREATE
+  return {
+    id: String(body.id ?? "").trim(),
+    name: String(body.name ?? "").trim(),
+    description: String(body.description ?? ""),
+    quantity: toNum(body.quantity, 0),
+    unitPrice: toNum(body.unitPrice, 0),
+    avgDailyUsage: toNum(body.avgDailyUsage, 0),
+    leadTimeDays: toNum(body.leadTimeDays, 0),
+  };
+};
+
+// For UPDATE we never let the primary business `id` change via body
+const sanitizeUpdate = (body) => {
+  const out = {};
+  if (body.name !== undefined) out.name = String(body.name ?? "").trim();
+  if (body.description !== undefined) out.description = String(body.description ?? "");
+  if (body.quantity !== undefined) out.quantity = toNum(body.quantity, 0);
+  if (body.unitPrice !== undefined) out.unitPrice = toNum(body.unitPrice, 0);
+  if (body.avgDailyUsage !== undefined) out.avgDailyUsage = toNum(body.avgDailyUsage, 0);
+  if (body.leadTimeDays !== undefined) out.leadTimeDays = toNum(body.leadTimeDays, 0);
+  return out;
+};
+
+const ensureNonNegative = (doc) => {
+  const fields = ["quantity", "unitPrice", "avgDailyUsage", "leadTimeDays"];
+  for (const f of fields) {
+    if (doc[f] !== undefined && doc[f] < 0) {
+      throw Object.assign(new Error(`${f} must be >= 0`), { status: 400 });
+    }
+  }
+};
+
+/* ---------- controllers ---------- */
+
+/** GET /api/inventory -> { items: [...] } */
+const listInventory = async (_req, res, next) => {
+  try {
+    const items = await Inventory.find().lean();
+    return res.json({ items });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/** GET /api/inventory/:id -> { item }  (by business id) */
+const getByBusinessId = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const item = await Inventory.findOne({ id: String(id).trim() }).lean();
+    if (!item) {
+      return res.status(404).json({ message: `Item with id "${id}" not found` });
+    }
+    return res.json({ item });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/** POST /api/inventory -> { item } */
+const createItem = async (req, res, next) => {
+  try {
+    const payload = sanitizeCreate(req.body);
+
+    if (!payload.id) return res.status(400).json({ message: "id is required" });
+    if (!payload.name) return res.status(400).json({ message: "name is required" });
+
+    ensureNonNegative(payload);
+
+    // check duplicate business id
+    const exists = await Inventory.exists({ id: payload.id });
+    if (exists) {
+      return res.status(409).json({ message: `Item with id "${payload.id}" already exists` });
+    }
+
+    const created = await Inventory.create(payload);
+    return res.status(201).json({ item: created });
+  } catch (err) {
+    // handle unique index conflict (just in case of race)
+    if (err?.code === 11000) {
+      return res.status(409).json({ message: "Duplicate id. Item already exists." });
+    }
+    if (err.status) return res.status(err.status).json({ message: err.message });
+    return next(err);
+  }
+};
+
+/** PUT /api/inventory/:id -> { item }  (update by business id) */
+const updateByBusinessId = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    // prevent changing the primary id
+    if (req.body?.id && String(req.body.id).trim() !== String(id).trim()) {
+      return res.status(400).json({ message: "Changing the item 'id' is not allowed" });
+    }
+
+    const updates = sanitizeUpdate(req.body);
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No valid fields provided for update" });
+    }
+
+    ensureNonNegative(updates);
+
+    const updated = await Inventory.findOneAndUpdate(
+      { id: String(id).trim() },
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: `Item with id "${id}" not found` });
+    }
+
+    return res.json({ item: updated });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message });
+    return next(err);
+  }
+};
+
+/** DELETE /api/inventory/:id -> { deleted: true } */
+const removeByBusinessId = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await Inventory.deleteOne({ id: String(id).trim() });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: `Item with id "${id}" not found` });
+    }
+    return res.json({ deleted: true });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  listInventory,
+  getByBusinessId,
+  createItem,
+  updateByBusinessId,
+  removeByBusinessId,
+};
