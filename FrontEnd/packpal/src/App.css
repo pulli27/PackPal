@@ -1,9 +1,0 @@
-/* App-wide base styles (no invalid placeholders) */
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, #root, .App { height: 100%; }
-body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  background: #f7fafc;
-  color: #0f172a;
-}
-a { color: inherit; text-decoration: none; }

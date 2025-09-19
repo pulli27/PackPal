@@ -6,7 +6,7 @@ const router = require("./Routes/userRouter");
 const app = express();
 
 //Middleware
-//app.use("/",(req, res, next) => {
+//app.use("/",(req, res, next) => {     
    // res.send("It is Working");
    app.use(express.json());
 app.use("/users", router);
@@ -19,4 +19,4 @@ mongoose.connect(MONGO_URI)
     console.log("Connected to MongoDB");
     app.listen(5000, () => console.log("Server running on http://localhost:5000"));
   })
-  .catch((err) => console.error("Mongo connect error:", err));
+  .catch((err) => console.error("Mongo connect error:", err)); 
