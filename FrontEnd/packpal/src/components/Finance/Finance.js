@@ -18,6 +18,7 @@ const unpackList = (payload) =>
     ? payload
     : payload?.transactions ?? payload?.items ?? payload?.data ?? [];
 
+// NOTE: method removed; status added (default "pending")
 const toTx = (row) => ({
   id: String(
     row?.id ??
@@ -33,10 +34,10 @@ const toTx = (row) => ({
   unitPrice: Number(row?.unitPrice ?? 0),
   discountPerUnit: Number(row?.discountPerUnit ?? 0),
   total: Number(row?.total ?? 0),
-  method: row?.method ?? "Card",
-  // status deliberately omitted in Finance page
+  status: (row?.status ?? "pending").toLowerCase(), // "pending" | "paid" | "refund"
 });
 
+// CSV helpers
 const csvEscape = (v) => {
   if (v == null) return "";
   const s = String(v).replace(/"/g, '""');
@@ -57,6 +58,7 @@ const exportCsv = (filename, rows, headers) => {
   a.click();
   URL.revokeObjectURL(url);
 };
+
 const printHtml = (inner) => {
   const w = window.open("", "_blank");
   w.document.write(`<!DOCTYPE html><html><head><title>Print</title>
@@ -67,6 +69,10 @@ const printHtml = (inner) => {
       thead th{background:#f3f4f6}
       .right{text-align:right}
       .center{text-align:center}
+      .pill{padding:4px 8px;border-radius:999px;font-weight:700;text-transform:capitalize;display:inline-block}
+      .pill.pending{background:#fef3c7;color:#b45309}
+      .pill.paid{background:#dcfce7;color:#15803d}
+      .pill.refund{background:#fee2e2;color:#b91c1c}
     </style>
   </head><body>${inner}</body></html>`);
   w.document.close();
@@ -80,7 +86,7 @@ export default function FinancePage() {
   const [ok, setOk] = useState("");
   const [q, setQ] = useState("");
 
-  // edit modal
+  // status-only edit modal
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -98,12 +104,10 @@ export default function FinancePage() {
   };
   useEffect(() => { fetchTx(); }, []);
 
-  /** base rows (newest first) */
-  const rawRows = useMemo(() => {
-    return txs.slice().reverse();
-  }, [txs]);
+  // newest first
+  const rawRows = useMemo(() => txs.slice().reverse(), [txs]);
 
-  /** filter + add sequential display id and keep real id as rid */
+  // filtered rows with displayId + rid
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
     const filtered = rawRows.filter((t, i) => {
@@ -116,12 +120,10 @@ export default function FinancePage() {
         (t.productName || "").toLowerCase().includes(term)
       );
     });
-
-    // now map to include displayId (1..n) and rid (real backend id)
     return filtered.map((t, i) => ({
       ...t,
-      rid: t.id,               // real backend id
-      displayId: String(i + 1) // what we show in TX ID column
+      rid: t.id,
+      displayId: String(i + 1),
     }));
   }, [rawRows, q]);
 
@@ -129,7 +131,7 @@ export default function FinancePage() {
     exportCsv(
       "transactions",
       rows.map((r) => ({
-        txId: r.displayId, // export the same TX ID users see
+        txId: r.displayId,
         date: r.date,
         customer: r.customer,
         product: r.productName,
@@ -137,9 +139,9 @@ export default function FinancePage() {
         unitPrice: r.unitPrice,
         discount: r.discountPerUnit,
         total: r.total,
-        method: r.method,
+        status: r.status, // export status instead of method
       })),
-      ["txId", "date", "customer", "product", "qty", "unitPrice", "discount", "total", "method"]
+      ["txId", "date", "customer", "product", "qty", "unitPrice", "discount", "total", "status"]
     );
 
   const doPrint = () => {
@@ -154,7 +156,7 @@ export default function FinancePage() {
           <td class="right">${money(r.unitPrice)}</td>
           <td class="right">${r.discountPerUnit ? money(r.discountPerUnit) : "—"}</td>
           <td class="right">${money(r.total)}</td>
-          <td>${r.method}</td>
+          <td><span class="pill ${r.status}">${r.status}</span></td>
         </tr>`
       )
       .join("");
@@ -164,7 +166,7 @@ export default function FinancePage() {
         <thead>
           <tr>
             <th>TX ID</th><th>Date</th><th>Customer</th><th>Product</th>
-            <th>Qty</th><th>Unit</th><th>Discount</th><th>Total</th><th>Method</th>
+            <th>Qty</th><th>Unit</th><th>Discount</th><th>Total</th><th>Status</th>
           </tr>
         </thead>
         <tbody>${body}</tbody>
@@ -172,44 +174,36 @@ export default function FinancePage() {
     `);
   };
 
-  /* ====== ACTIONS: EDIT (modal) / DELETE ====== */
+  // ====== ACTIONS: EDIT (status only) ======
   const openEdit = (row) =>
     setEditing({
-      ...row,
-      id: row.rid, // make sure we save with the real backend id
+      id: row.rid,       // real backend id
+      status: row.status // current status
     });
   const closeEdit = () => setEditing(null);
-
-  const setEdit = (k, v) => {
-    setEditing((e) => {
-      if (!e) return e;
-      const next = { ...e, [k]: v };
-      const qty = Number(k === "qty" ? v : next.qty || 1);
-      const unit = Number(k === "unitPrice" ? v : next.unitPrice || 0);
-      next.total = qty * unit;
-      return next;
-    });
-  };
 
   const saveEdit = async () => {
     if (!editing) return;
     setSaving(true);
     setErr(""); setOk("");
     try {
+      // find the original row so we PUT full record with updated status only
+      const orig = txs.find((t) => t.id === editing.id);
       const payload = {
-        date: editing.date,
-        customer: editing.customer,
-        productName: editing.productName,
-        qty: Number(editing.qty || 1),
-        unitPrice: Number(editing.unitPrice || 0),
-        discountPerUnit: Number(editing.discountPerUnit || 0),
-        total: Number(editing.unitPrice || 0) * Number(editing.qty || 1),
-        method: editing.method || "Card",
+        // keep original values to satisfy PUT APIs
+        date: orig?.date,
+        customer: orig?.customer,
+        productName: orig?.productName,
+        qty: Number(orig?.qty || 1),
+        unitPrice: Number(orig?.unitPrice || 0),
+        discountPerUnit: Number(orig?.discountPerUnit || 0),
+        total: Number(orig?.total || (Number(orig?.unitPrice || 0) * Number(orig?.qty || 1))),
+        status: editing.status, // only change
       };
       await axios.put(`${TX_URL}/${editing.id}`, payload, {
         headers: { "Content-Type": "application/json" },
       });
-      setOk("Updated.");
+      setOk("Status updated.");
       setEditing(null);
       await fetchTx();
       setTimeout(() => setOk(""), 1800);
@@ -220,6 +214,7 @@ export default function FinancePage() {
     }
   };
 
+  // ====== DELETE BUTTON ======
   const deleteTx = async (rowId) => {
     if (!window.confirm("Delete this transaction?")) return;
     setErr(""); setOk("");
@@ -275,7 +270,7 @@ export default function FinancePage() {
                     <th className="right">Unit</th>
                     <th className="right">Discount</th>
                     <th className="right">Total</th>
-                    <th>Method</th>
+                    <th>Status</th>
                     <th className="center">Actions</th>
                   </tr>
                 </thead>
@@ -288,12 +283,20 @@ export default function FinancePage() {
                       <td>{r.productName}</td>
                       <td className="right">{r.qty}</td>
                       <td className="right">{money(r.unitPrice)}</td>
-                      <td className="right">{r.discountPerUnit ? money(r.discountPerUnit) : "—"}</td>
+                      <td className="right">
+                        {r.discountPerUnit ? money(r.discountPerUnit) : "—"}
+                      </td>
                       <td className="right">{money(r.total)}</td>
-                      <td>{r.method}</td>
+                      <td>
+                        <span className={`pill ${r.status}`}>{r.status}</span>
+                      </td>
                       <td className="center">
-                        <button className="btn small warning" onClick={() => openEdit(r)}>✏️ Edit</button>
-                        <button className="btn small danger" onClick={() => deleteTx(r.rid)}>🗑 Delete</button>
+                        <button className="btn small warning" onClick={() => openEdit(r)}>
+                          ✏️ Edit
+                        </button>
+                        <button className="btn small danger" onClick={() => deleteTx(r.rid)}>
+                          🗑 Delete
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -304,55 +307,30 @@ export default function FinancePage() {
         </div>
       </section>
 
-      {/* EDIT MODAL */}
+      {/* STATUS-ONLY EDIT MODAL */}
       {editing && (
         <div className="modal-backdrop" onClick={closeEdit} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Edit Transaction</h3>
-            <div className="modal-grid">
+            <h3>Update Status</h3>
+
+            <div className="modal-grid one-col">
               <div>
-                <label>Date</label>
-                <input type="date" value={editing.date} onChange={(e) => setEdit("date", e.target.value)} />
-              </div>
-              <div>
-                <label>Customer</label>
-                <input value={editing.customer} onChange={(e) => setEdit("customer", e.target.value)} />
-              </div>
-              <div>
-                <label>Product</label>
-                <input value={editing.productName} onChange={(e) => setEdit("productName", e.target.value)} />
-              </div>
-              <div>
-                <label>Qty</label>
-                <input type="number" min="1" value={editing.qty} onChange={(e) => setEdit("qty", e.target.value)} />
-              </div>
-              <div>
-                <label>Unit Price</label>
-                <input type="number" min="0" step="0.01" value={editing.unitPrice} onChange={(e) => setEdit("unitPrice", e.target.value)} />
-              </div>
-              <div>
-                <label>Discount / Unit</label>
-                <input type="number" min="0" step="0.01" value={editing.discountPerUnit} onChange={(e) => setEdit("discountPerUnit", e.target.value)} />
-              </div>
-              <div>
-                <label>Method</label>
-                <select value={editing.method} onChange={(e) => setEdit("method", e.target.value)}>
-                  <option>Card</option>
-                  <option>Cash</option>
-                  <option>Bank Transfer</option>
-                  <option>Invoice</option>
+                <label>Status</label>
+                <select
+                  value={editing.status}
+                  onChange={(e) => setEditing({ ...editing, status: e.target.value })}
+                >
+                  <option value="pending">pending</option>
+                  <option value="paid">paid</option>
+                  <option value="refund">refund</option>
                 </select>
-              </div>
-              <div>
-                <label>Total (auto)</label>
-                <input value={money(editing.total)} readOnly />
               </div>
             </div>
 
             <div className="modal-actions">
               <button className="btn" onClick={closeEdit} disabled={saving}>Cancel</button>
               <button className="btn success" onClick={saveEdit} disabled={saving}>
-                {saving ? "Saving…" : "Save Changes"}
+                {saving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>
