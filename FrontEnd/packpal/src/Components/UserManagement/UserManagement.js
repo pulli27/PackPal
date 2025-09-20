@@ -1,7 +1,7 @@
 // src/Components/UserManagement/UserManagement.js
 import React, { useMemo, useState, useEffect } from "react";
 import "./UserManagement.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebaris/Sidebaris";
 
 // ✅ jsPDF + autotable (function import)
 import jsPDF from "jspdf";
@@ -9,7 +9,7 @@ import autoTable from "jspdf-autotable";
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-function slugify(s = "") {
+function slugify(s = "") {  
   return s
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")

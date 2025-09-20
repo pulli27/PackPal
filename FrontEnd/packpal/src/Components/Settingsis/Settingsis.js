@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./Settings.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebaris/Sidebaris";
 
 /* ---------- Translations ---------- */
 const translations = {

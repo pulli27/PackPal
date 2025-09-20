@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./Udashboard.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebaris/Sidebaris";
 
 /* ---------- config ---------- */
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";

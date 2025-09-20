@@ -1,7 +1,7 @@
 // src/Components/Order/Order.js
 import React, { useEffect, useMemo, useState } from "react";
 import "./Order.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebaris/Sidebaris";
 
 /* Demo orders (you can replace with API later) */
 const ORDERS = [
