@@ -268,7 +268,7 @@ export default function FinancePage() {
                     <th>Product</th>
                     <th className="right">Qty</th>
                     <th className="right">Unit</th>
-                    <th className="right">Discount</th>
+                    <th className="right">Discounnts</th>
                     <th className="right">Total</th>
                     <th>Status</th>
                     <th className="center">Actions</th>

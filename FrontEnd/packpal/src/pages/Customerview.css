@@ -7,6 +7,11 @@
   min-height: 100vh;
   background: #f8fafc;
   color: #0f172a;
+
+  /* Create an isolated stacking context so stray globals can't overlap */
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
 }
 
 /* =============== Hero =============== */
@@ -16,6 +21,9 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #ffffff;
   overflow: hidden;
+
+  /* Keep hero below main container (cards/buttons) */
+  z-index: 1;
 }
 .cv-hero::after {
   content: "";
@@ -24,7 +32,10 @@
   background:
     radial-gradient(1200px 400px at 10% -10%, rgba(255,255,255,0.15), transparent 60%),
     radial-gradient(1000px 400px at 90%   0%, rgba(255,255,255,0.12), transparent 60%);
+
+  /* Make 100% sure the decorative layer cannot steal clicks */
   pointer-events: none;
+  z-index: 0;
 }
 
 .cv-hero-inner {
@@ -34,6 +45,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+
+  /* Sit above ::after */
+  position: relative;
+  z-index: 1;
 }
 .cv-brand {
   font-weight: 900;
@@ -71,6 +86,10 @@
   margin: 0 auto;
   text-align: center;
   padding: 10px 8px 0;
+
+  /* Sit above ::after */
+  position: relative;
+  z-index: 1;
 }
 .cv-hero-content h1 {
   margin: 0 0 8px;
@@ -94,6 +113,9 @@
   border-radius: 14px;
   padding: 8px;
   box-shadow: 0 12px 30px rgba(0,0,0,.12);
+
+  /* Make it explicitly interactive */
+  pointer-events: auto;
 }
 .cv-hero-search input {
   width: min(68vw, 520px);
@@ -129,6 +151,10 @@
   max-width: 1200px;
   margin: -28px auto 0; /* slight overlap with hero */
   padding: 0 20px 28px;
+
+  /* Ensure cards/buttons sit ABOVE hero + its ::after */
+  position: relative;
+  z-index: 2;
 }
 .cv-list-head {
   display: flex;
@@ -153,6 +179,11 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0,1fr));
   gap: 22px;
+
+  /* Explicitly interactive */
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
 }
 @media (max-width:1100px) { .cards-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width:640px)  { .cards-grid { grid-template-columns: 1fr; } }
@@ -167,6 +198,10 @@
   display: flex;
   flex-direction: column;
   transition: transform .25s ease, box-shadow .25s ease;
+
+  /* Keep its children above any weird overlaps */
+  position: relative;
+  z-index: 1;
 }
 .card:hover {
   transform: translateY(-3px) scale(1.01);
@@ -186,6 +221,7 @@
   object-fit: cover;
   display: block;
   transition: transform .35s ease;
+  pointer-events: auto; /* allow context menu/drag if needed */
 }
 .card-media:hover img { transform: scale(1.05); }
 
@@ -201,6 +237,7 @@
   padding: 6px 10px;
   letter-spacing: .3px;
   box-shadow: 0 8px 18px rgba(239,68,68,.2);
+  z-index: 2; /* above image */
 }
 
 /* Price block under image */
@@ -262,8 +299,19 @@
 .stars   { color: #f59e0b; letter-spacing: 1px; font-weight: 900; }
 .reviews { color: #64748b; font-size: 14px; }
 
-/* Buttons */
-.btn-row { display: flex; gap: 12px; align-items: center; }
+/* Buttons (heart centered) */
+.btn-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  /* keep Add to Cart left, More right, and heart centered */
+  justify-content: space-between;
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+  min-height: 48px; /* ensures enough height for absolute heart */
+}
 .btn {
   border: none;
   cursor: pointer;
@@ -274,6 +322,10 @@
   background: #fff;
   color: #1f2937;
   border: 2px solid #e5e7eb;
+
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
 }
 .btn:hover {
   transform: translateY(-1px);
@@ -294,7 +346,40 @@
   transform: translateY(-2px);
 }
 .btn.ghost  { background: #fff; }
-.btn.heart  { width: 48px; padding: 0; font-size: 18px; color: #ef4444; }
+
+/* Heart button centered in row */
+.btn.heart  {
+  width: 52px;
+  height: 42px;
+  padding: 0;
+  font-size: 18px;
+  color: #ef4444;
+
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Wishlist visual state */
+.btn.heart.active {
+  background: #fee2e2;          /* soft red bg */
+  border-color: #fecaca;
+  color: #dc2626;                /* deeper red */
+}
+.btn.heart.active::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 14px;
+  animation: wish-pulse 600ms ease-out;
+}
+@keyframes wish-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239,68,68,.35); opacity: 1; }
+  100% { box-shadow: 0 0 0 10px rgba(239,68,68,0); opacity: 0; }
+}
 
 /* Empty / Error */
 .cv-empty { margin-top: 18px; color: #64748b; text-align: center; }
@@ -317,4 +402,14 @@
   .cv-hero-search { width: 100%; }
   .cv-hero-search input { width: 100%; }
   .cv-container { padding: 0 16px 22px; }
+
+  /* ensure center heart stays clickable on small screens */
+  .btn-row { min-height: 52px; }
+}
+
+/* ===== Extra safety: disable clicks on any global overlays ===== */
+body .global-overlay,
+body .sidebar-overlay,
+body .header-overlay {
+  pointer-events: none !important;
 }

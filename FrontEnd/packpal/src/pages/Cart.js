@@ -13,6 +13,106 @@ const money = (n) =>
 
 const nowISO = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
+// -------------------- VALIDATION HELPERS --------------------
+const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+const nameRe  = /^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$/;
+const cityRe  = /^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$/;
+const zipRe   = /^[A-Za-z0-9 -]{3,10}$/;
+
+const onlyDigits = (s = "") => (s || "").replace(/\D/g, "");
+
+const luhnCheck = (num) => {
+  const s = onlyDigits(num);
+  if (s.length < 12) return false;
+  let sum = 0, alt = false;
+  for (let i = s.length - 1; i >= 0; i--) {
+    let n = +s[i];
+    if (alt) { n *= 2; if (n > 9) n -= 9; }
+    sum += n; alt = !alt;
+  }
+  return sum % 10 === 0;
+};
+
+const parseExpiry = (mmYY) => {
+  const m = mmYY.match(/^(\d{2})\/?(\d{2})$/);
+  if (!m) return null;
+  const month = +m[1];
+  const year  = 2000 + +m[2];
+  if (month < 1 || month > 12) return null;
+  return { month, year };
+};
+
+const expiryInFuture = (mmYY) => {
+  const parsed = parseExpiry(mmYY);
+  if (!parsed) return false;
+  const { month, year } = parsed;
+  const now = new Date();
+  const exp = new Date(year, month, 0, 23, 59, 59, 999); // end of month
+  return exp >= now;
+};
+
+const normalizeSLPhonePretty = (raw) => {
+  let digits = onlyDigits(raw);
+  if (digits.startsWith("0")) digits = "94" + digits.slice(1);
+  if (!digits.startsWith("94")) digits = "94" + digits;
+  digits = digits.slice(0, 11); // 94 + 9 locals
+  const local = digits.slice(2);
+  let out = "+94";
+  if (local.length > 0) out += " " + local.slice(0, 2);
+  if (local.length > 2) out += " " + local.slice(2, 5);
+  if (local.length > 5) out += " " + local.slice(5, 9);
+  return out.trim();
+};
+
+const phoneIsValidSL = (pretty) => {
+  const digits = onlyDigits(pretty);
+  return digits.length === 11 && digits.startsWith("94");
+};
+
+const validateForm = (form) => {
+  const errors = {};
+
+  if (!form.email || !emailRe.test(form.email.trim()))
+    errors.email = "Enter a valid email (e.g., you@example.com).";
+
+  if (!form.phone || !phoneIsValidSL(form.phone))
+    errors.phone = "Enter a valid Sri Lankan number like +94 71 234 5678.";
+
+  if (!form.firstName || !nameRe.test(form.firstName.trim()))
+    errors.firstName = "First name should be at least 2 letters.";
+
+  if (!form.lastName || !nameRe.test(form.lastName.trim()))
+    errors.lastName = "Last name should be at least 2 letters.";
+
+  if (!form.address || form.address.trim().length < 5)
+    errors.address = "Address should be at least 5 characters.";
+
+  if (!form.city || !cityRe.test(form.city.trim()))
+    errors.city = "Enter a valid city or town.";
+
+  if (!form.zip || !zipRe.test(form.zip.trim()))
+    errors.zip = "Postal code should be 3–10 characters.";
+
+  const rawPan = onlyDigits(form.cardNumber);
+  if (rawPan.length < 13 || rawPan.length > 19 || !luhnCheck(form.cardNumber))
+    errors.cardNumber = "Enter a valid card number.";
+
+  if (!form.expiryDate || !parseExpiry(form.expiryDate))
+    errors.expiryDate = "Use MM/YY format.";
+  else if (!expiryInFuture(form.expiryDate))
+    errors.expiryDate = "Card is expired.";
+
+  const cv = onlyDigits(form.cvv);
+  if (!(cv.length === 3 || cv.length === 4))
+    errors.cvv = "CVV should be 3–4 digits.";
+
+  if (!form.cardName || form.cardName.trim().length < 3)
+    errors.cardName = "Enter the name shown on the card.";
+
+  return errors;
+};
+// ------------------------------------------------------------
+
 export default function Cart() {
   const [step, setStep] = useState("cart");
   const [cart, setCart] = useState([]);
@@ -21,6 +121,33 @@ export default function Cart() {
   const [ok, setOk] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+
+  // --------- form state + validation state ---------
+  const [form, setForm] = useState({
+    email: "", phone: "", firstName: "", lastName: "",
+    address: "", city: "", zip: "", cardNumber: "", expiryDate: "", cvv: "", cardName: "",
+  });
+  const [touched, setTouched] = useState({});
+  const [errors, setErrors] = useState({});
+  const markTouched = (k) => setTouched((t) => ({ ...t, [k]: true }));
+  const change = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // formatters
+  const onCardNumber = (e) => {
+    let v = e.target.value.replace(/\D/g, "").slice(0, 19);
+    v = v.replace(/(\d{4})(?=\d)/g, "$1 ");
+    change("cardNumber", v);
+  };
+  const onExp = (e) => {
+    let v = e.target.value.replace(/\D/g, "").slice(0, 4);
+    if (v.length >= 3) v = v.slice(0, 2) + "/" + v.slice(2);
+    change("expiryDate", v);
+  };
+  const onCVV = (e) => change("cvv", e.target.value.replace(/\D/g, "").slice(0, 4));
+  const onPhone = (e) => change("phone", normalizeSLPhonePretty(e.target.value));
+
+  // live validation
+  useEffect(() => { setErrors(validateForm(form)); }, [form]);
 
   // remove left sidebar spacing (if your layout adds it)
   useEffect(() => {
@@ -36,25 +163,27 @@ export default function Cart() {
 
   // 1) load from localStorage
   useEffect(() => {
-    setCart(readCart());
+    setCart(readCart().map((it) => ({
+      ...it,
+      quantity: Math.max(1, parseInt(it.quantity || 1, 10) || 1),
+    })));
   }, []);
 
-  // 2) if CustomerView navigated with { state: { justAdded } }, merge it
+  // 2) merge just-added item from route state
   useEffect(() => {
     const justAdded = location.state && location.state.justAdded;
     if (justAdded) {
       setCart((prev) => {
         const exists = prev.some((x) => String(x.id) === String(justAdded.id));
-        const next = exists ? prev : [...prev, justAdded];
+        const next = exists ? prev : [...prev, { ...justAdded, quantity: Math.max(1, justAdded.quantity || 1) }];
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
         return next;
       });
-      // clear state so reloads don’t duplicate
       navigate(".", { replace: true, state: null });
     }
   }, [location.state, navigate]);
 
-  // save back whenever cart changes (normalize)
+  // save cart
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cart)); } catch {}
   }, [cart]);
@@ -78,68 +207,49 @@ export default function Cart() {
           : it
       )
     );
+
   const removeItem = (id) =>
     setCart((list) => list.filter((it) => String(it.id) !== String(id)));
   const clearCart = () => setCart([]);
 
-  // payment form
-  const [form, setForm] = useState({
-    email: "", phone: "", firstName: "", lastName: "",
-    address: "", city: "", zip: "", cardNumber: "", expiryDate: "", cvv: "", cardName: "",
-  });
-  const change = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const onCardNumber = (e) => {
-    let v = e.target.value.replace(/\D/g, "").slice(0, 16);
-    v = v.replace(/(\d{4})(?=\d)/g, "$1 ");
-    change("cardNumber", v);
-  };
-  const onExp = (e) => {
-    let v = e.target.value.replace(/\D/g, "").slice(0, 4);
-    if (v.length >= 3) v = v.slice(0, 2) + "/" + v.slice(2);
-    change("expiryDate", v);
-  };
-  const onCVV = (e) =>
-    change("cvv", e.target.value.replace(/\D/g, "").slice(0, 4));
-  const onPhone = (e) => {
-    let digits = e.target.value.replace(/\D/g, "");
-    if (digits.startsWith("0")) digits = "94" + digits.slice(1);
-    if (!digits.startsWith("94")) digits = "94" + digits;
-    digits = digits.slice(0, 11);
-    const local = digits.slice(2);
-    let out = "+94";
-    if (local.length > 0) out += " " + local.slice(0, 2);
-    if (local.length > 2) out += " " + local.slice(2, 5);
-    if (local.length > 5) out += " " + local.slice(5, 9);
-    change("phone", out.trim());
-  };
-
   // === SEND TO BACKEND on Complete Payment ===
   const processPayment = async () => {
-    const required = [
-      "email","phone","firstName","lastName",
-      "address","city","zip","cardNumber","expiryDate","cvv","cardName"
-    ];
-    const missing = required.filter((k) => !String(form[k] || "").trim());
-    if (missing.length) { alert("Please fill in all required fields."); return; }
+    // quick cart checks
     if (!cart.length) { alert("Your cart is empty."); return; }
+    const bad = cart.find((it) => !Number.isFinite(+it.quantity) || +it.quantity < 1);
+    if (bad) { alert("Each cart item must have a quantity of at least 1."); return; }
+
+    // submit-time validation (mark all fields touched to show errors)
+    const currentErrors = validateForm(form);
+    setErrors(currentErrors);
+    setTouched({
+      email: true, phone: true, firstName: true, lastName: true,
+      address: true, city: true, zip: true,
+      cardNumber: true, expiryDate: true, cvv: true, cardName: true,
+    });
+    if (Object.keys(currentErrors).length) {
+      const firstKey = Object.keys(currentErrors)[0];
+      const el = document.querySelector(`[name="${firstKey}"]`);
+      if (el && el.focus) el.focus();
+      return;
+    }
 
     setProcessing(true);
     setErr(""); setOk("");
 
     const customerName = `${form.firstName} ${form.lastName}`.trim();
-    const method = "Card"; // or detect from form if you add a selector
+    const method = "Card";
     const date = nowISO();
 
     try {
-      // Build payloads per line item
       const payloads = cart.map((it) => {
         const qty = Number(it.quantity || 1);
         const unit = Number(it.price || 0);
         return {
           date,
           customer: customerName || form.email,
-          customerId: "",          // optional, leave blank
-          fmc: false,              // not needed on Finance page
+          customerId: "",
+          fmc: false,
           productId: String(it.id),
           productName: it.name,
           qty,
@@ -147,25 +257,20 @@ export default function Cart() {
           discountPerUnit: 0,
           total: unit * qty,
           method,
-          status: "Paid",          // harmless (Finance ignores status)
+          status: "Paid",
           notes: `Checkout: ${form.email} / ${form.phone}`,
         };
       });
 
-      // POST all transactions
       await Promise.all(
         payloads.map((p) =>
           axios.post(TX_URL, p, { headers: { "Content-Type": "application/json" } })
         )
       );
 
-      // let other pages refresh (Dashboard/Finance listen for this)
       window.dispatchEvent(new Event("tx:changed"));
-
-      // clear cart + save
       setCart([]);
       try { localStorage.setItem(STORAGE_KEY, "[]"); } catch {}
-
       setOk("Payment successful and transactions saved.");
       setStep("success");
     } catch (e) {
@@ -175,6 +280,8 @@ export default function Cart() {
       setProcessing(false);
     }
   };
+
+  const formValid = !Object.keys(errors).length;
 
   return (
     <div className="cart-page">
@@ -262,61 +369,162 @@ export default function Cart() {
               <div className="form-section">
                 <h3>📧 Contact Information</h3>
                 <div className="form-group">
-                  <label>Email Address</label>
-                  <input value={form.email} onChange={(e) => change("email", e.target.value)} placeholder="you@example.com" required />
+                  <label htmlFor="email">Email Address</label>
+                  <input
+                    id="email" name="email"
+                    value={form.email}
+                    onChange={(e) => change("email", e.target.value)}
+                    onBlur={() => markTouched("email")}
+                    placeholder="you@example.com" required type="email" autoComplete="email"
+                    aria-invalid={Boolean(touched.email && errors.email)}
+                    aria-describedby={touched.email && errors.email ? "email-err" : undefined}
+                  />
+                  {touched.email && errors.email && <div className="field-error" id="email-err">{errors.email}</div>}
                 </div>
                 <div className="form-group">
-                  <label>Phone Number (Sri Lanka)</label>
-                  <input value={form.phone} onChange={onPhone} placeholder="+94 71 234 5678" required />
+                  <label htmlFor="phone">Phone Number (Sri Lanka)</label>
+                  <input
+                    id="phone" name="phone"
+                    value={form.phone}
+                    onChange={onPhone}
+                    onBlur={() => markTouched("phone")}
+                    placeholder="+94 71 234 5678" required inputMode="tel" autoComplete="tel"
+                    aria-invalid={Boolean(touched.phone && errors.phone)}
+                    aria-describedby={touched.phone && errors.phone ? "phone-err" : undefined}
+                  />
+                  {touched.phone && errors.phone && <div className="field-error" id="phone-err">{errors.phone}</div>}
                 </div>
               </div>
+
               {/* address */}
               <div className="form-section">
                 <h3>🚚 Shipping Address</h3>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>First Name</label>
-                    <input value={form.firstName} onChange={(e) => change("firstName", e.target.value)} placeholder="John" required />
+                    <label htmlFor="firstName">First Name</label>
+                    <input
+                      id="firstName" name="firstName"
+                      value={form.firstName}
+                      onChange={(e) => change("firstName", e.target.value)}
+                      onBlur={() => markTouched("firstName")}
+                      placeholder="John" required autoComplete="given-name"
+                      aria-invalid={Boolean(touched.firstName && errors.firstName)}
+                      aria-describedby={touched.firstName && errors.firstName ? "firstName-err" : undefined}
+                    />
+                    {touched.firstName && errors.firstName && <div className="field-error" id="firstName-err">{errors.firstName}</div>}
                   </div>
                   <div className="form-group">
-                    <label>Last Name</label>
-                    <input value={form.lastName} onChange={(e) => change("lastName", e.target.value)} placeholder="Doe" required />
+                    <label htmlFor="lastName">Last Name</label>
+                    <input
+                      id="lastName" name="lastName"
+                      value={form.lastName}
+                      onChange={(e) => change("lastName", e.target.value)}
+                      onBlur={() => markTouched("lastName")}
+                      placeholder="Doe" required autoComplete="family-name"
+                      aria-invalid={Boolean(touched.lastName && errors.lastName)}
+                      aria-describedby={touched.lastName && errors.lastName ? "lastName-err" : undefined}
+                    />
+                    {touched.lastName && errors.lastName && <div className="field-error" id="lastName-err">{errors.lastName}</div>}
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Street Address</label>
-                  <input value={form.address} onChange={(e) => change("address", e.target.value)} placeholder="123 Main Street" required />
+                  <label htmlFor="address">Street Address</label>
+                  <input
+                    id="address" name="address"
+                    value={form.address}
+                    onChange={(e) => change("address", e.target.value)}
+                    onBlur={() => markTouched("address")}
+                    placeholder="123 Main Street" required autoComplete="address-line1"
+                    aria-invalid={Boolean(touched.address && errors.address)}
+                    aria-describedby={touched.address && errors.address ? "address-err" : undefined}
+                  />
+                  {touched.address && errors.address && <div className="field-error" id="address-err">{errors.address}</div>}
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>City / Town</label>
-                    <input value={form.city} onChange={(e) => change("city", e.target.value)} placeholder="Colombo" required />
+                    <label htmlFor="city">City / Town</label>
+                    <input
+                      id="city" name="city"
+                      value={form.city}
+                      onChange={(e) => change("city", e.target.value)}
+                      onBlur={() => markTouched("city")}
+                      placeholder="Colombo" required autoComplete="address-level2"
+                      aria-invalid={Boolean(touched.city && errors.city)}
+                      aria-describedby={touched.city && errors.city ? "city-err" : undefined}
+                    />
+                    {touched.city && errors.city && <div className="field-error" id="city-err">{errors.city}</div>}
                   </div>
                   <div className="form-group">
-                    <label>Postal Code</label>
-                    <input value={form.zip} onChange={(e) => change("zip", e.target.value)} placeholder="00100" required />
+                    <label htmlFor="zip">Postal Code</label>
+                    <input
+                      id="zip" name="zip"
+                      value={form.zip}
+                      onChange={(e) => change("zip", e.target.value)}
+                      onBlur={() => markTouched("zip")}
+                      placeholder="00100" required inputMode="numeric" autoComplete="postal-code"
+                      aria-invalid={Boolean(touched.zip && errors.zip)}
+                      aria-describedby={touched.zip && errors.zip ? "zip-err" : undefined}
+                    />
+                    {touched.zip && errors.zip && <div className="field-error" id="zip-err">{errors.zip}</div>}
                   </div>
                 </div>
               </div>
+
               {/* card */}
               <div className="form-section">
                 <h3>💳 Payment Information</h3>
                 <div className="form-group">
-                  <label>Card Number</label>
-                  <input value={form.cardNumber} onChange={onCardNumber} placeholder="1234 5678 9012 3456" maxLength={19} required />
+                  <label htmlFor="cardNumber">Card Number</label>
+                  <input
+                    id="cardNumber" name="cardNumber"
+                    value={form.cardNumber}
+                    onChange={onCardNumber}
+                    onBlur={() => markTouched("cardNumber")}
+                    placeholder="1234 5678 9012 3456" maxLength={23} required inputMode="numeric"
+                    aria-invalid={Boolean(touched.cardNumber && errors.cardNumber)}
+                    aria-describedby={touched.cardNumber && errors.cardNumber ? "cardNumber-err" : undefined}
+                  />
+                  {touched.cardNumber && errors.cardNumber && <div className="field-error" id="cardNumber-err">{errors.cardNumber}</div>}
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Expiry Date</label>
-                    <input value={form.expiryDate} onChange={onExp} placeholder="MM/YY" maxLength={5} required />
+                    <label htmlFor="expiryDate">Expiry Date</label>
+                    <input
+                      id="expiryDate" name="expiryDate"
+                      value={form.expiryDate}
+                      onChange={onExp}
+                      onBlur={() => markTouched("expiryDate")}
+                      placeholder="MM/YY" maxLength={5} required inputMode="numeric"
+                      aria-invalid={Boolean(touched.expiryDate && errors.expiryDate)}
+                      aria-describedby={touched.expiryDate && errors.expiryDate ? "expiryDate-err" : undefined}
+                    />
+                    {touched.expiryDate && errors.expiryDate && <div className="field-error" id="expiryDate-err">{errors.expiryDate}</div>}
                   </div>
                   <div className="form-group">
-                    <label>CVV</label>
-                    <input value={form.cvv} onChange={onCVV} placeholder="123" maxLength={4} required />
+                    <label htmlFor="cvv">CVV</label>
+                    <input
+                      id="cvv" name="cvv"
+                      value={form.cvv}
+                      onChange={onCVV}
+                      onBlur={() => markTouched("cvv")}
+                      placeholder="123" maxLength={4} required inputMode="numeric"
+                      aria-invalid={Boolean(touched.cvv && errors.cvv)}
+                      aria-describedby={touched.cvv && errors.cvv ? "cvv-err" : undefined}
+                    />
+                    {touched.cvv && errors.cvv && <div className="field-error" id="cvv-err">{errors.cvv}</div>}
                   </div>
                   <div className="form-group">
-                    <label>Name on Card</label>
-                    <input value={form.cardName} onChange={(e) => change("cardName", e.target.value)} placeholder="John Doe" required />
+                    <label htmlFor="cardName">Name on Card</label>
+                    <input
+                      id="cardName" name="cardName"
+                      value={form.cardName}
+                      onChange={(e) => change("cardName", e.target.value)}
+                      onBlur={() => markTouched("cardName")}
+                      placeholder="John Doe" required
+                      aria-invalid={Boolean(touched.cardName && errors.cardName)}
+                      aria-describedby={touched.cardName && errors.cardName ? "cardName-err" : undefined}
+                    />
+                    {touched.cardName && errors.cardName && <div className="field-error" id="cardName-err">{errors.cardName}</div>}
                   </div>
                 </div>
               </div>
@@ -337,7 +545,16 @@ export default function Cart() {
 
               <div style={{ textAlign: "center", marginTop: 35 }}>
                 <button className="btn btn-secondary" onClick={() => setStep("cart")} disabled={processing}>⬅️ Back to Cart</button>
-                <button className="btn btn-success" onClick={processPayment} disabled={processing}>
+                <button
+                  className="btn btn-success"
+                  onClick={processPayment}
+                  disabled={processing || !formValid || !cart.length}
+                  title={
+                    !cart.length ? "Your cart is empty" :
+                    !formValid ? "Please fix validation errors above" :
+                    "Ready to pay"
+                  }
+                >
                   {processing ? "⏳ Processing Payment..." : "🔒 Complete Payment"}
                 </button>
               </div>
@@ -404,6 +621,7 @@ body, .cart-page { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
 .form-group label{ display:block; margin-bottom:8px; color:#2d3748; font-weight:600; font-size:1rem; }
 .form-group input{ width:100%; padding:15px; border:2px solid #e2e8f0; border-radius:10px; font-size:1rem; transition:all .3s ease; background:rgba(255,255,255,0.8); }
 .form-group input:focus{ outline:none; border-color:#667eea; box-shadow:0 0 0 3px rgba(102,126,234,0.1); background:#fff; }
+.field-error{ color:#b91c1c; font-size:.9rem; margin-top:6px; }
 .btn{ background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; border:none; padding:18px 35px; border-radius:12px; font-size:1.1rem; font-weight:600; cursor:pointer; transition:all .3s ease; margin:10px; box-shadow:0 8px 25px rgba(102,126,234,0.3); }
 .btn:hover{ transform:translateY(-3px); box-shadow:0 15px 35px rgba(102,126,234,0.4); }
 .btn-success{ background:linear-gradient(135deg,#48bb78,#38a169); box-shadow:0 8px 25px rgba(72,187,120,0.3); }

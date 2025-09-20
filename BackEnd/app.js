@@ -1,29 +1,3 @@
-//pass= H1234pul
-
-/*const express = require("express");
-const mongoose = require("mongoose");
-const router=require('./Routes/CartRoutes');
-
-const app = express();
-
-
-
-app.use("/users",router) ;
-app.use(express.json());
-
-//Middleware
-/*app.use("/",(req, res, next) => {
-    res.send("It is Working");
-})*/
-
-/*mongoose.connect("mongodb+srv://pulmivihansa27:H1234pul@cluster0.uowmnpn.mongodb.net/")
-.then(()=> console.log("Connected to MongoDB"))
-.then(()=> {
-    app.listen(5000);
-})
-.catch((err)=> console.log((err)));*/
-
-//pass= H1234pul
 
 /*const express = require("express");
 const mongoose = require("mongoose");
@@ -68,7 +42,7 @@ app.use("/carts", cartRoutes);
 app.use("/transactions", transactionRoutes); 
 
 // MongoDB connection
-const mongoURI = "mongodb+srv://pulmivihansa27:H1234pul@cluster0.jhfjlg0.mongodb.net/PackPal?retryWrites=true&w=majority";
+const mongoURI = "mongodb+srv://ranasinghasasangi_db_user:H1234pul@cluster1.bfmejns.mongodb.net/PackPal?retryWrites=true&w=majority&appName=Cluster1";
 
 mongoose.connect(mongoURI)
 .then(() => {

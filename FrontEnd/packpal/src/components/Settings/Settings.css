@@ -16,7 +16,7 @@
   max-width: clamp(1100px, 95vw, 1600px);
   margin: 0 auto;
   padding: 1.5rem 1.75rem;                     /* tighter */
-  margin-left: calc(var(--sidebar-w, 200px) + 12px); /* was 270px */
+ /* was 270px */
   min-width: 0;                                /* prevent overflow in flex parents */
 }
 

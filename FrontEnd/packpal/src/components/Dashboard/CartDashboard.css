@@ -1,63 +1,140 @@
-/* === Compact layout tweaks (paste after your existing CSS) === */
+/* === Compact layout + Light Blue Table Theme ===================== */
+/* Tokens (adds --border so table borders render nicely) */
+:root{
+  --sidebar-w: 180px;
 
-/* Sidebar width (was 220px) */
-:root{ --sidebar-w: 180px; }
+  /* Neutral UI */
+  --bg: #f8fafc;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #475569;
+  --border: #e5e7eb;
 
-/* If your sidebar element doesn't already use the var, force it: */
+  /* Light blue table palette */
+  --tbl-bg:     #f0f7ff;  /* table surface */
+  --tbl-header: #e3efff;  /* thead background */
+  --tbl-border: #c7ddff;  /* table borders */
+  --tbl-ink:    #0f172a;  /* text */
+  --tbl-muted:  #385ea8;  /* header text */
+  --tbl-hover:  #e9f2ff;  /* hover row */
+  --tbl-zebra:  #f6faff;  /* even rows */
+  --tbl-chip:   #dbeafe;  /* badge bg (optional) */
+}
+
+/* ---------- Layout ---------- */
+body{ background: var(--bg); color: var(--ink); }
+
 .sidebar{ width: var(--sidebar-w); }
 
-/* Content offset + a bit less padding */
 .dashboard-container{
   margin-left: calc(var(--sidebar-w) + 8px);
   margin-right: 12px;
   padding: 20px;
 }
 
-/* Sections a bit tighter */
-.section{ margin: 16px 0; }
-.head{ padding: 12px 14px; }
-.body{ padding: 12px; }
+/* Sections a bit tighter + clean panels */
+.section{
+  margin: 16px 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.head{
+  padding: 12px 14px;
+  background: #f3f4f6;
+  color: #374151;
+  border-bottom: 1px solid var(--border);
+  border-top-left-radius: 12px; border-top-right-radius: 12px;
+}
+.body{
+  padding: 12px;
+  background: var(--panel);
+  border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+}
 
-/* ------ Tables: compact spacing ------ */
-.table-wrap{ overflow-x: auto; }
+/* Stats tighter */
+.stats{ gap:12px; margin:12px 0; }
+.card{
+  padding:14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.stat .v{ font-size:20px; color: var(--ink); } /* smaller big number */
+.stat .l{ font-size:11px; color: var(--muted); }
 
+/* ---------- Tables: compact + light blue theme ---------- */
+.table-wrap{
+  overflow-x: auto;
+  background: var(--tbl-bg);
+  border: 1px solid var(--tbl-border);
+  border-radius: 12px;
+}
+
+/* Base table */
 table{
   width:100%;
-  min-width: 880px;            /* was 1000px */
+  min-width: 880px;                 /* was 1000px */
   border-collapse: collapse;
+  background: var(--tbl-bg);
+  color: var(--tbl-ink);
 }
 
+/* Header */
 thead th{
-  background:#f3f4f6;
-  color:#374151;
+  background: var(--tbl-header);
+  color: var(--tbl-muted);
   text-transform: uppercase;
   letter-spacing:.04em;
-  font-size: 11px;             /* smaller header text */
-  padding: 10px 10px;          /* tighter header padding */
+  font-size: 11px;                   /* smaller header text */
+  padding: 10px 10px;                /* tighter header padding */
+  border-bottom: 1px solid var(--tbl-border);
 }
 
+/* Cells */
 th, td{
-  padding: 8px 10px;           /* was 12px 14px */
-  border-bottom:1px solid var(--border);
+  padding: 8px 10px;                 /* was 12px 14px */
+  border-bottom: 1px solid var(--tbl-border);
   text-align:left;
   vertical-align:top;
   font-size: 13px;
-  line-height: 1.25;           /* shorter rows */
+  line-height: 1.25;                 /* shorter rows */
+  color: var(--tbl-ink);
 }
 
-tr:hover td{ background:#fafafa; }
+/* Zebra + hover */
+tbody tr:nth-child(even) td{
+  background: var(--tbl-zebra);
+}
+tr:hover td{
+  background: var(--tbl-hover);
+}
 
-/* Badges a touch smaller */
-.badge{ padding:3px 8px; font-size:11px; }
+/* Links in cells/headers */
+th a, td a{
+  color: #2563eb;                    /* blue-600 */
+  text-decoration: none;
+}
+th a:hover, td a:hover{
+  color: #1d4ed8;                    /* blue-700 */
+  text-decoration: underline;
+}
 
-/* Stats cards also slightly tighter */
-.stats{ gap:12px; margin:12px 0; }
-.card{ padding:14px; }
-.stat .v{ font-size:20px; }    /* smaller big number */
-.stat .l{ font-size:11px; }
+/* Optional: badges in table */
+.badge{
+  padding:3px 8px; font-size:11px;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--tbl-chip);
+  color: #1e3a8a;                    /* blue-900 */
+  border: 1px solid var(--tbl-border);
+  border-radius: 999px;
+}
 
-/* Mobile: squeeze a bit more */
+/* ---------- Mobile squeeze ---------- */
 @media (max-width: 768px){
   table{ min-width: 760px; }
-  .dashboard-container{ margin-left: calc(var(--sidebar-w) + 6px); padding: 16px; }
+  .dashboard-container{
+    margin-left: calc(var(--sidebar-w) + 6px);
+    padding: 16px;
+  }
 }

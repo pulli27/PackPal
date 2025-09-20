@@ -6,18 +6,26 @@
   --sidebar-w: 220px;
 }
 
+/* Light Blue Table Theme (scoped to this page) */
+.content.products-page{
+  --tbl-bg:     #f0f7ff;   /* table surface */
+  --tbl-header: #e3efff;   /* thead background */
+  --tbl-border: #c7ddff;   /* borders */
+  --tbl-ink:    #0f172a;   /* text */
+  --tbl-muted:  #385ea8;   /* header text */
+  --tbl-hover:  #e9f2ff;   /* hover */
+  --tbl-zebra:  #f6faff;   /* even rows */
+  --tbl-chip:   #dbeafe;   /* small badges (optional) */
+}
+
 /* Page layout assumes Sidebar is fixed at --sidebar-w */
 .content.products-page{
-        /* aligns with sidebar width */
   padding: 20px 24px;
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  overflow-x: hidden;      
-  .content.products-page {
-  margin-left: 260px; /* Match sidebar width */
-}
-              /* kill page-level horizontal scroll */
+  overflow-x: hidden;
+  
 }
 
 .page-title{ margin:0 0 8px; font-size:38px; font-weight:900; letter-spacing:.01em; }
@@ -46,21 +54,70 @@
 .btn.red{ background:var(--danger); color:#fff; border-color:var(--danger); }
 .btn:hover{ filter:brightness(.97); }
 
-/* Tables – no horizontal scroll, wrap content */
-.table-wrap{ overflow-x: hidden; }       /* was auto; we avoid cross scroll */
-table{ 
-  width:100%; border-collapse:collapse; table-layout:fixed; 
+/* ONLY the row "Edit" button = light green (first button inside ACTIONS cell) */
+.content.products-page td .actions .btn:first-child{
+  background: #d1fae5;          /* emerald-100 */
+  color: #065f46;               /* emerald-900 */
+  border-color: #a7f3d0;        /* emerald-200 */
 }
-thead th{
-  background:#f3f4f6; color:#374151; text-transform:uppercase;
+.content.products-page td .actions .btn:first-child:hover{
+  background: #bbf7d0;          /* emerald-200 */
+  border-color: #86efac;        /* emerald-300 */
+}
+.content.products-page td .actions .btn:first-child:focus-visible{
+  outline: 3px solid rgba(5, 150, 105, .35); /* emerald-600 ring */
+  outline-offset: 2px;
+}
+
+/* Tables – keep your natural sizing (NO width/table-layout overrides) */
+.table-wrap{ overflow-x: hidden; }  /* keep as you had */
+
+/* === Light Blue styling applied here (visuals only) === */
+.content.products-page table{
+  background: var(--tbl-bg);
+  color: var(--tbl-ink);
+  border-color: var(--tbl-border);
+  border-collapse: collapse;          /* visual border behavior only */
+}
+.content.products-page thead th{
+  background: var(--tbl-header);
+  color: var(--tbl-muted);
+  text-transform: uppercase;
   font-size:12px; letter-spacing:.04em;
+  border-bottom:1px solid var(--tbl-border);
 }
-th, td{
-  padding:12px 14px; border-bottom:1px solid var(--border);
+.content.products-page th,
+.content.products-page td{
+  padding:12px 14px;
+  border-bottom:1px solid var(--tbl-border);
   text-align:left; vertical-align:top; font-size:14px;
   white-space:normal; word-break:break-word; overflow-wrap:anywhere;
+  color: var(--tbl-ink);
 }
-tr:hover td{ background:#fafafa; }
+.content.products-page tbody tr:nth-child(even) td{
+  background: var(--tbl-zebra);
+}
+.content.products-page tr:hover td{
+  background: var(--tbl-hover);
+}
+
+/* (Optional) links and tiny badges inside table cells */
+.content.products-page td a,
+.content.products-page th a{
+  color:#2563eb; text-decoration:none;
+}
+.content.products-page td a:hover,
+.content.products-page th a:hover{
+  color:#1d4ed8; text-decoration:underline;
+}
+.content.products-page .badge{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 8px; font-size:11px;
+  background: var(--tbl-chip);
+  color:#1e3a8a;
+  border:1px solid var(--tbl-border);
+  border-radius:999px;
+}
 
 .right{ text-align:right; }
 .center{ text-align:center; }
@@ -79,7 +136,6 @@ tr:hover td{ background:#fafafa; }
   background:#fef2f2; color:#991b1b; padding:4px 8px;
   border-radius:999px; font-size:12px; font-weight:700;
 }
-.save-text{ color:#065f46; font-weight:700; font-size:12px; }
 
 /* Modal */
 .backdrop{
@@ -113,7 +169,7 @@ tr:hover td{ background:#fafafa; }
   th, td{ padding:10px 12px; }
 }
 @media (max-width: 768px){
-  .content.products-page{ margin-left: 0; }      /* stacked layout if sidebar collapses */
+  .content.products-page{ margin-left: 0; } /* stacked layout if sidebar collapses */
   .pimg{ width:48px; height:48px; }
   .page-title{ font-size:30px; }
 }

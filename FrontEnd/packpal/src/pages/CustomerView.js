@@ -6,6 +6,7 @@ import "./Customerview.css";
 
 const URL = "http://localhost:5000/carts";
 const STORAGE_KEY = "packPalCart";
+const WISHLIST_KEY = "packPalWishlist";
 
 const money = (n) =>
   "LKR" +
@@ -16,7 +17,6 @@ const money = (n) =>
 
 const pct = (n) => `${Number(n || 0).toFixed(0)}%`;
 
-// price after discount
 const effectivePrice = (p) => {
   const price = Number(p?.price || 0);
   const dv = Number(p?.discountValue || 0);
@@ -25,13 +25,9 @@ const effectivePrice = (p) => {
   return price;
 };
 
-// normalize product object from backend
 const toUI = (row) => ({
   id: String(
-    row?.id ??
-      row?._id ??
-      row?.productId ??
-      Math.random().toString(36).slice(2, 10)
+    row?.id ?? row?._id ?? row?.productId ?? Math.random().toString(36).slice(2, 10)
   ),
   name: row?.name ?? "Unnamed",
   category: row?.category ?? "BACKPACKS",
@@ -48,13 +44,26 @@ const toUI = (row) => ({
     "Durable, comfy straps, and playful design — perfect for school & play.",
 });
 
-// resolve image source
 const imgSrc = (val) => {
   if (!val) return "https://via.placeholder.com/800x600?text=Bag";
   if (val.startsWith("http")) return val;
   if (val.startsWith("/")) return val;
-  if (val.startsWith("images/")) return "/" + val; // served from public/images
+  if (val.startsWith("images/")) return "/" + val;
   return val;
+};
+
+// localStorage helpers
+const readJSON = (key, fallback) => {
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+};
+const writeJSON = (key, val) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch {}
 };
 
 export default function CustomerView() {
@@ -62,16 +71,27 @@ export default function CustomerView() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [search, setSearch] = useState("");
-  const [show, setShow] = useState(false);     // modal visible?
-  const [active, setActive] = useState(null);  // product in modal
+  const [show, setShow] = useState(false);
+  const [active, setActive] = useState(null);
+  const [wishlist, setWishlist] = useState(() => new Set(readJSON(WISHLIST_KEY, [])));
   const navigate = useNavigate();
 
   useEffect(() => {
     document.body.classList.add("sidebar-off");
-    return () => document.body.classList.remove("sidebar-off");
+    const root = document.querySelector(".cv-page");
+    if (root) {
+      root.style.position = "relative";
+      root.style.zIndex = "1";
+    }
+    return () => {
+      document.body.classList.remove("sidebar-off");
+      if (root) {
+        root.style.position = "";
+        root.style.zIndex = "";
+      }
+    };
   }, []);
 
-  // fetch products from backend
   useEffect(() => {
     (async () => {
       try {
@@ -102,21 +122,10 @@ export default function CustomerView() {
     );
   }, [products, search]);
 
-  // localStorage helpers
-  const readCart = () => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  };
-  const writeCart = (arr) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
-    } catch {}
-  };
+  // cart helpers
+  const readCart = () => readJSON(STORAGE_KEY, []);
+  const writeCart = (arr) => writeJSON(STORAGE_KEY, arr);
 
-  // add a single item
   const addToCart = (p) => {
     const newItem = {
       id: String(p.id),
@@ -137,11 +146,9 @@ export default function CustomerView() {
       list.push(newItem);
     }
     writeCart(list);
-
-    navigate("/cart", { state: { justAdded: newItem } });
+    navigate("/cart", { state: { justAdded: newItem }, replace: false });
   };
 
-  // add all filtered products
   const addAllFiltered = () => {
     const list = readCart();
     const map = new Map(list.map((x) => [String(x.id), x]));
@@ -165,7 +172,18 @@ export default function CustomerView() {
     });
     const next = Array.from(map.values());
     writeCart(next);
-    navigate("/cart", { state: { addedMany: true } });
+    navigate("/cart", { state: { addedMany: true }, replace: false });
+  };
+
+  // wishlist logic
+  const isWished = (id) => wishlist.has(String(id));
+  const toggleWishlist = (p) => {
+    const id = String(p.id);
+    const next = new Set(wishlist);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setWishlist(next);
+    writeJSON(WISHLIST_KEY, Array.from(next));
   };
 
   const openMore = (p) => { setActive(p); setShow(true); };
@@ -193,24 +211,22 @@ export default function CustomerView() {
             />
             <button type="button" aria-label="Search">🔍</button>
           </div>
+
+          {!loading && filtered.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <button type="button" className="btn primary" onClick={addAllFiltered}>
+                Add All To Cart
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
-      <main className="cv-container">
+      <main className="cv-container" style={{ position: "relative", zIndex: 2 }}>
         <div className="cv-list-head" style={{ alignItems: "center" }}>
-          <h2>Kids Bags</h2>
           <div className="cv-count">
             {loading ? "Loading…" : <>Showing <strong>{filtered.length}</strong> products</>}
           </div>
-          {!loading && filtered.length > 0 && (
-            <button
-              className="btn primary"
-              style={{ marginLeft: "auto" }}
-              onClick={addAllFiltered}
-            >
-              ➕ Add All (filtered)
-            </button>
-          )}
         </div>
 
         {err && <div className="cv-error">{err}</div>}
@@ -224,16 +240,17 @@ export default function CustomerView() {
               p.discountType === "percentage"
                 ? pct(p.discountValue)
                 : `-${money(p.discountValue)}`;
+            const wished = isWished(p.id);
+
             return (
-              <article className="card" key={p.id}>
+              <article className="card" key={p.id} style={{ position: "relative" }}>
                 <div className="card-media">
                   {!!p.badge && <span className="badge">{String(p.badge).toUpperCase()}</span>}
                   <img
                     src={imgSrc(p.img)}
                     alt={p.name}
-                    onError={(e) => {
-                      e.currentTarget.src = "https://via.placeholder.com/800x600?text=Bag";
-                    }}
+                    onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/800x600?text=Bag"; }}
+                    draggable={false}
                   />
                 </div>
 
@@ -259,9 +276,35 @@ export default function CustomerView() {
                   </div>
 
                   <div className="btn-row">
-                    <button className="btn primary" onClick={() => addToCart(p)}>Add to Cart</button>
-                    <button className="btn ghost" onClick={() => openMore(p)}>More</button>
-                    <button className="btn heart" title="Wishlist">♡</button>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={() => addToCart(p)}
+                      style={{ position: "relative", zIndex: 3 }}
+                    >
+                      Add to Cart
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => openMore(p)}
+                      style={{ position: "relative", zIndex: 3 }}
+                    >
+                      More
+                    </button>
+
+                    {/* Centered wishlist heart */}
+                    <button
+                      type="button"
+                      className={`btn heart${wished ? " active" : ""}`}
+                      aria-pressed={wished}
+                      title={wished ? "Remove from wishlist" : "Add to wishlist"}
+                      onClick={() => toggleWishlist(p)}
+                      style={{ position: "absolute", left: "50%", transform: "translateX(-50%)" }}
+                    >
+                      {wished ? "♥" : "♡"}
+                    </button>
                   </div>
                 </div>
               </article>
@@ -274,7 +317,6 @@ export default function CustomerView() {
         )}
       </main>
 
-      {/* simple modal for "More" */}
       {show && active && (
         <div
           role="dialog"
@@ -305,9 +347,8 @@ export default function CustomerView() {
                 src={imgSrc(active.img)}
                 alt={active.name}
                 style={{ width: 160, height: 120, objectFit: "cover", borderRadius: 12 }}
-                onError={(e) => {
-                  e.currentTarget.src = "https://via.placeholder.com/800x600?text=Bag";
-                }}
+                onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/800x600?text=Bag"; }}
+                draggable={false}
               />
               <div style={{ flex: 1 }}>
                 <h3 style={{ margin: "0 0 6px" }}>{active.name}</h3>
@@ -326,12 +367,22 @@ export default function CustomerView() {
                     </span>
                   )}
                 </div>
-                <div style={{ marginTop: 16 }}>
-                  <button className="btn primary" onClick={() => addToCart(active)}>
+                <div style={{ marginTop: 16, position: "relative" }}>
+                  <button type="button" className="btn primary" onClick={() => addToCart(active)}>
                     Add to Cart
                   </button>
-                  <button className="btn" style={{ marginLeft: 8 }} onClick={closeMore}>
+                  <button type="button" className="btn" style={{ marginLeft: 8 }} onClick={closeMore}>
                     Close
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn heart${isWished(active.id) ? " active" : ""}`}
+                    aria-pressed={isWished(active.id)}
+                    title={isWished(active.id) ? "Remove from wishlist" : "Add to wishlist"}
+                    onClick={() => toggleWishlist(active)}
+                    style={{ marginLeft: 8 }}
+                  >
+                    {isWished(active.id) ? "♥" : "♡"}
                   </button>
                 </div>
               </div>
