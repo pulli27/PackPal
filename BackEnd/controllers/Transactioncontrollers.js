@@ -1,0 +1,172 @@
+/*const Transaction = require('../Model/TransactionModel');
+const Product = require('../Model/CartModel');
+
+// Get all transactions
+exports.getTransactions = async (req, res) => {
+  const txs = await Transaction.find().sort({ date: -1 });
+  res.json(txs);
+};
+
+// Add transaction
+exports.addTransaction = async (req, res) => {
+  const { productId, qty } = req.body;
+  const product = await Product.findById(productId);
+  if(!product) return res.status(400).json({ error: 'Invalid product' });
+
+  const unitPrice = product.price;
+  const discountPerUnit = product.discountType==='percentage' ? unitPrice*(product.discountValue/100) : product.discountValue;
+  const total = unitPrice*qty - discountPerUnit*qty;
+
+  const tx = new Transaction({
+    ...req.body,
+    productName: product.name,
+    unitPrice,
+    discountPerUnit,
+    total
+  });
+  await tx.save();
+  res.json(tx);
+};
+
+// Update transaction status
+exports.updateTransaction = async (req, res) => {
+  const tx = await Transaction.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  res.json(tx);
+};
+
+// Delete transaction
+exports.deleteTransaction = async (req, res) => {
+  await Transaction.findByIdAndDelete(req.params.id);
+  res.json({ message: 'Transaction deleted' });
+};
+*/
+// controllers/Transactioncontrollers.js (CommonJS)
+const mongoose = require("mongoose");
+const Transaction = require("../Model/TransactionModel");
+const Product = require("../Model/CartModel");
+
+const isObjectId = (v) => mongoose.Types.ObjectId.isValid(v);
+
+// Build a filter that works with either Mongo _id or a custom string id
+const txFilter = (idOrTxId) =>
+  isObjectId(idOrTxId) ? { _id: idOrTxId } : { id: idOrTxId }; // ensure your schema has `id: String` if you use this
+
+// ===== Get all transactions
+exports.getTransactions = async (req, res) => {
+  try {
+    const txs = await Transaction.find().sort({ date: -1 });
+    return res.json(txs);
+  } catch (err) {
+    console.error("getTransactions:", err);
+    return res.status(500).json({ ok: false, error: "Failed to fetch transactions", details: err.message });
+  }
+};
+
+// ===== Add transaction
+exports.addTransaction = async (req, res) => {
+  try {
+    const {
+      productId,
+      qty,
+      customer = "",
+      customerId = "",
+      fmc = true,
+      method = "Cash",
+      status = "Paid",
+      notes = "",
+      date,          // optional; e.g., "YYYY-MM-DD"
+      id,            // optional custom id from client, else we create one
+    } = req.body || {};
+
+    // qty must be >= 1
+    const q = Math.max(1, Number(qty) || 0);
+
+    // productId must be a valid ObjectId for findById
+    if (!isObjectId(productId)) {
+      return res.status(400).json({ ok: false, error: "Invalid productId (must be a Mongo ObjectId)" });
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(400).json({ ok: false, error: "Invalid product (not found)" });
+    }
+
+    const unitPrice = Number(product.price ?? 0);
+
+    // normalize discount
+    const discountType = product.discountType || "none"; // "none" | "percentage" | "fixed"
+    const discountValue = Number(product.discountValue ?? 0);
+
+    let discountPerUnit = 0;
+    if (discountType === "percentage") {
+      discountPerUnit = unitPrice * (discountValue / 100);
+    } else if (discountType === "fixed") {
+      discountPerUnit = discountValue;
+    }
+    if (!Number.isFinite(discountPerUnit) || discountPerUnit < 0) discountPerUnit = 0;
+
+    const effectiveUnit = Math.max(0, unitPrice - discountPerUnit);
+    const total = effectiveUnit * q;
+
+    const txDoc = new Transaction({
+      id: id || `TX-${Date.now()}`,   // keep a human-readable id too (optional)
+      date: date || new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+      customer,
+      customerId,
+      fmc: Boolean(fmc),
+      productId,                       // Mongo ObjectId
+      productName: product.name || "Unknown",
+      qty: q,
+      unitPrice,
+      discountPerUnit,
+      total,
+      method,
+      status,
+      notes,
+    });
+
+    await txDoc.save();
+    return res.json(txDoc);
+  } catch (err) {
+    console.error("addTransaction:", err);
+    return res.status(500).json({ ok: false, error: "Failed to add transaction", details: err.message });
+  }
+};
+
+// ===== Update transaction (by _id or custom id)
+exports.updateTransaction = async (req, res) => {
+  try {
+    const { id } = req.params; // can be _id or your string id
+    if (!id) return res.status(400).json({ ok: false, error: "Missing id parameter" });
+
+    const filter = txFilter(id);
+    const updated = await Transaction.findOneAndUpdate(filter, req.body, { new: true });
+
+    if (!updated) {
+      return res.status(404).json({ ok: false, error: "Transaction not found" });
+    }
+    return res.json(updated);
+  } catch (err) {
+    console.error("updateTransaction:", err);
+    return res.status(500).json({ ok: false, error: "Failed to update transaction", details: err.message });
+  }
+};
+
+// ===== Delete transaction (by _id or custom id)
+exports.deleteTransaction = async (req, res) => {
+  try {
+    const { id } = req.params; // can be _id or your string id
+    if (!id) return res.status(400).json({ ok: false, error: "Missing id parameter" });
+
+    const filter = txFilter(id);
+    const deleted = await Transaction.findOneAndDelete(filter);
+
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: "Transaction not found" });
+    }
+    return res.json({ ok: true, message: "Transaction deleted", deleted: { _id: deleted._id, id: deleted.id } });
+  } catch (err) {
+    console.error("deleteTransaction:", err);
+    return res.status(500).json({ ok: false, error: "Failed to delete transaction", details: err.message });
+  }
+};

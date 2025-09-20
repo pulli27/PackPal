@@ -1,0 +1,143 @@
+/* ===== Finance.css (full-page table) ===== */
+
+/* Page scaffolding */
+.content.finance-page{
+  max-width: none !important;
+  width: 100%;
+  margin: 0;
+  padding: 24px 0; /* top/bottom only; sides handled by full-bleed section */
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color:#0f172a;
+}
+
+.page-title{ margin:0 0 6px; font-size: 34px; font-weight: 800; letter-spacing:.2px }
+.muted{ color:#64748b }
+
+/* Sections */
+.section{
+  border:1px solid #e5e7eb;
+  border-radius: 16px;
+  background:#fff;
+  overflow:hidden;
+}
+
+/* Make THIS section full-width (edge to edge of viewport) */
+.finance-page .section.full-bleed{
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
+/* Section head */
+.section .head{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 24px;
+  background: #f8fafc;
+  border-bottom:1px solid #eef2f7;
+}
+.section .head h3{ margin:0; font-size:20px; font-weight:800 }
+.section .head .actions{
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+}
+.section .head input{
+  height:38px; border:1px solid #e5e7eb; border-radius:10px;
+  padding:0 12px; min-width:280px; outline:none;
+}
+
+/* Buttons */
+.btn{
+  height:38px; padding:0 14px; border-radius:10px; border:1px solid #e5e7eb;
+  background:#ffffff; cursor:pointer;
+  box-shadow: 0 6px 20px rgba(2, 6, 23, .06);
+}
+.btn:hover{ background:#f8fafc }
+.btn.small{ height:32px; padding:0 10px; }
+
+/* Light-green EDIT button */
+.btn.warning{
+  background:#dcfce7;         /* green-100 */
+  border-color:#bbf7d0;       /* green-200 */
+  color:#166534;              /* green-700 */
+}
+.btn.warning:hover{ filter: brightness(0.98); }
+
+/* Danger / Success (unchanged) */
+.btn.danger{ background:#fee2e2; border-color:#fecaca }
+.btn.success{ background:#dcfce7; border-color:#bbf7d0 }
+
+/* Section body */
+.section .body{ padding: 0 }
+
+/* Table */
+.table-wrap{
+  width:100%;
+  overflow:auto;                 /* horizontal scroll on small screens */
+  background: #ffffff;
+}
+.tx-table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  min-width: 980px;
+}
+
+/* Light-blue table header */
+.tx-table thead th{
+  background:#dbeafe;           /* light blue */
+  color:#0f172a;
+  text-align:left;
+  font-weight:800;
+  padding:14px 16px;
+  border-bottom:1px solid #c7dbff;  /* soft blue border */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Light-blue body rows */
+.tx-table tbody td{
+  padding:14px 16px;
+  border-bottom:1px solid #dbeafe;  /* blue divider */
+  background:#eff6ff;               /* light blue row */
+}
+
+/* Zebra alt row (slightly different blue) */
+.tx-table tbody tr:nth-child(odd) td{
+  background:#eaf2ff;
+}
+
+.tx-table .right{ text-align:right }
+.tx-table .center{ text-align:center }
+
+/* Status pills */
+.pill{
+  padding:4px 10px; border-radius:999px; font-weight:700; text-transform:capitalize;
+  display:inline-block;
+}
+.pill.pending{ background:#fef3c7; color:#b45309 }
+.pill.paid{ background:#dcfce7; color:#15803d }
+.pill.refund{ background:#fee2e2; color:#b91c1c }
+
+/* Modal */
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(2,6,23,.4);
+  display:flex; align-items:center; justify-content:center; z-index:50;
+}
+.modal{
+  width:min(560px, 92vw); background:#fff; border-radius:16px; padding:18px;
+  box-shadow:0 20px 60px rgba(2,6,23,.25);
+}
+.modal-grid.one-col{ display:grid; gap:12px; grid-template-columns:1fr }
+.modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:10px }
+
+/* Alerts */
+.error{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca; padding:10px 12px; border-radius:10px }
+.ok{ background:#dcfce7; color:#166534; border:1px solid #bbf7d0; padding:10px 12px; border-radius:10px }
+
+/* Page background */
+body { background: #f3f6fb; }

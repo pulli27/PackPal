@@ -1,0 +1,175 @@
+/* --- Layout tokens --- */
+:root{
+  --bg:#f1f5f9; --card:#fff; --text:#0f172a; --muted:#637087; --border:#e5e7eb;
+  --primary:#2563eb; --danger:#ef4444; --ok:#16a34a; --amber:#f59e0b; --slate:#1f2937;
+  /* keep this equal to your actual Sidebar width */
+  --sidebar-w: 220px;
+}
+
+/* Light Blue Table Theme (scoped to this page) */
+.content.products-page{
+  --tbl-bg:     #f0f7ff;   /* table surface */
+  --tbl-header: #e3efff;   /* thead background */
+  --tbl-border: #c7ddff;   /* borders */
+  --tbl-ink:    #0f172a;   /* text */
+  --tbl-muted:  #385ea8;   /* header text */
+  --tbl-hover:  #e9f2ff;   /* hover */
+  --tbl-zebra:  #f6faff;   /* even rows */
+  --tbl-chip:   #dbeafe;   /* small badges (optional) */
+}
+
+/* Page layout assumes Sidebar is fixed at --sidebar-w */
+.content.products-page{
+  padding: 20px 24px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  
+}
+
+.page-title{ margin:0 0 8px; font-size:38px; font-weight:900; letter-spacing:.01em; }
+.muted{ color:var(--muted); font-size:13px; }
+
+/* Card / section */
+.section{
+  background:#fff; border:1px solid var(--border); border-radius:14px;
+  overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.04); margin:18px 0;
+}
+.head{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 16px; border-bottom:1px solid var(--border);
+}
+.body{ padding:16px; }
+
+/* Buttons */
+.actions{ display:flex; gap:8px; flex-wrap:wrap; }
+.btn{
+  display:inline-flex; align-items:center; gap:8px; padding:8px 12px;
+  border-radius:10px; border:1px solid var(--border); background:#fff;
+  cursor:pointer; font-weight:600;
+}
+.btn.primary{ background:var(--primary); color:#fff; border-color:var(--primary); }
+.btn.green{ background:var(--ok); color:#fff; border-color:var(--ok); }
+.btn.red{ background:var(--danger); color:#fff; border-color:var(--danger); }
+.btn:hover{ filter:brightness(.97); }
+
+/* ONLY the row "Edit" button = light green (first button inside ACTIONS cell) */
+.content.products-page td .actions .btn:first-child{
+  background: #d1fae5;          /* emerald-100 */
+  color: #065f46;               /* emerald-900 */
+  border-color: #a7f3d0;        /* emerald-200 */
+}
+.content.products-page td .actions .btn:first-child:hover{
+  background: #bbf7d0;          /* emerald-200 */
+  border-color: #86efac;        /* emerald-300 */
+}
+.content.products-page td .actions .btn:first-child:focus-visible{
+  outline: 3px solid rgba(5, 150, 105, .35); /* emerald-600 ring */
+  outline-offset: 2px;
+}
+
+/* Tables – keep your natural sizing (NO width/table-layout overrides) */
+.table-wrap{ overflow-x: hidden; }  /* keep as you had */
+
+/* === Light Blue styling applied here (visuals only) === */
+.content.products-page table{
+  background: var(--tbl-bg);
+  color: var(--tbl-ink);
+  border-color: var(--tbl-border);
+  border-collapse: collapse;          /* visual border behavior only */
+}
+.content.products-page thead th{
+  background: var(--tbl-header);
+  color: var(--tbl-muted);
+  text-transform: uppercase;
+  font-size:12px; letter-spacing:.04em;
+  border-bottom:1px solid var(--tbl-border);
+}
+.content.products-page th,
+.content.products-page td{
+  padding:12px 14px;
+  border-bottom:1px solid var(--tbl-border);
+  text-align:left; vertical-align:top; font-size:14px;
+  white-space:normal; word-break:break-word; overflow-wrap:anywhere;
+  color: var(--tbl-ink);
+}
+.content.products-page tbody tr:nth-child(even) td{
+  background: var(--tbl-zebra);
+}
+.content.products-page tr:hover td{
+  background: var(--tbl-hover);
+}
+
+/* (Optional) links and tiny badges inside table cells */
+.content.products-page td a,
+.content.products-page th a{
+  color:#2563eb; text-decoration:none;
+}
+.content.products-page td a:hover,
+.content.products-page th a:hover{
+  color:#1d4ed8; text-decoration:underline;
+}
+.content.products-page .badge{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 8px; font-size:11px;
+  background: var(--tbl-chip);
+  color:#1e3a8a;
+  border:1px solid var(--tbl-border);
+  border-radius:999px;
+}
+
+.right{ text-align:right; }
+.center{ text-align:center; }
+
+/* Images stay contained */
+.pimg{
+  width:56px; height:56px; object-fit:cover;
+  border-radius:10px; border:1px solid var(--border); background:#fff;
+}
+
+/* Price / discount chips */
+.price-old{ color:#9ca3af; text-decoration:line-through; font-size:12px; }
+.price-new{ font-weight:800; color:#111827; }
+.discount-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  background:#fef2f2; color:#991b1b; padding:4px 8px;
+  border-radius:999px; font-size:12px; font-weight:700;
+}
+
+/* Modal */
+.backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.45);
+  display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px;
+}
+.modal{
+  background:#fff; width:100%; max-width:640px; border-radius:14px;
+  border:1px solid var(--border); overflow:hidden;
+}
+.modal-head{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 16px; border-bottom:1px solid var(--border);
+}
+.modal-body{ padding:16px; }
+.modal-foot{
+  padding:14px 16px; border-top:1px solid var(--border);
+  display:flex; justify-content:flex-end; gap:8px;
+}
+.x{ background:transparent; border:0; font-size:22px; cursor:pointer; }
+
+/* Simple grid */
+.grid{ display:grid; gap:12px; }
+@media(min-width:900px){
+  .grid-3{ grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Responsive tighten for smaller screens */
+@media (max-width: 1024px){
+  .content.products-page{ margin-left: calc(var(--sidebar-w) - 10px); padding:16px; }
+  th, td{ padding:10px 12px; }
+}
+@media (max-width: 768px){
+  .content.products-page{ margin-left: 0; } /* stacked layout if sidebar collapses */
+  .pimg{ width:48px; height:48px; }
+  .page-title{ font-size:30px; }
+}
