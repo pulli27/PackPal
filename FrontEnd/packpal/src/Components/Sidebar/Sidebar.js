@@ -1,13 +1,48 @@
-import React, { useEffect, useRef, useState } from "react";
+/*import React from "react"
+import { Link } from "react-router-dom";
 import "./Sidebar.css";
-import { NavLink } from "react-router-dom";
 
-export default function Sidebar({ initialActive = "reports", onNavigate, onLogout }) {
+function Sidebar()  {
+  return (
+   <div className="sidebar">
+      <h2 className="logo">  <h2>Smart Bag System</h2></h2>
+      <ul className="nav-list">
+        <li>
+          <Link to="/dashboard">📊 Dashboard</Link>
+        </li>
+        <li>
+          <Link to="/products">🛒 Products List</Link>
+        </li>
+        <li>
+          <Link to="/discounts">💸 Discounts</Link>
+        </li>
+        <li>
+          <Link to="/finance">💰 Finance</Link>
+        </li>
+        <li>
+          <Link to="/reports">📑 Reports</Link>
+        </li>
+      </ul>
+    </div>
+  );
+};
+
+export default Sidebar;
+*/
+// src/Components/Sidebar/Sidebar.jsx
+import React, { useEffect, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import "./Sidebar.css";
+
+export default function Sidebar({
+  initialActive = "reports",
+  onNavigate,
+  onLogout, // optional callback
+}) {
   const [active, setActive] = useState(initialActive);
-  const [open, setOpen] = useState(false);
-  const sidebarRef = useRef(null);
+  const location = useLocation();
 
-  // Restore last page
+  // Restore last page once
   useEffect(() => {
     try {
       const last = localStorage.getItem("financehub:lastPage");
@@ -15,37 +50,35 @@ export default function Sidebar({ initialActive = "reports", onNavigate, onLogou
     } catch {}
   }, []);
 
-  // Close on outside click (mobile)
+  // Keep active state in sync with the URL
   useEffect(() => {
-    const handleDocClick = (e) => {
-      if (window.innerWidth <= 768) {
-        const btn = document.querySelector(".mobile-menu");
-        if (
-          sidebarRef.current &&
-          !sidebarRef.current.contains(e.target) &&
-          (!btn || !btn.contains(e.target))
-        ) {
-          setOpen(false);
-        }
-      }
+    const path = location.pathname.toLowerCase();
+    const map = {
+      "/dashboard": "dashboard",
+      "/products": "products",
+      "/discounts": "discounts",
+      "/finance": "finance",
+      "/reports": "reports",
+      "/settings": "settings", // ✅ added
     };
-    document.addEventListener("click", handleDocClick);
-    return () => document.removeEventListener("click", handleDocClick);
-  }, []);
+    const key = map[path];
+    if (key) setActive(key);
+  }, [location.pathname]);
 
   const titleMap = {
     dashboard: "Dashboard",
-    itemInventory: "Item Inventory",
-    productInventory: "Product Inventory",
-    purchase: "Purchase Items",
-    suppliers: "Suppliers",
-    reports: "Report & Analytics",
-    settings: "Settings",
+    products: "Products List",
+    discounts: "Discounts",
+    finance: "Finance",
+    reports: "Reports",
+    settings: "Settings", // ✅ added
   };
 
   const handleNavigate = (key) => {
     setActive(key);
-    try { localStorage.setItem("financehub:lastPage", key); } catch {}
+    try {
+      localStorage.setItem("financehub:lastPage", key);
+    } catch {}
     if (window.showNotification) {
       window.showNotification(`Opening ${titleMap[key] || "Feature"}...`, "info");
     }
@@ -53,103 +86,107 @@ export default function Sidebar({ initialActive = "reports", onNavigate, onLogou
   };
 
   const logout = () => {
-    // eslint-disable-next-line no-restricted-globals
     const ok = window.confirm("Are you sure you want to logout?");
     if (!ok) return;
-    if (window.showNotification) window.showNotification("Logging out...", "info");
+    if (window.showNotification) {
+      window.showNotification("Logging out...", "info");
+    }
+    try {
+      localStorage.removeItem("financehub:lastPage");
+    } catch {}
     setTimeout(() => {
       alert("You have been logged out successfully!");
-      onLogout?.();
+      onLogout?.();          // let parent clear auth / redirect if needed
+      onNavigate?.("login"); // optional: hint parent to route to login
     }, 800);
   };
 
   return (
-    <aside ref={sidebarRef} id="sidebar" className={`sidebar ${open ? "active" : ""}`}>
-      <div className="sidebar-header">
-        <h2>📦 PackPal</h2>
-        <p>Inventory Management System</p>
-      </div>
+    <div className="sidebar">
+      <h2 className="logo">Smart Bag System</h2>
 
-      <nav className="sidebar-nav">
-        <NavLink
-          to="/maindashboard"
-          className={({ isActive }) =>
-            `nav-item ${isActive || active === "dashboard" ? "active" : ""}`
-          }
-          onClick={() => handleNavigate("dashboard")}
-        >
-          <i className="fas fa-chart-line" /> <span>Dashboard</span>
-        </NavLink>
+      <ul className="nav-list">
+        <li>
+          <NavLink
+            to="/dashboard"
+            className={({ isActive }) =>
+              `nav-item ${isActive || active === "dashboard" ? "active" : ""}`
+            }
+            onClick={() => handleNavigate("dashboard")}
+          >
+            📊 Dashboard
+          </NavLink>
+        </li>
 
-        <NavLink
-          to="/iteminventory"
-          className={({ isActive }) =>
-            `nav-item ${isActive || active === "itemInventory" ? "active" : ""}`
-          }
-          onClick={() => handleNavigate("itemInventory")}
-        >
-          <i className="fa-solid fa-boxes-stacked" /> <span>Item Inventory</span>
-        </NavLink>
+        <li>
+          <NavLink
+            to="/products"
+            className={({ isActive }) =>
+              `nav-item ${isActive || active === "products" ? "active" : ""}`
+            }
+            onClick={() => handleNavigate("products")}
+          >
+            🛒 Products List
+          </NavLink>
+        </li>
 
-        <NavLink
-          to="/productinventory"
-          className={({ isActive }) =>
-            `nav-item ${isActive || active === "productInventory" ? "active" : ""}`
-          }
-          onClick={() => handleNavigate("productInventory")}
-        >
-          <i className="fa-solid fa-box-open" /> <span>Product Inventory</span>
-        </NavLink>
+        <li>
+          <NavLink
+            to="/discounts"
+            className={({ isActive }) =>
+              `nav-item ${isActive || active === "discounts" ? "active" : ""}`
+            }
+            onClick={() => handleNavigate("discounts")}
+          >
+            💸 Discounts
+          </NavLink>
+        </li>
 
-        <NavLink
-          to="/purchase"
-          className={({ isActive }) =>
-            `nav-item ${isActive || active === "purchase" ? "active" : ""}`
-          }
-          onClick={() => handleNavigate("purchase")}
-        >
-          <i className="fa-solid fa-cart-shopping" /> <span>Purchase Items</span>
-        </NavLink>
+        <li>
+          <NavLink
+            to="/finance"
+            className={({ isActive }) =>
+              `nav-item ${isActive || active === "finance" ? "active" : ""}`
+            }
+            onClick={() => handleNavigate("finance")}
+          >
+            💰 Finance
+          </NavLink>
+        </li>
 
-        <NavLink
-          to="/supplier"
-          className={({ isActive }) =>
-            `nav-item ${isActive || active === "suppliers" ? "active" : ""}`
-          }
-          onClick={() => handleNavigate("suppliers")}
-        >
-          <i className="fa-solid fa-truck" /> <span>Suppliers</span>
-        </NavLink>
+        <li>
+          <NavLink
+            to="/reports"
+            className={({ isActive }) =>
+              `nav-item ${isActive || active === "reports" ? "active" : ""}`
+            }
+            onClick={() => handleNavigate("reports")}
+          >
+            📑 Reports
+          </NavLink>
+        </li>
 
-        <NavLink
-          to="/report"
-          className={({ isActive }) =>
-            `nav-item ${isActive || active === "reports" ? "active" : ""}`
-          }
-          onClick={() => handleNavigate("reports")}
-        >
-          <i className="fa-solid fa-chart-line" /> <span>Report &amp; Analytics</span>
-        </NavLink>
+        {/* ✅ New: Settings */}
+        <li>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `nav-item ${isActive || active === "settings" ? "active" : ""}`
+            }
+            onClick={() => handleNavigate("settings")}
+          >
+            ⚙️ Settings
+          </NavLink>
+        </li>
+      </ul>
 
-        <div className="nav-divider" />
-
-        <NavLink
-          to="/settings"
-          className={({ isActive }) =>
-            `nav-item ${isActive || active === "settings" ? "active" : ""}`
-          }
-          onClick={() => handleNavigate("settings")}
-        >
-          <i className="fa-solid fa-gear" /> <span>Settings</span>
-        </NavLink>
-      </nav>
-
+      {/* Divider + Logout button (uses your CSS .logout-section / .logout-btn) */}
+      <div className="nav-divider" />
       <div className="logout-section">
-        {/* Don't nest a <button> inside a <Link>. Just use a button. */}
-        <button className="logout-btn" type="button" onClick={logout}>
-          <i className="fa-solid fa-right-from-bracket" /> <span>Logout</span>
+        <button type="button" className="logout-btn" onClick={logout}>
+          🚪 <span>Logout</span>
         </button>
       </div>
-    </aside>
+    </div>
   );
 }
