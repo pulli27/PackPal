@@ -1,7 +1,7 @@
 // src/Components/UserManagement/UserManagement.js
 import React, { useMemo, useState, useEffect } from "react";
 import "./UserManagement.css";
-import Sidebar from "../Sidebaris/Sidebaris";
+import Sidebar from "../Sidebar/Sidebaris";
 
 // ✅ jsPDF + autotable (function import)
 import jsPDF from "jspdf";
