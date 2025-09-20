@@ -1,4 +1,6 @@
-/* Reuse the same look as SalaryCal; scoped where helpful */
+/* ===========================
+   Attendance Page Styles
+   =========================== */
 
 /* Layout offset for sidebar */
 .Attendance { padding-left: 280px; }
@@ -55,7 +57,7 @@
   gap:12px;
 }
 .Attendance .section .tab-btn{
-    padding: 13px 30px;
+  padding: 13px 30px;
   border-radius: 5px;
   background: #ffffff;
   font-weight: 700;
@@ -64,10 +66,12 @@
   transition: all 0.3s ease;
   text-decoration: none;
 }
-.Attendance .section .tab-btn:hover{  background: rgba(102,126,234,0.1);
-  color: #667eea; }
+.Attendance .section .tab-btn:hover{
+  background: rgba(102,126,234,0.1);
+  color: #667eea;
+}
 .Attendance .section .tab-btn.active{
-background: linear-gradient(45deg,#354fc5,#15122f);
+  background: linear-gradient(45deg,#354fc5,#15122f);
   color: #fff;
 }
 
@@ -95,7 +99,7 @@ background: linear-gradient(45deg,#354fc5,#15122f);
   box-shadow:0 0 0 3px rgba(102,126,234,.1);
 }
 
-/* Buttons */
+/* Buttons (general) */
 .Attendance .btn{
   padding: 12px 24px;
   border: none;
@@ -105,43 +109,88 @@ background: linear-gradient(45deg,#354fc5,#15122f);
   transition: transform .3s ease, box-shadow .3s ease;
   margin: 5px;
   color: #fff;
-  margin-left: 925px;
 }
-.Attendance .btn:hover{ transform:translateY(-2px); box-shadow:0 10px 20px rgba(0,0,0,.2); }
-.Attendance .btn-primary{ background:linear-gradient(45deg,#354fc5,#15122f); color:#fff; }
-.Attendance .btn-success{ background:linear-gradient(45deg,#2281ad,#3f8d9e); color:#fff; }
-.Attendance .btn-warning{ background:linear-gradient(45deg,#22b845,#1bb82a); color:#fff; }
-.Attendance .btn-danger{  background:linear-gradient(45deg,#e72121,#e72121); color:#fff; }
+.Attendance .btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 10px 20px rgba(0,0,0,.2);
+}
+.Attendance .btn-primary{ background:linear-gradient(45deg,#354fc5,#15122f); }
+.Attendance .btn-success{ background:linear-gradient(45deg,#2281ad,#3f8d9e); }
+.Attendance .btn-warning{ background:linear-gradient(45deg,#22b845,#1bb82a); }
+.Attendance .btn-danger { background:linear-gradient(45deg,#e72121,#e72121); }
+
+/* Left-aligned action rows (Add, Save/Cancel) */
+.Attendance .btn-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start; /* left align */
+  align-items: center;
+  margin: 10px 0 0 0;
+}
 
 /* Table */
 .Attendance table{
-  width:100%; border-collapse:collapse; margin-top:20px; background:#fff;
-  border-radius:10px; overflow:hidden; box-shadow:0 5px 15px rgba(0,0,0,.08);
+  width:100%;
+  border-collapse:collapse;
+  margin-top:20px;
+  background:#fff;
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:0 5px 15px rgba(0,0,0,.08);
 }
 .Attendance th{
   background:linear-gradient(45deg,#667eea,#764ba2);
-  color:#fff; padding:15px; text-align:left; font-weight:600;
+  color:#fff;
+  padding:15px;
+  text-align:left;
+  font-weight:600;
 }
 .Attendance td{ padding:15px; border-bottom:1px solid #e0e6ed; }
 .Attendance tbody tr:hover{ background:#f8f9ff; }
 .Attendance .actions{
-  display:flex; gap:10px; justify-content:center; align-items:center;
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  align-items:center;
 }
 .Attendance .actions .btn{
-  padding:8px 16px; margin:0; border-radius:8px; font-size:.85rem; box-shadow:none;
+  padding:8px 16px;
+  margin:0;
+  border-radius:8px;
+  font-size:.85rem;
+  box-shadow:none;
 }
 
-/* Modal (scoped) */
-.Attendance .salary-modal{
-  display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%;
-  background:rgba(0,0,0,.5); backdrop-filter:blur(5px);
+/* Attendance-only Modal (no clash with SalaryCal) */
+.att-modal{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  background:rgba(0,0,0,.45);
+  backdrop-filter:blur(2px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
-.Attendance .salary-modal-content{
-  background:#fff; margin:10% auto; padding:30px; border-radius:20px; width:90%; max-width:500px;
-  box-shadow:0 20px 40px rgba(0,0,0,.3);
+.att-modal-content{
+  background:#fff;
+  width:90%;
+  max-width:560px;
+  border-radius:16px;
+  padding:24px;
+  box-shadow:0 20px 40px rgba(0,0,0,.25);
+  position:relative;
 }
-.Attendance .salary-modal-close{ color:#aaa; float:right; font-size:28px; font-weight:700; cursor:pointer; }
-.Attendance .salary-modal-close:hover{ color:#000; }
+.att-modal-close{
+  position:absolute;
+  top:10px;
+  right:12px;
+  border:0;
+  background:transparent;
+  font-size:28px;
+  line-height:1;
+  cursor:pointer;
+}
 
 /* Responsive */
 @media (max-width:768px){

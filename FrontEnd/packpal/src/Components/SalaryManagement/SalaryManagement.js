@@ -1,176 +1,125 @@
-import React, { useEffect } from "react";
+// FrontEnd/src/components/SalaryManagement/SalaryManagement.jsx
+import React, { useEffect, useState } from "react";
 import "./SalaryManagement.css";
 import Sidebar from "../Sidebar/Sidebar";
 import { NavLink } from "react-router-dom";
+import { api } from "../../lib/api";
 
-function SalaryManagement() {
-  /* ---------------- storage + helpers ---------------- */
-  const Store = {
-    kE: "employees",
-    kA: "attendance",
-    kAd: "advances",
-    kT: "transfers",
-    get(k, d = []) {
-      try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; }
-    },
-    set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
-    seed(force = false) {
-      if (force || !localStorage.getItem(this.kE)) {
-        this.set(this.kE, [
-          { id: "EMP001", name: "John Silva",  designation: "Software Engineer", epf: "EPF001", salary: 50000, bankName: "BOC",           branch: "Colombo", accNo: "1234567890" },
-          { id: "EMP002", name: "Maria Fernando", designation: "HR Manager",     epf: "EPF002", salary: 85000, bankName: "People's Bank", branch: "Kandy",   accNo: "9876543210" }
-        ]);
+const LKR = (n) => `LKR ${Math.round(Number(n || 0)).toLocaleString()}`;
+
+function numberToWords(num) {
+  num = Math.round(Number(num || 0));
+  if (num === 0) return "Zero";
+  const ones = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  const chunk = (n) => n < 20 ? ones[n] :
+    n < 100 ? tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "") :
+    ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + chunk(n % 100) : "");
+  let out = "", scales = [["Billion",1e9],["Million",1e6],["Thousand",1e3]];
+  for (const [name, val] of scales) { if (num >= val) { out += `${chunk(Math.floor(num / val))} ${name} `; num %= val; } }
+  if (num > 0) out += chunk(num);
+  return out.trim();
+}
+
+export default function SalaryManagement() {
+  const [employees, setEmployees] = useState([]);
+  const [empId, setEmpId] = useState("");
+  const [calc, setCalc] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get("/finances/min-list");
+        setEmployees(data.employees || []);
+        if ((data.employees || []).length) setEmpId(data.employees[0].EmpId);
+      } catch (e) {
+        alert(`ERROR: ${(e?.response?.data?.message || e.message)}`);
       }
-      if (force || !localStorage.getItem(this.kA)) {
-        this.set(this.kA, [{ empId: "EMP001", period: "2025-08", workingDays: 22, overtimeHrs: 10, leaveAllowed: 2, noPayLeave: 0, leaveTaken: 1, other: "Good performance" }]);
-      }
-      if (force || !localStorage.getItem(this.kAd)) {
-        this.set(this.kAd, [{ empId: "EMP001", period: "2025-08", costOfLiving: 5000, food: 0, conveyance: 0, medical: 0, bonus: 0, reimbursements: 0 }]);
-      }
-      if (force || !localStorage.getItem(this.kT)) { this.set(this.kT, []); }
+    })();
+  }, []);
+
+  async function calculateSalary() {
+    if (!empId) { alert("Select an employee"); return null; }
+    try {
+      setLoading(true);
+      const { data } = await api.get(`/salary/calc`, { params: { empId } });
+      setCalc(data);
+
+      const n = data.numbers;
+      document.getElementById("basicSal").textContent  = LKR(n.basic);
+      document.getElementById("grossSal").textContent  = LKR(n.gross);
+      document.getElementById("empEpf").textContent    = LKR(n.epfEmp);
+      document.getElementById("emplerEpf").textContent = LKR(n.epfEr);
+      document.getElementById("etfAmt").textContent    = LKR(n.etf);
+      document.getElementById("netSal").textContent    = LKR(n.netPayable);
+      document.getElementById("calcBox").style.display = "block";
+      return data;
+    } catch (e) {
+      alert(`ERROR: ${(e?.response?.data?.message || e.message)}`);
+      return null;
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const LKR = (n) => `LKR ${Math.round(Number(n || 0)).toLocaleString()}`;
-
-  function numberToWords(num) {
-    num = Math.round(Number(num || 0));
-    if (num === 0) return "Zero";
-    const ones = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
-    const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
-    const chunk = (n) => n < 20 ? ones[n] :
-      n < 100 ? tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "") :
-      ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + chunk(n % 100) : "");
-    let out = "", scales = [["Billion",1e9],["Million",1e6],["Thousand",1e3]];
-    for (const [name, val] of scales) { if (num >= val) { out += `${chunk(Math.floor(num / val))} ${name} `; num %= val; } }
-    if (num > 0) out += chunk(num);
-    return out.trim();
   }
 
-  function fillEmpOptions(selectFirst = false) {
-    const sel = document.getElementById("salaryEmpId");
-    if (!sel) return;
-    const emps = Store.get(Store.kE);
-    sel.innerHTML = '<option value="">Select Employee</option>';
-    emps.forEach((e) => {
-      const o = document.createElement("option");
-      o.value = e.id; o.textContent = `${e.id} - ${e.name}`;
-      sel.appendChild(o);
-    });
-    if (selectFirst && emps.length) sel.value = emps[0].id;
-  }
-
-  function ensureEmpId() {
-    const sel = document.getElementById("salaryEmpId");
-    if (!sel.value) {
-      const emps = Store.get(Store.kE);
-      if (emps.length) sel.value = emps[0].id;
-    }
-    return document.getElementById("salaryEmpId").value;
-  }
-
-  /* ---------------- calculations ---------------- */
-  function calculateSalary() {
-    const empId = ensureEmpId();
-    if (!empId) { window.alert("No employees found. Click “Reset sample data”."); return; }
-
-    const emp = Store.get(Store.kE).find((e) => e.id === empId);
-    if (!emp) { window.alert("Employee not found"); return; }
-
-    const att = Store.get(Store.kA).find((a) => a.empId === empId) || {};
-    const adv = Store.get(Store.kAd).find((a) => a.empId === empId) || {};
-
-    const basic = Number(emp.salary) || 0;
-    const col = Number(adv.costOfLiving) || 0;
-    const food = Number(adv.food) || 0;
-    const conv = Number(adv.conveyance) || 0;
-    const med  = Number(adv.medical) || 0;
-    const bonus = Number(adv.bonus) || 0;
-    const reimbursements = Number(adv.reimbursements) || 0;
-
-    const otHrs = Number(att.overtimeHrs) || 0;
-    const noPayLeave = Number(att.noPayLeave) || 0;
-
-    const hourlyRate = basic / (22 * 8);
-    const overtimePay = otHrs > 0 ? otHrs * hourlyRate * 1.5 : 0;
-    const noPay = noPayLeave > 0 ? (basic / 22) * noPayLeave : 0;
-
-    const totalAllowances = col + food + conv + med;
-    const gross = basic + totalAllowances;
-
-    const salaryBeforeDeduction = gross + overtimePay + bonus;
-    const epfEmp    = salaryBeforeDeduction * 0.08;
-    const epfEr     = salaryBeforeDeduction * 0.12;
-    const etfAmount = salaryBeforeDeduction * 0.03;
-    const apit   = 0;
-    const salaryAdvance = 0;
-
-    const totalDeductions = noPay + salaryAdvance + apit + epfEmp + etfAmount;
-    const netPayable = salaryBeforeDeduction - totalDeductions;
-
-    // mini dashboard update
-    document.getElementById("basicSal").textContent  = LKR(basic);
-    document.getElementById("grossSal").textContent  = LKR(gross);
-    document.getElementById("empEpf").textContent    = LKR(epfEmp);
-    document.getElementById("emplerEpf").textContent = LKR(epfEr);
-    document.getElementById("etfAmt").textContent    = LKR(etfAmount);
-    document.getElementById("netSal").textContent    = LKR(netPayable);
-    document.getElementById("calcBox").style.display = "block";
-
-    return { emp, att, adv, numbers: {
-      basic, col, food, conv, med, bonus, reimbursements,
-      overtimePay, noPay, totalAllowances, gross,
-      salaryBeforeDeduction, epfEmp, epfEr, etf: etfAmount, apit, salaryAdvance,
-      totalDeductions, netPayable
-    }};
-  }
-
+  /* ---------- RELIABLE TAB OPEN (Blob) ---------- */
   function openSlip(html) {
-    let w = window.open("", "_blank");
-    if (w && !w.closed) { w.document.write(html); w.document.close(); return; }
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.target = "_blank";
-    document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
+    try {
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");  // no document.write
+      // revoke later (allow tab to load)
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      console.error("openSlip failed", e);
+      alert("Could not open the salary slip tab.");
+    }
   }
 
-  function generateSalarySlip() {
-    const res = calculateSalary(); if (!res) return;
-    const { emp, att, numbers } = res;
+  async function generateSalarySlip() {
+    // Always get a fresh calculation to avoid stale/slip mixups
+    const data = await calculateSalary();
+    if (!data) return;
+
+    const emp = data.employee;
+    const att = data.attendance || {};
+    const n   = data.numbers;
 
     const now = new Date();
     const periodShort = now.toLocaleString("en-US", { month: "short" }) + " " + String(now.getFullYear()).slice(-2);
     const periodLong  = now.toLocaleString("en-US", { month: "long", year: "numeric" });
-    const amountWords = numberToWords(numbers.netPayable);
+    const amountWords = numberToWords(n.netPayable);
 
-    // NOTE: </script> escaped as <\/script>
     const slipHTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Salary Slip - ${emp.name}</title>
 <style>
+ :root{ --ink:#2e2e2e; --grid:#aeb7d6; --head:#111; --muted:#666; --bg:#fff; }
  *{box-sizing:border-box}
- body{font-family:Segoe UI,Arial,Helvetica,sans-serif;background:#fff;color:#1a1a1a;margin:0;padding:24px}
- .wrap{max-width:900px;margin:0 auto;border:1px solid #cfd7ff;border-radius:8px;background:#fff}
- .header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:2px solid #cfd7ff}
- .brand{display:flex;align-items:center;gap:12px}
- .logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#ff82b3,#ff4d7a);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px}
- .brand h1{margin:0;font-size:20px}
- .brand small{display:block;font-size:11px;color:#667}
- .contact{font-size:11px;color:#334;text-align:right;line-height:1.4}
- .title{position:relative;text-align:center;font-weight:700;padding:10px 16px;border-bottom:1px solid #e7ebff}
- .title .period-right{position:absolute;right:16px;top:10px}
- .bar{background:#eef2ff;border-top:1px solid #cfd7ff;border-bottom:1px solid #cfd7ff;padding:8px 10px;font-weight:700}
- .tbl{width:100%;border-collapse:separate;border-spacing:0}
- .tbl th,.tbl td{border:1px solid #cfd7ff;padding:8px 10px;font-size:13px}
- .tbl th{background:#eef2ff;color:#223;font-weight:700}
- .tbl td.key{background:#f7f8ff;color:#223;width:220px;font-weight:600}
- .grid{display:grid;grid-template-columns:1fr 1fr}
- .hpad{padding:0 16px 16px}
- .right{text-align:right}
- .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
- .tot{font-weight:800}
- .net{background:#e9f7ec}
+ body{font-family:"Segoe UI",Arial,Helvetica,sans-serif;background:#fff;color:var(--ink);margin:0;padding:24px}
+ .wrap{max-width:930px;margin:0 auto;background:var(--bg);border:1px solid var(--grid)}
+ .company{font-size:28px;font-weight:800;text-align:center;margin:8px 0 0}
+ .addr{font-size:14px;text-align:center;color:var(--muted);margin:2px 0 10px}
+ .titlebar{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:6px 10px;font-weight:800}
+ .titlebar .left{font-size:16px}.titlebar .right{font-size:14px}
+ .bar{font-weight:800;border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:6px 10px;background:#f6f8ff}
+ .bar.bar-tight{padding:4px 8px}
+ .tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+ .tbl th,.tbl td{border:1px solid var(--grid);padding:7px 10px;font-size:13px;vertical-align:middle}
+ .tbl th{background:#eef2ff;font-weight:800;color:var(--head)}
+ .tbl td.key{font-weight:700;background:#fafbff;width:35%}
+ .tbl.tbl-mini td{padding:6px 8px;font-size:12px}
+ .tbl.tbl-mini .k{background:#f6f8ff;font-weight:700;color:#223}
+ .tbl.tbl-mini .v{width:72px;text-align:center;font-weight:700}
+ .tbl.tbl-mini .v.wide{width:auto}
+ .grid2{display:grid;grid-template-columns:1fr 1fr}
+ .grid2>div{border-right:1px solid var(--grid)}
+ .grid2>div:last-child{border-right:none}
+ @media(max-width:640px){.grid2{grid-template-columns:1fr}.grid2>div{border-right:none}}
+ .right{text-align:right}.tot{font-weight:800}.net{background:#f0fbf3}
  @media print{.noprint{display:none}}
- .noprint .btn{display:inline-block;margin:14px 8px 0 0;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px}
+ .noprint{margin-bottom:10px}
+ .noprint .btn{display:inline-block;margin-right:8px;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px}
  .noprint .btn.green{background:#22c55e}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
@@ -183,103 +132,71 @@ function SalaryManagement() {
 </div>
 
 <div id="slip" class="wrap">
-  <div class="header">
-    <div class="brand">
-      <div class="logo">👜</div>
-      <div>
-        <h1>BagCorp (Pvt) Ltd</h1>
-        <small>Premium Bags • Backpacks • Luggage</small>
-      </div>
-    </div>
-    <div class="contact">123 Leather Lane, Colombo 01<br/>+94 11 222 3344 • info@bagcorp.lk</div>
-  </div>
+  <div class="company">BagCorp (Pvt) Ltd</div>
+  <div class="addr">123 Leather Lane, Colombo 01 • +94 11 222 3344 • info@bagcorp.lk</div>
 
-  <div class="title">Salary Slip For the month of <span class="period-right">${periodShort}</span></div>
+  <div class="titlebar"><div class="left">Salary Slip For the month of</div><div class="right">${periodShort}</div></div>
 
-  <div class="grid">
+  <div class="bar">Employee Information</div>
+  <table class="tbl">
+    <tr><td class="key">UID:</td><td>${emp.id}</td><td class="key">Designation:</td><td>${emp.designation || "-"}</td></tr>
+    <tr><td class="key">Name:</td><td>${emp.name}</td><td class="key">EPF No:</td><td>${emp.epf || "-"}</td></tr>
+  </table>
+
+  <div class="grid2">
     <div>
-      <div class="bar">Employee Information</div>
-      <table class="tbl">
-        <tr><td class="key">UID:</td><td>${emp.id}</td></tr>
-        <tr><td class="key">Designation:</td><td>${emp.designation || '-'}</td></tr>
-        <tr><td class="key">Name:</td><td>${emp.name}</td></tr>
-        <tr><td class="key">EPF No:</td><td>${emp.epf || '-'}</td></tr>
-      </table>
-
-      <div class="bar">Employee Attendance</div>
-      <table class="tbl">
-        <tr><td class="key">Working Days</td><td>${Number(att.workingDays) || 0}</td></tr>
-        <tr><td class="key">Overtime Hours</td><td>${Number(att.overtimeHrs) || 0}</td></tr>
-        <tr><td class="key">Leave Allowed</td><td>${Number(att.leaveAllowed) || 0}</td></tr>
-        <tr><td class="key">No Pay Leave</td><td>${Number(att.noPayLeave) || 0}</td></tr>
-        <tr><td class="key">Leave Taken</td><td>${Number(att.leaveTaken) || 0}</td></tr>
+      <div class="bar bar-tight">Employee Attendance</div>
+      <table class="tbl tbl-mini">
+        <tr><td class="k">Working Days</td><td class="v">${Number(att?.workingDays ?? 0)}</td><td class="k">Overtime Hours</td><td class="v">${Number(att?.overtimeHrs ?? 0)}</td></tr>
+        <tr><td class="k">Leave Allowed</td><td class="v">${Number(att?.leaveAllowed ?? 0)}</td><td class="k">No Pay Leave</td><td class="v">${Number(att?.noPayLeave ?? 0)}</td></tr>
+        <tr><td class="k">Leave Taken</td><td class="v wide" colspan="3">${Number(att?.leaveTaken ?? 0)}</td></tr>
       </table>
     </div>
-
     <div>
-      <div class="bar">Salary Transferred To</div>
-      <table class="tbl">
-        <tr><td class="key">Bank Name</td><td>${emp.bankName || '—'}</td></tr>
-        <tr><td class="key">Account No</td><td>${emp.accNo || '—'}</td></tr>
-        <tr><td class="key">Branch Name</td><td>${emp.branch || '—'}</td></tr>
+      <div class="bar bar-tight">Salary Transferred To</div>
+      <table class="tbl tbl-mini">
+        <tr><td class="k">Bank Name:</td><td class="v wide">${emp.bankName || "—"}</td></tr>
+        <tr><td class="k">Account No:</td><td class="v wide">${emp.accNo || "—"}</td></tr>
+        <tr><td class="k">Branch Name:</td><td class="v wide">${emp.branch || "—"}</td></tr>
       </table>
     </div>
   </div>
 
-  <div class="grid">
+  <div class="bar">Salary Calculations</div>
+  <div class="grid2">
     <div>
-      <div class="bar">Salary Calculations</div>
       <table class="tbl">
-        <tr><td class="key">Basic Salary</td><td class="right mono">LKR ${Math.round(numbers.basic).toLocaleString()}</td></tr>
-        <tr><td class="key">Cost of Living Allowance</td><td class="right mono">LKR ${Math.round(numbers.col).toLocaleString()}</td></tr>
-        <tr><td class="key">Food Allowance</td><td class="right mono">LKR ${Math.round(numbers.food).toLocaleString()}</td></tr>
-        <tr><td class="key">Conveyance Allowance</td><td class="right mono">LKR ${Math.round(numbers.conv).toLocaleString()}</td></tr>
-        <tr><td class="key">Medical Allowance</td><td class="right mono">LKR ${Math.round(numbers.med).toLocaleString()}</td></tr>
-        <tr><td class="key tot">Total Allowances</td><td class="right mono tot">LKR ${Math.round(numbers.totalAllowances).toLocaleString()}</td></tr>
-        <tr><td class="key tot">Gross Salary</td><td class="right mono tot">LKR ${Math.round(numbers.gross).toLocaleString()}</td></tr>
+        <tr><td class="key">Basic Salary</td><td class="right">${LKR(n.basic)}</td></tr>
+        <tr><td class="key">Allowances:</td><td></td></tr>
+        <tr><td class="key">Cost of Living Allowance</td><td class="right">${LKR(n.col)}</td></tr>
+        <tr><td class="key">Conveyance Allowance</td><td class="right">${LKR(n.conv)}</td></tr>
+        <tr><td class="key">Medical Allowance</td><td class="right">${LKR(n.med)}</td></tr>
+        <tr><td class="key tot">Total Allowances</td><td class="right tot">${LKR(n.totalAllowances)}</td></tr>
+        <tr><td class="key tot">Gross Salary</td><td class="right tot">${LKR(n.gross)}</td></tr>
       </table>
     </div>
-
     <div>
-      <div class="bar">Deductions</div>
       <table class="tbl">
-        <tr><td class="key">No Pay Days Deductions</td><td class="right mono">LKR ${Math.round(numbers.noPay).toLocaleString()}</td></tr>
-        <tr><td class="key">Salary Advance</td><td class="right mono">LKR ${Math.round(numbers.salaryAdvance).toLocaleString()}</td></tr>
-        <tr><td class="key">EPF Employee Contribution (8%)</td><td class="right mono">LKR ${Math.round(numbers.epfEmp).toLocaleString()}</td></tr>
-        <tr><td class="key">APIT (0%)</td><td class="right mono">LKR ${Math.round(numbers.apit).toLocaleString()}</td></tr>
-        <tr><td class="key tot">Total Deductions</td><td class="right mono tot">LKR ${Math.round(numbers.totalDeductions).toLocaleString()}</td></tr>
-        <tr><td class="key">EPF Employer Contribution (12%)</td><td class="right mono">LKR ${Math.round(numbers.epfEr).toLocaleString()}</td></tr>
-        <tr><td class="key">ETF Employer Contribution (3%)</td><td class="right mono">LKR ${Math.round(numbers.etf).toLocaleString()}</td></tr>
+        <tr><td class="key">Deductions</td><td></td></tr>
+        <tr><td class="key">No Pay Days Deductions</td><td class="right">${LKR(n.noPay)}</td></tr>
+        <tr><td class="key">EPF Employee Contribution (8%)</td><td class="right">${LKR(n.epfEmp)}</td></tr>
+        <tr><td class="key tot">Total Deductions</td><td class="right tot">${LKR(n.totalDeductions)}</td></tr>
+        <tr><td class="key">EPF Employer Contribution (12%)</td><td class="right">${LKR(n.epfEr)}</td></tr>
+        <tr><td class="key">ETF Employer Contribution (3%)</td><td class="right">${LKR(n.etf)}</td></tr>
       </table>
     </div>
   </div>
 
-  <div>
-    <div class="bar">Additional Perks</div>
-    <table class="tbl">
-      <tr>
-        <td class="key">Overtime</td><td class="right mono">LKR ${Math.round(numbers.overtimePay).toLocaleString()}</td>
-        <td class="key">Reimbursements</td><td class="right mono">LKR ${Math.round(numbers.reimbursements).toLocaleString()}</td>
-      </tr>
-      <tr>
-        <td class="key">Bonus</td><td class="right mono">LKR ${Math.round(numbers.bonus).toLocaleString()}</td>
-        <td class="key"></td><td></td>
-      </tr>
-      <tr>
-        <td class="key tot">Salary Before Deduction</td><td class="right mono tot">LKR ${Math.round(numbers.salaryBeforeDeduction).toLocaleString()}</td>
-        <td class="key tot net">Net Payable Salary</td><td class="right mono tot net">LKR ${Math.round(numbers.netPayable).toLocaleString()}</td>
-      </tr>
-    </table>
-  </div>
+  <div class="bar">Additional Perks</div>
+  <table class="tbl">
+    <tr><td class="key">Overtime</td><td class="right">${LKR(n.overtimePay)}</td><td class="key">Bonus</td><td class="right">${LKR(n.bonus)}</td></tr>
+    <tr><td class="key tot">Salary Before Deduction</td><td class="right tot">${LKR(n.salaryBeforeDeduction)}</td><td class="key tot net">Net Payable Salary</td><td class="right tot net">${LKR(n.netPayable)}</td></tr>
+  </table>
 
-  <div>
-    <div class="bar">Amount in Words:</div>
-    <div class="hpad mono"><strong>LKR ${amountWords}</strong></div>
-  </div>
+  <div class="bar">Amount in Words</div>
+  <table class="tbl"><tr><td>${amountWords} Rupees Only</td></tr></table>
 
-  <div class="hpad" style="color:#667;font-size:12px;border-top:1px solid #e7ebff;padding-top:8px;">
-    Salary Period: ${periodLong}
-  </div>
+  <div style="padding:8px 10px;color:#555;border-top:1px solid var(--grid);font-size:12px;">Salary Period: ${periodLong}</div>
 </div>
 
 <script>
@@ -294,7 +211,7 @@ function SalaryManagement() {
       pdf.addImage(img,'PNG',0,0,imgW,imgH);
       left-=pageH;
       while(left>0){ pdf.addPage(); pdf.addImage(img,'PNG',0,-(left),imgW,imgH); left-=pageH; }
-      pdf.save('salary-slip-${emp.name.replace(/\s+/g,"-")}-${periodLong.replace(/\s+/g,"-")}.pdf');
+      pdf.save('salary-slip-${emp.name.replace(/\\s+/g,"-")}-${periodLong.replace(/\\s+/g,"-")}.pdf');
     });
   }
 <\/script>
@@ -302,49 +219,31 @@ function SalaryManagement() {
     openSlip(slipHTML);
   }
 
-  /* ---------------- transfers ---------------- */
-  function transferSalary() {
-    const res = calculateSalary(); if (!res) return;
-    const { emp, numbers } = res;
-    const list = Store.get(Store.kT);
+  async function transferSalary() {
+    const data = await calculateSalary();
+    if (!data) return;
     const month = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long" });
-    if (list.find((t) => t.empId === emp.id && t.month === month)) {
-      window.alert("Salary transfer already exists for this employee in this month"); return;
+    try {
+      await api.post("/transfers", {
+        empId: data.employee.id,
+        empName: data.employee.name,
+        amount: Math.round(data.numbers.netPayable),
+        month
+      });
+      alert(`Salary transfer initiated for ${data.employee.name} — ${LKR(data.numbers.netPayable)}`);
+    } catch (e) {
+      alert(e?.response?.data?.message || "Transfer failed");
     }
-    list.push({
-      empId: emp.id,
-      date: new Date().toISOString().split("T")[0],
-      month,
-      empName: emp.name,
-      amount: Math.round(numbers.netPayable),
-      status: "Pending",
-    });
-    Store.set(Store.kT, list);
-    window.alert(`Salary transfer initiated for ${emp.name}!\nAmount: ${LKR(numbers.netPayable)}`);
   }
-
-  /* ---------------- boot ---------------- */
-  useEffect(() => {
-    Store.seed();
-    fillEmpOptions(true);
-    // No addEventListener needed; we use React onClick handlers below.
-  }, []);
-
-  // (optional) expose to window for debugging
-  window.calculateSalary = calculateSalary;
-  window.generateSalarySlip = generateSalarySlip;
-  window.transferSalary = transferSalary;
 
   return (
     <div className="salarycal">
       <Sidebar />
-
       <div className="container">
-         <h1>Employee Salary Management</h1>
+        <h1>Employee Salary Management</h1>
         <p>Real-time salary insights and employee payroll management</p>
 
         <div className="section">
-          {/* Tabs FIRST (inside card) */}
           <div className="nav">
             <NavLink to="/finance/employees"  className={({isActive}) => `tab-btn ${isActive ? 'active' : ''}`}>👥 Employees</NavLink>
             <NavLink to="/finance/attendance" className={({isActive}) => `tab-btn ${isActive ? 'active' : ''}`}>📅 Attendance</NavLink>
@@ -357,15 +256,21 @@ function SalaryManagement() {
 
           <div className="form-group">
             <label>Select Employee</label>
-            <select id="salaryEmpId">
-              <option value="">Select Employee</option>
+            <select value={empId} onChange={(e)=>setEmpId(e.target.value)}>
+              {employees.length === 0 ? (
+                <option value="">Loading…</option>
+              ) : employees.map(e => (
+                <option key={e.EmpId} value={e.EmpId}>
+                  {e.EmpId} - {e.Emp_Name}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="actions">
-            <button className="btn btn-success"  onClick={generateSalarySlip}  id="btnSlip">📄 Generate Salary Slip</button>
-            <button className="btn btn-primary"  onClick={transferSalary}      id="btnTransfer">💰 Transfer Salary</button>
-            <button className="btn btn-warning"  onClick={calculateSalary}     id="btnCalc">🧮 Calculate Salary</button>
+            <button className="btn btn-success"  onClick={generateSalarySlip} disabled={!empId || loading}>📄 Generate Salary Slip</button>
+            <button className="btn btn-primary" onClick={transferSalary}     disabled={!empId || loading}>💰 Transfer Salary</button>
+            <button className="btn btn-warning" onClick={calculateSalary}    disabled={!empId || loading}>🧮 Calculate Salary</button>
           </div>
 
           <div id="calcBox" className="calc" style={{ display: "none" }}>
@@ -384,5 +289,3 @@ function SalaryManagement() {
     </div>
   );
 }
-
-export default SalaryManagement;

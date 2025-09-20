@@ -3,13 +3,14 @@ import "./EpfManagement.css";
 import Sidebar from "../Sidebar/Sidebar";
 import { useNavigate } from "react-router-dom";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import { api } from "../../lib/api"; // <-- axios instance
 
-/** Money helpers */
+/* Money format */
 const fmtMoney = (n) =>
   "LKR " + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
-/* --- Simple toast helper --- */
-const showNotification = (message, type = "info") => {
+/* Tiny toast */
+const notify = (message, type = "info") => {
   document.querySelectorAll(".notification").forEach((n) => n.remove());
   const colors = { success: "#10B981", error: "#EF4444", warning: "#F59E0B", info: "#3B82F6" };
   const icons = {
@@ -40,100 +41,112 @@ const showNotification = (message, type = "info") => {
   setTimeout(() => {
     n.style.animation = "epf-slideOut .3s ease";
     setTimeout(() => n.remove(), 300);
-  }, 3000);
+  }, 2500);
 };
 
-/** Seed rows */
-const initialRows = [
-  { periodLabel: "December 2024",  periodKey: "Dec 2024", epf: 12450, etf: 4670, total: 17120, due: "Jan 18, 2025", status: "Pending" },
-  { periodLabel: "November 2024",  periodKey: "Nov 2024", epf: 11850, etf: 4440, total: 16290, due: "Dec 15, 2024", status: "Paid" },
-  { periodLabel: "October 2024",   periodKey: "Oct 2024", epf: 11200, etf: 4200, total: 15400, due: "Nov 15, 2024", status: "Paid" },
-  { periodLabel: "September 2024", periodKey: "Sep 2024", epf: 10950, etf: 4100, total: 15050, due: "Oct 15, 2024", status: "Paid" },
-  { periodLabel: "January 2025",   periodKey: "Jan 2025", epf: 13200, etf: 4950, total: 18150, due: "Feb 15, 2025", status: "Upcoming" },
-];
-
 export default function EpfManagement() {
-  const [rows, setRows] = useState(initialRows);
-  const [showPayModal, setShowPayModal] = useState(false);
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [payTarget, setPayTarget] = useState(null);
-
-  // New payment form state
-  const [npPeriod, setNpPeriod] = useState("2025-02");
-  const [npBase, setNpBase] = useState("");
-  const [npEpf, setNpEpf] = useState(8);
-  const [npEtf, setNpEtf] = useState(3);
-
   const navigate = useNavigate();
 
-  // Welcome toast
+  // Cards (from /contributions/summary)
+  const [summary, setSummary] = useState({
+    period: "",
+    periodLabel: "",
+    due: "",
+    status: "Pending",
+    baseTotal: 0,
+    epfEmp: 0,
+    epfEr: 0,
+    epfTotal: 0,
+    etf: 0,
+    grandTotal: 0,
+  });
+
+  // Table rows (from /contributions)
+  const [rows, setRows] = useState([]);
+  const [loadingRows, setLoadingRows] = useState(true);
+
+  // Collapsible “New Payment” (hidden by default per your ask)
+  const [npOpen, setNpOpen] = useState(false);
+
+  // Current period (YYYY-MM) for summary/create
+  const currentPeriod = useMemo(() => new Date().toISOString().slice(0, 7), []);
+
+  /* ------- Load summary (pulls employees, computes EPF/ETF on server) ------- */
+  async function loadSummary(period = currentPeriod) {
+    try {
+      const { data } = await api.get("/contributions/summary", { params: { period } });
+      setSummary({
+        period: data.period,
+        periodLabel: data.periodLabel,
+        due: data.due,
+        status: data.status,
+        baseTotal: data.baseTotal,
+        epfEmp: data.epfEmp,
+        epfEr: data.epfEr,
+        epfTotal: data.epfTotal,
+        etf: data.etf,
+        grandTotal: data.grandTotal,
+      });
+    } catch (e) {
+      notify(e?.response?.data?.message || "Failed to load summary", "error");
+    }
+  }
+
+  /* ------- Load saved contribution rows for table ------- */
+  async function loadRows(year = new Date().getFullYear()) {
+    try {
+      setLoadingRows(true);
+      const { data } = await api.get("/contributions", { params: { year } });
+      setRows(data.contributions || []);
+    } catch (e) {
+      notify(e?.response?.data?.message || "Failed to load contributions", "error");
+    } finally {
+      setLoadingRows(false);
+    }
+  }
+
   useEffect(() => {
-    const t = setTimeout(() => {
-      showNotification(
-        "Welcome to EPF/ETF Management! Track, pay, and export your contributions.",
-        "success"
-      );
-    }, 400);
-    return () => clearTimeout(t);
-  }, []);
+    loadSummary();
+    loadRows();
+    // welcome
+    setTimeout(() => notify("EPF/ETF page ready — live data from employees.", "success"), 300);
+  }, []); // eslint-disable-line
 
-  const headerAlertText = useMemo(
-    () =>
-      "EPF contributions for December 2024 are due in 3 days (January 18, 2025). Total amount due: LKR 17,120",
-    []
-  );
+  /* ------- Create (save) this month's contribution row ------- */
+  async function createThisMonth() {
+    try {
+      await api.post("/contributions", { period: currentPeriod });
+      notify("Contribution created for this month.", "success");
+      await Promise.all([loadRows(), loadSummary()]);
+    } catch (e) {
+      const msg = e?.response?.data?.message || "Failed to create";
+      notify(msg, msg.includes("already exists") ? "warning" : "error");
+    }
+  }
 
-  const openPayModal = (row) => {
-    setPayTarget(row);
-    setShowPayModal(true);
-  };
+  /* ------- Mark a row as paid ------- */
+  async function markPaid(id) {
+    try {
+      await api.patch(`/contributions/${id}/pay`);
+      notify("Marked as Paid.", "success");
+      await Promise.all([loadRows(), loadSummary()]);
+    } catch (e) {
+      notify(e?.response?.data?.message || "Failed to update", "error");
+    }
+  }
 
-  const confirmPayment = () => {
-    if (!payTarget) return;
-    setRows((old) =>
-      old.map((r) => (r.periodKey === payTarget.periodKey ? { ...r, status: "Paid" } : r))
-    );
-    setShowPayModal(false);
-    showNotification(`Payment recorded for ${payTarget.periodLabel}.`, "success");
-    setPayTarget(null);
-  };
-
-  const bulkPay = () => {
-    if (!window.confirm("Pay ALL outstanding (Pending) items?")) return;
-    setRows((old) => old.map((r) => (r.status === "Pending" ? { ...r, status: "Paid" } : r)));
-    showNotification("All pending items marked as Paid.", "success");
-  };
-
-  const viewDetails = (row) => {
-    const { periodLabel, epf, etf, total, due, status } = row;
-    window.alert(
-      `Details for ${periodLabel}\n\nEPF: ${fmtMoney(epf)}\nETF: ${fmtMoney(etf)}\nTotal: ${fmtMoney(
-        total
-      )}\nDue: ${due}\nStatus: ${status}`
-    );
-  };
-
-  const addNewPayment = () => {
-    if (!npPeriod) return;
-    const d = new Date(`${npPeriod}-01`);
-    const periodLabel = d.toLocaleString("en-US", { month: "long", year: "numeric" });
-    const periodKey = d.toLocaleString("en-US", { month: "short", year: "numeric" });
-
-    const base = parseFloat(npBase) || 0;
-    const epf = base * (parseFloat(npEpf) / 100 || 0);
-    const etf = base * (parseFloat(npEtf) / 100 || 0);
-    const total = epf + etf;
-
-    // Assume due on the 15th of next month
-    const due = `${d.toLocaleString("en-US", { month: "short" })} 15, ${d.getFullYear()}`;
-
-    const newRow = { periodLabel, periodKey, epf, etf, total, due, status: "Pending" };
-
-    setRows((old) => [newRow, ...old]);
-    setShowNewModal(false);
-    setNpBase("");
-    showNotification(`Added ${periodLabel}: ${fmtMoney(total)}`, "success");
-  };
+  /* ------- Alert content (only when pending & before/near due date) ------- */
+  const alertText = useMemo(() => {
+    if (!summary?.due) return "";
+    const dueDate = new Date(summary.due);
+    const today = new Date();
+    const ms = dueDate - today;
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+    if (summary.status === "Paid") return ""; // hide after paid
+    if (days < -1) return `EPF/ETF for ${summary.periodLabel} is OVERDUE. Total due: ${fmtMoney(summary.grandTotal)}`;
+    if (days <= 7) return `EPF/ETF for ${summary.periodLabel} is due in ${days} day(s). Total due: ${fmtMoney(summary.grandTotal)}`;
+    return `Upcoming payment for ${summary.periodLabel}. Total due: ${fmtMoney(summary.grandTotal)}`;
+  }, [summary]);
 
   return (
     <div className="epf">
@@ -142,110 +155,122 @@ export default function EpfManagement() {
       <div className="container">
         {/* Header */}
         <div className="content-header epf-header">
-          <h1> EPF/ETF Management</h1>
-          <p>Manage Employee Provident Fund and Employee Trust Fund contributions</p>
-          <div className="header-actions">
-            <button className="btn btn-pay cta-new" onClick={() => setShowNewModal(true)}>
-              + New Payment
-            </button>
-          </div>
+          <h1>EPF/ETF Management</h1>
+          <p>Automatically calculated from your employee salaries</p>
         </div>
 
-        {/* Alert */}
-        <div className="alert alert-warning">
-          <div className="alert-icon">⚠️</div>
-          <div>
-            <strong>Action Required:</strong> {headerAlertText}
+        {/* Due Alert (auto hides when Paid) */}
+        {alertText && (
+          <div className="alert alert-warning">
+            <div className="alert-icon">⚠️</div>
+            <div><strong>Action Required:</strong> {alertText}</div>
           </div>
-        </div>
+        )}
 
         {/* KPI cards */}
         <div className="stats-grid">
+          {/* EPF Employee 8% */}
           <div className="stat-card">
             <div className="stat-header">
-              <div
-                className="stat-icon"
-                style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
-              >
-                🏦
-              </div>
+              <div className="stat-icon" style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>🧑‍💼</div>
               <div className="stat-info">
-                <h3>EPF Contributions (8%)</h3>
-                <p>Employee Provident Fund</p>
+                <h3>EPF (Employee 8%)</h3>
+                <p>{summary.periodLabel}</p>
               </div>
             </div>
-            <div className="stat-value">LKR124,500</div>
+            <div className="stat-value">{fmtMoney(summary.epfEmp)}</div>
+            <div className="stat-details"><span className="neutral">Base</span><span>{fmtMoney(summary.baseTotal)}</span></div>
+          </div>
+
+          {/* EPF Employer 12% */}
+          <div className="stat-card">
+            <div className="stat-header">
+              <div className="stat-icon" style={{ background: "linear-gradient(135deg, #0ea5e9, #2563eb)" }}>🏢</div>
+              <div className="stat-info">
+                <h3>EPF (Employer 12%)</h3>
+                <p>{summary.periodLabel}</p>
+              </div>
+            </div>
+            <div className="stat-value">{fmtMoney(summary.epfEr)}</div>
+            <div className="stat-details"><span className="neutral">EPF Total</span><span>{fmtMoney(summary.epfTotal)}</span></div>
+          </div>
+
+          {/* ETF 3% */}
+          <div className="stat-card">
+            <div className="stat-header">
+              <div className="stat-icon" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>🏦</div>
+              <div className="stat-info">
+                <h3>ETF (Employer 3%)</h3>
+                <p>{summary.periodLabel}</p>
+              </div>
+            </div>
+            <div className="stat-value">{fmtMoney(summary.etf)}</div>
+            <div className="stat-details"><span className="neutral">—</span><span>3% of base</span></div>
+          </div>
+
+          {/* Grand Total */}
+          <div className="stat-card">
+            <div className="stat-header">
+              <div className="stat-icon" style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)" }}>📊</div>
+              <div className="stat-info">
+                <h3>Total (EPF+ETF)</h3>
+                <p>{summary.periodLabel}</p>
+              </div>
+            </div>
+            <div className="stat-value">{fmtMoney(summary.grandTotal)}</div>
             <div className="stat-details">
-              <span className="neutral">December 2024</span>
-              <span className="stat-change positive">↗ +5.2%</span>
+              <span className="neutral">EPF (8%+12%)</span>
+              <span>{fmtMoney(summary.epfTotal)}</span>
             </div>
           </div>
 
+          {/* Pending count */}
           <div className="stat-card">
             <div className="stat-header">
-              <div
-                className="stat-icon"
-                style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}
-              >
-                🏛️
-              </div>
-              <div className="stat-info">
-                <h3>ETF Contributions (3%)</h3>
-                <p>Employee Trust Fund</p>
-              </div>
-            </div>
-            <div className="stat-value">LKR46,700</div>
-            <div className="stat-details">
-              <span className="neutral">December 2024</span>
-              <span className="stat-change positive">↗ +3.8%</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-header">
-              <div
-                className="stat-icon"
-                style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
-              >
-                📊
-              </div>
-              <div className="stat-info">
-                <h3>Total Annual (2024)</h3>
-                <p>Combined EPF & ETF</p>
-              </div>
-            </div>
-            <div className="stat-value">LKR205,440</div>
-            <div className="stat-details">
-              <span className="neutral">January - December</span>
-              <span className="stat-change positive">↗ +7.1%</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-header">
-              <div
-                className="stat-icon"
-                style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}
-              >
-                ⏰
-              </div>
+              <div className="stat-icon" style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}>⏰</div>
               <div className="stat-info">
                 <h3>Pending Payments</h3>
-                <p>Requires attention</p>
+                <p>All saved months</p>
               </div>
             </div>
-            <div className="stat-value">
-              {rows.filter((r) => r.status === "Pending").length}
-            </div>
-            <div className="stat-details">
-              <span className="neutral">Outstanding</span>
-              <span className="stat-change negative">Due soon</span>
-            </div>
+            <div className="stat-value">{rows.filter(r => r.status === "Pending").length}</div>
+            <div className="stat-details"><span className="neutral">Status</span><span>{summary.status}</span></div>
           </div>
         </div>
 
         {/* Main content */}
         <div className="main-content">
+          {/* Collapsible “New Payment” (no manual base; server computes from employees) */}
+          <div className={`new-payment-card ${npOpen ? "open" : "collapsed"}`}>
+            {!npOpen ? (
+              <div className="npc-collapsed">
+                <button className="btn btn-pay npc-cta" onClick={() => setNpOpen(true)}>
+                  + New Payment (save this month)
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="npc-header">
+                  <h3>Create This Month’s Contribution</h3>
+                  <button className="npc-toggle" onClick={() => setNpOpen(false)}>Hide</button>
+                </div>
+
+                <div className="npc-preview">
+                  <div className="row"><span>Period</span><strong>{summary.periodLabel}</strong></div>
+                  <div className="row"><span>EPF (8% + 12%)</span><strong>{fmtMoney(summary.epfTotal)}</strong></div>
+                  <div className="row"><span>ETF (3%)</span><strong>{fmtMoney(summary.etf)}</strong></div>
+                  <div className="row total"><span>Grand Total</span><strong className="ok">{fmtMoney(summary.grandTotal)}</strong></div>
+                </div>
+
+                <div className="npc-actions">
+                  <button className="btn btn-pay" onClick={createThisMonth}>Save Month</button>
+                  <button className="btn btn-secondary" onClick={() => setNpOpen(false)}>Cancel</button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Table */}
           <div className="contributions-table">
             <div className="table-header">
               <div className="table-header-icon">📋</div>
@@ -256,55 +281,38 @@ export default function EpfManagement() {
                 <thead>
                   <tr>
                     <th>Period</th>
-                    <th>EPF Amount</th>
+                    <th>EPF Amount (Emp+Er)</th>
                     <th>ETF Amount</th>
-                    <th>Total</th>
+                    <th>Total (EPF+ETF)</th>
                     <th>Due Date</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.periodKey}>
-                      <td>
-                        <strong>{r.periodLabel}</strong>
-                      </td>
+                  {loadingRows ? (
+                    <tr><td colSpan={7}>Loading…</td></tr>
+                  ) : rows.length === 0 ? (
+                    <tr><td colSpan={7}>No contributions saved yet.</td></tr>
+                  ) : rows.map(r => (
+                    <tr key={r._id}>
+                      <td><strong>{r.periodLabel}</strong></td>
                       <td>{fmtMoney(r.epf)}</td>
                       <td>{fmtMoney(r.etf)}</td>
+                      <td><strong>{fmtMoney(r.total)}</strong></td>
+                      <td><span className={`due ${r.status === "Pending" ? "danger" : "warn"}`}>{r.due}</span></td>
                       <td>
-                        <strong>{fmtMoney(r.total)}</strong>
-                      </td>
-                      <td>
-                        <span className={`due ${r.status === "Pending" ? "danger" : "warn"}`}>
-                          {r.due}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={
-                            "status-badge " +
-                            (r.status === "Paid"
-                              ? "status-paid"
-                              : r.status === "Pending"
-                              ? "status-pending"
-                              : "status-overdue")
-                          }
-                        >
+                        <span className={
+                          "status-badge " + (r.status === "Paid" ? "status-paid" :
+                                             r.status === "Pending" ? "status-pending" : "status-overdue")
+                        }>
                           {r.status}
                         </span>
                       </td>
-                      <td>
-                        <div className="action-buttons">
-                          {r.status === "Pending" ? (
-                            <button className="btn btn-pay" onClick={() => openPayModal(r)}>
-                              Pay Now
-                            </button>
-                          ) : null}
-                          <button className="btn btn-view" onClick={() => viewDetails(r)}>
-                            {r.status === "Upcoming" ? "Preview" : "View"}
-                          </button>
-                        </div>
+                      <td className="actions">
+                        {r.status === "Pending" ? (
+                          <button className="btn btn-pay" onClick={() => markPaid(r._id)}>Mark as Paid</button>
+                        ) : <span>Completed</span>}
                       </td>
                     </tr>
                   ))}
@@ -313,51 +321,31 @@ export default function EpfManagement() {
             </div>
           </div>
 
+          {/* Sidebar */}
           <aside className="sidebar-content">
             <div className="quick-actions">
               <h3>Quick Actions</h3>
-
-              <button className="action-btn action-btn-primary" onClick={bulkPay}>
-                💳 Pay Outstanding Amount
+              <button className="action-btn action-btn-primary" onClick={() => {
+                const pend = rows.filter(r => r.status === "Pending");
+                if (pend.length === 0) return notify("No pending rows.", "info");
+                if (!window.confirm(`Mark ${pend.length} row(s) as Paid?`)) return;
+                // Mark all pending one by one
+                Promise.all(pend.map(p => api.patch(`/contributions/${p._id}/pay`)))
+                  .then(() => { notify("All pending rows marked as Paid.", "success"); return Promise.all([loadRows(), loadSummary()]); })
+                  .catch(e => notify(e?.response?.data?.message || "Bulk update failed", "error"));
+              }}>
+                💳 Pay All Pending
               </button>
 
               <button
                 className="action-btn action-btn-secondary"
                 onClick={() => {
-                  const header = ["Period", "EPF Amount", "ETF Amount", "Total", "Due Date", "Status"];
+                  const header = ["Period","EPF (Emp+Er)","ETF","Total","Due","Status"];
                   const lines = [
                     header.join(","),
-                    ...rows.map((r) =>
+                    ...rows.map(r =>
                       [r.periodLabel, r.epf, r.etf, r.total, r.due, r.status]
-                        .map((x) => `"${String(x).replace(/"/g, '""')}"`)
-                        .join(",")
-                    ),
-                  ].join("\n");
-                  const blob = new Blob([lines], { type: "text/csv;charset=utf-8;" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "epf-etf-annual-report.csv";
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                  showNotification("Annual report generated.", "success");
-                }}
-              >
-                📊 Generate Annual Report
-              </button>
-
-              <button
-                className="action-btn action-btn-secondary"
-                onClick={() => {
-                  const header = ["Period", "EPF Amount", "ETF Amount", "Total", "Due Date", "Status"];
-                  const lines = [
-                    header.join(","),
-                    ...rows.map((r) =>
-                      [r.periodLabel, r.epf, r.etf, r.total, r.due, r.status]
-                        .map((x) => `"${String(x).replace(/"/g, '""')}"`)
-                        .join(",")
+                        .map(x => `"${String(x).replace(/"/g,'""')}"`).join(",")
                     ),
                   ].join("\n");
                   const blob = new Blob([lines], { type: "text/csv;charset=utf-8;" });
@@ -369,134 +357,19 @@ export default function EpfManagement() {
                   a.click();
                   document.body.removeChild(a);
                   URL.revokeObjectURL(url);
-                  showNotification("Records downloaded.", "success");
+                  notify("Records downloaded.", "success");
                 }}
               >
                 📥 Download Records
               </button>
 
-              <button
-                className="action-btn action-btn-secondary"
-                onClick={() => navigate("/salarycal")} // change to "/finance/employees" if that's your route
-              >
+              <button className="action-btn action-btn-secondary" onClick={() => navigate("/salarycal")}>
                 👥 View Employee Details
               </button>
             </div>
           </aside>
         </div>
       </div>
-
-      {/* Payment Modal */}
-      {showPayModal && payTarget && (
-        <div className="modal active" role="dialog" aria-modal="true">
-          <div className="modal-content">
-            <div className="modal-header">
-              <div className="modal-title">Process Payment</div>
-              <button className="close-btn" onClick={() => setShowPayModal(false)}>
-                &times;
-              </button>
-            </div>
-            <div>
-              <p className="mb">You are about to process payment for:</p>
-              <div className="summary-box">
-                <div className="row">
-                  <span>
-                    <strong>Period:</strong>
-                  </span>
-                  <span>{payTarget.periodLabel}</span>
-                </div>
-                <div className="row">
-                  <span>
-                    <strong>EPF Amount:</strong>
-                  </span>
-                  <span>{fmtMoney(payTarget.epf)}</span>
-                </div>
-                <div className="row">
-                  <span>
-                    <strong>ETF Amount:</strong>
-                  </span>
-                  <span>{fmtMoney(payTarget.etf)}</span>
-                </div>
-                <div className="row total">
-                  <span>Total Amount:</span>
-                  <span className="ok">{fmtMoney(payTarget.total)}</span>
-                </div>
-              </div>
-              <div className="dual">
-                <button className="btn btn-pay big" onClick={confirmPayment}>
-                  Confirm Payment
-                </button>
-                <button className="btn btn-secondary big" onClick={() => setShowPayModal(false)}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* New Payment Modal */}
-      {showNewModal && (
-        <div className="modal active" role="dialog" aria-modal="true">
-          <div className="modal-content">
-            <div className="modal-header">
-              <div className="modal-title">Add New Payment</div>
-              <button className="close-btn" onClick={() => setShowNewModal(false)}>
-                &times;
-              </button>
-            </div>
-            <div>
-              <div className="form-group">
-                <label className="form-label">Period</label>
-                <input
-                  type="month"
-                  className="form-input"
-                  value={npPeriod}
-                  onChange={(e) => setNpPeriod(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Total Salary Base</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder="Enter total salary amount"
-                  value={npBase}
-                  onChange={(e) => setNpBase(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">EPF Rate (%)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={npEpf}
-                  step="0.1"
-                  onChange={(e) => setNpEpf(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">ETF Rate (%)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={npEtf}
-                  step="0.1"
-                  onChange={(e) => setNpEtf(e.target.value)}
-                />
-              </div>
-              <div className="dual mt">
-                <button className="btn btn-pay big" onClick={addNewPayment}>
-                  Add Payment
-                </button>
-                <button className="btn btn-secondary big" onClick={() => setShowNewModal(false)}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
