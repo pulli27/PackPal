@@ -9,6 +9,7 @@ const mongoose = require("mongoose");
 
 const inventoryRoutes = require("./Route/InventoryRoute");
 const purchaseRoutes  = require("./Route/PurchaseRoute");
+const productRoutes  = require("./Route/ProductRoute");
 
 if (!process.env.MONGO_URI) {
   console.error("FATAL: MONGO_URI is missing in BackEnd/.env");
@@ -42,6 +43,7 @@ app.use(express.json());
 // routes
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/purchases", purchaseRoutes);
+app.use("/api/products", productRoutes);
 
 // health
 app.get("/health", (_req, res) => res.json({ ok: true }));

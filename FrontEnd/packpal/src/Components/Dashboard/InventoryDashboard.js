@@ -1,66 +1,211 @@
+// src/Components/InventoryDashboard/InventoryDashboard.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import "./InventoryDashboard.css";
+import axios from "axios";
 
-const initialRows = [
-  { product: "Mini backpack", stock: 142, value: 14200, status: "in-stock" },
-  { product: "Rolling school bag",    stock: 8,   value: 1600,  status: "low-stock" },
-  { product: "Crossbody bag",        stock: 0,   value: 0,     status: "out-of-stock" },
-  { product: " Laptop backpack ",       stock: 67,  value: 3350,  status: "in-stock" },
-  { product: "Beach tote",   stock: 15,  value: 1500,  status: "low-stock" }
-];
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const INVENTORY_PRODUCTS_PATH = "/api/products";   // finished products
+const INVENTORY_ITEMS_PATH    = "/api/inventory";  // inventory items/materials
 
-function InventoryDashboard() {
+/* ---------- Helpers ---------- */
+function statusOf(stock) {
+  if (stock === 0) return "out-of-stock";
+  if (stock <= 20) return "low-stock";
+  return "in-stock";
+}
+
+const money = (n) =>
+  "LKR " + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+/* ---------- Discount logic (matches ProductInventory) ---------- */
+function discountedUnitPrice(p) {
+  const base = Number(p.unitPrice || 0);
+  const type = String(p.discountType || "").trim().toLowerCase();
+  const valRaw = p.discountValue;
+  if (valRaw === null || valRaw === undefined) return base;
+
+  const value = Number(valRaw);
+  if (!Number.isFinite(value) || value <= 0) return base;
+
+  const isPercent =
+    type === "percent" ||
+    type === "percentage" ||
+    type === "%" ||
+    type === "pc" ||
+    type === "pct";
+
+  const isFlat =
+    type === "flat" ||
+    type === "amount" ||
+    type === "value" ||
+    type === "lkr" ||
+    type === "rs" ||
+    type === "rs." ||
+    type === "priceoff";
+
+  if (isPercent) {
+    const pct = Math.max(0, Math.min(100, value));
+    return Math.max(0, base * (1 - pct / 100));
+  }
+  // flat or unknown: treat as flat
+  return Math.max(0, base - value);
+}
+
+/* ---------- Mappers (defensive to field names) ---------- */
+function toUiProduct(item) {
+  const name = item.name || item.productName || "Unnamed";
+  const category = item.category || "Uncategorized";
+  const stock = Number(item.stock ?? item.quantity ?? 0);
+  const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
+
+  // include discount fields so dashboard mirrors ProductInventory
+  const discountType = item.discountType || "";
+  const discountValue = item.discountValue ?? null;
+
+  const p = { name, category, stock, unitPrice, discountType, discountValue };
+  return {
+    name: String(name),
+    category: String(category),
+    stock,
+    unitPrice,
+    discountType,
+    discountValue,
+    // value uses discounted unit price
+    value: stock * discountedUnitPrice(p),
+  };
+}
+
+function toUiItem(row) {
+  const name = row.name || row.itemName || "Item";
+  const quantity = Number(row.quantity ?? row.stock ?? 0);
+  const unitPrice = Number(row.unitPrice ?? row.price ?? 0);
+  return {
+    name: String(name),
+    quantity,
+    unitPrice,
+    value: quantity * unitPrice,
+  };
+}
+
+export default function InventoryDashboard() {
   const [query, setQuery] = useState("");
   const [dateTime, setDateTime] = useState(new Date());
+  const [products, setProducts] = useState([]); // finished products
+  const [items, setItems] = useState([]);       // inventory items/materials
+  const [error, setError] = useState("");
   const canvasRef = useRef(null);
 
-  // Live date/time
+  /* ---- Live clock ---- */
   useEffect(() => {
-    const timer = setInterval(() => setDateTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    const t = setInterval(() => setDateTime(new Date()), 1000);
+    return () => clearInterval(t);
   }, []);
-
-  // Nicely formatted date/time (e.g., August 29, 2025, 9:41 PM)
   const formattedNow = useMemo(
     () =>
-      dateTime.toLocaleString(undefined, {
-        dateStyle: "long",
-        timeStyle: "short",
-      }),
+      dateTime.toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" }),
     [dateTime]
   );
 
-  // Search
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return initialRows;
-    return initialRows.filter((r) =>
-      `${r.product} ${r.stock} ${r.value}`.toLowerCase().includes(q)
-    );
-  }, [query]);
+  /* ---- Fetch both sources ---- */
+  useEffect(() => {
+    (async () => {
+      try {
+        setError("");
+        const [prodRes, itemRes] = await Promise.allSettled([
+          axios.get(`${API_BASE}${INVENTORY_PRODUCTS_PATH}`),
+          axios.get(`${API_BASE}${INVENTORY_ITEMS_PATH}`),
+        ]);
 
-  // Draw donut chart (no external libs)
+        if (prodRes.status === "fulfilled") {
+          const list = Array.isArray(prodRes.value.data)
+            ? prodRes.value.data
+            : prodRes.value.data.items || prodRes.value.data.data || [];
+          setProducts(list.map(toUiProduct));
+        } else {
+          setProducts([]);
+          console.error("Products fetch failed:", prodRes.reason);
+          setError((e) => e || "Could not load products (/api/products).");
+        }
+
+        if (itemRes.status === "fulfilled") {
+          const list = Array.isArray(itemRes.value.data)
+            ? itemRes.value.data
+            : itemRes.value.data.items || itemRes.value.data.data || [];
+          setItems(list.map(toUiItem));
+        } else {
+          setItems([]); // gracefully treat as 0
+          console.warn("Items fetch failed (treating as 0):", itemRes.reason);
+        }
+      } catch (e) {
+        console.error("Dashboard fetch error:", e);
+        setProducts([]);
+        setItems([]);
+        setError("Could not load inventory. Check API routes.");
+      }
+    })();
+  }, []);
+
+  /* ---- Metrics (with discounts applied to products) ---- */
+  const metrics = useMemo(() => {
+    // Products (finished goods)
+    const totalProductUnits = products.reduce((s, p) => s + p.stock, 0);
+    const totalProductValue = products.reduce((s, p) => s + p.value, 0); // already discounted
+
+    // Items (materials/raw)
+    const totalItemUnits = items.reduce((s, i) => s + i.quantity, 0);
+    const totalInventoryValue = items.reduce((s, i) => s + i.value, 0);
+
+    const lowStockProducts = products.filter((p) => statusOf(p.stock) === "low-stock").length;
+    const outOfStockProducts = products.filter((p) => statusOf(p.stock) === "out-of-stock").length;
+
+    return {
+      totalProductUnits,           // "Total Products" (units)
+      totalItemUnits,              // "Total Items" (units)
+      totalInventoryValue,         // value of inventory (items)
+      totalProductValue,           // value of products (discounted)
+      lowStockProducts,
+      outOfStockProducts,
+      totalValueOfStock: totalProductValue + totalInventoryValue, // combined
+    };
+  }, [products, items]);
+
+  /* ---- Search over product table ---- */
+  const filteredProducts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((r) =>
+      `${r.name} ${r.category} ${r.stock} ${r.value}`.toLowerCase().includes(q)
+    );
+  }, [products, query]);
+
+  /* ---- Donut segments from products only ---- */
+  const donutSegments = useMemo(() => {
+    const inStock = products.filter((r) => statusOf(r.stock) === "in-stock").length;
+    const lowStock = products.filter((r) => statusOf(r.stock) === "low-stock").length;
+    const outStock = products.filter((r) => statusOf(r.stock) === "out-of-stock").length;
+    return [
+      { label: "In Stock", value: inStock, color: "#10b981" },
+      { label: "Low Stock", value: lowStock, color: "#f59e0b" },
+      { label: "Out of Stock", value: outStock, color: "#ef4444" },
+    ];
+  }, [products]);
+
+  /* ---- Draw donut whenever data changes ---- */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-
-    const segments = [
-      { label: "In Stock", value: 220, color: "#10b981" },
-      { label: "Low Stock", value: 70, color: "#f59e0b" },
-      { label: "Out of Stock", value: 35, color: "#ef4444" },
-    ];
-    const total = segments.reduce((s, d) => s + d.value, 0);
-
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const r = 100;
+    const total = donutSegments.reduce((s, d) => s + d.value, 0) || 1;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const r = Math.min(canvas.width, canvas.height) * 0.38;
+
     let start = -Math.PI / 2;
-    segments.forEach((seg) => {
+    donutSegments.forEach((seg) => {
       const angle = (seg.value / total) * Math.PI * 2;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
@@ -76,25 +221,25 @@ function InventoryDashboard() {
       start += angle;
     });
 
-    // Donut hole
+    // donut hole
     ctx.beginPath();
-    ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     ctx.strokeStyle = "#e5e7eb";
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Center text
+    // center text shows TOTAL PRODUCT UNITS
     ctx.fillStyle = "#374151";
     ctx.font = "bold 20px Arial";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("325", cx, cy - 8);
+    ctx.fillText(String(metrics.totalProductUnits || 0), cx, cy - 8);
     ctx.font = "12px Arial";
     ctx.fillStyle = "#6b7280";
-    ctx.fillText("Total", cx, cy + 8);
-  }, []);
+    ctx.fillText("Units", cx, cy + 8);
+  }, [donutSegments, metrics.totalProductUnits]);
 
   return (
     <div className="page-shell">
@@ -107,31 +252,40 @@ function InventoryDashboard() {
             <div className="date">Last Updated: {formattedNow}</div>
           </header>
 
-          {/* Metrics */}
+          {error && (
+            <div style={{ margin: "12px 0", padding: 12, borderRadius: 10, background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca" }}>
+              {error}
+            </div>
+          )}
+
+          {/* ===== Metrics ===== */}
           <section className="metrics-row">
             <article className="metric-card">
-              
-              <div className="metric-value">325</div>
+              <div className="metric-value">{metrics.totalProductUnits.toLocaleString()}</div>
               <div className="metric-label">Total Products</div>
             </article>
             <article className="metric-card">
-              
-              <div className="metric-value">1,000</div>
+              <div className="metric-value">{metrics.totalItemUnits.toLocaleString()}</div>
               <div className="metric-label">Total Items</div>
             </article>
             <article className="metric-card">
-              
-              <div className="metric-value">70</div>
+              <div className="metric-value">{metrics.lowStockProducts.toLocaleString()}</div>
               <div className="metric-label">Low Stock Products</div>
             </article>
             <article className="metric-card">
-              
-              <div className="metric-value">35</div>
+              <div className="metric-value">{metrics.outOfStockProducts.toLocaleString()}</div>
               <div className="metric-label">Out of Stock</div>
             </article>
             <article className="metric-card">
-              
-              <div className="metric-value">LKR 250,000</div>
+              <div className="metric-value">{money(metrics.totalInventoryValue)}</div>
+              <div className="metric-label">Total Value of Inventory</div>
+            </article>
+            <article className="metric-card">
+              <div className="metric-value">{money(metrics.totalProductValue)}</div>
+              <div className="metric-label">Total Value of Product</div>
+            </article>
+            <article className="metric-card">
+              <div className="metric-value">{money(metrics.totalValueOfStock)}</div>
               <div className="metric-label">Total Value of Stock</div>
             </article>
           </section>
@@ -153,15 +307,15 @@ function InventoryDashboard() {
                 <div className="chart-legend" aria-hidden="true">
                   <div className="legend-item">
                     <div className="legend-color" style={{ background: "#10b981" }} />
-                    <span className="legend-text">In Stock (220)</span>
+                    <span className="legend-text">In Stock ({donutSegments[0].value})</span>
                   </div>
                   <div className="legend-item">
                     <div className="legend-color" style={{ background: "#f59e0b" }} />
-                    <span className="legend-text">Low Stock (70)</span>
+                    <span className="legend-text">Low Stock ({donutSegments[1].value})</span>
                   </div>
                   <div className="legend-item">
                     <div className="legend-color" style={{ background: "#ef4444" }} />
-                    <span className="legend-text">Out of Stock (35)</span>
+                    <span className="legend-text">Out of Stock ({donutSegments[2].value})</span>
                   </div>
                 </div>
               </div>
@@ -171,11 +325,9 @@ function InventoryDashboard() {
               <h2 className="panel-title">⚠️ Alerts & Notifications</h2>
               <div className="alerts-content">
                 {[
-                  ["Critical Stock Level", "Gaming Mouse (GM-450) is out of stock"],
-                  ["Low Stock Warning", "Coffee Maker Pro needs reordering (8 units left)"],
-                  ["Reorder Reminder", "Bluetooth Speaker approaching minimum threshold"],
-                  ["Supplier Update", "New pricing available from TechSupply Co."],
-                  ["Quality Check", "Weekly quality inspection due for Electronics category"],
+                  ["Critical Stock Level", "Some products are out of stock"],
+                  ["Low Stock Warning", "Products with ≤ 20 units need reordering"],
+                  ["Reorder Reminder", "Review suppliers/pricing for items & products"],
                 ].map(([title, desc], i) => (
                   <div className="alert-item" key={i}>
                     <div className="alert-icon">!</div>
@@ -189,7 +341,7 @@ function InventoryDashboard() {
             </aside>
           </section>
 
-          {/* Table */}
+          {/* ===== Current Inventory (products) ===== */}
           <section className="inventory-table">
             <div className="table-header">
               <h2 className="table-title">📋 Current Inventory</h2>
@@ -212,23 +364,27 @@ function InventoryDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r, idx) => (
-                  <tr key={`${r.product}-${idx}`}>
-                    <td><strong>{r.product}</strong></td>
-                    <td>{r.stock} units</td>
-                    <td>LKR {r.value.toLocaleString()}</td>
-                    <td>
-                      <span className={`status ${r.status}`}>
-                        {r.status === "in-stock"
-                          ? "In Stock"
-                          : r.status === "low-stock"
-                          ? "Low Stock"
-                          : "Out of Stock"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
+                {filteredProducts.map((r, idx) => {
+                  const status = statusOf(r.stock);
+                  return (
+                    <tr key={`${r.name}-${idx}`}>
+                      <td><strong>{r.name}</strong></td>
+                      <td>{r.stock} units</td>
+                      {/* r.value is already discounted */}
+                      <td>{money(r.value)}</td>
+                      <td>
+                        <span className={`status ${status}`}>
+                          {status === "in-stock"
+                            ? "In Stock"
+                            : status === "low-stock"
+                            ? "Low Stock"
+                            : "Out of Stock"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredProducts.length === 0 && (
                   <tr>
                     <td colSpan="4" style={{ padding: 16, textAlign: "center" }}>
                       No results
@@ -243,5 +399,3 @@ function InventoryDashboard() {
     </div>
   );
 }
-
-export default InventoryDashboard;

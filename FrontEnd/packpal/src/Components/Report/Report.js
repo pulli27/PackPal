@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import "./Report.css";
 
-// Libs (module imports instead of <script> tags)
+// Libs
 import Chart from "chart.js/auto";
 import html2pdf from "html2pdf.js";
 
@@ -18,15 +18,12 @@ export default function Report() {
   // Scope root for CSS vars (so we don't rely on :root/body)
   const mainRef = useRef(null);
 
-  // Keep chart instances so we can destroy on re-render
+  // Keep chart instances so we can destroy on unmount
   const chartsRef = useRef([]);
 
   useEffect(() => {
-    // init
     initializeCharts();
     updateReportDate();
-
-    // cleanup
     return () => {
       chartsRef.current.forEach((c) => c && c.destroy());
       chartsRef.current = [];
@@ -217,7 +214,7 @@ export default function Report() {
     const pdfRoot = document.createElement("div");
     pdfRoot.id = "pdfRoot";
 
-    // Copy our scoped CSS vars into the PDF root so styles match
+    // Copy scoped CSS vars into the PDF root
     const vars = [
       "--ink","--text","--muted","--bg","--card","--line",
       "--brand","--brand-600","--green","--amber","--red","--violet","--indigo"
@@ -396,8 +393,6 @@ export default function Report() {
   return (
     <div className="report-shell">
       <Sidebar />
-
-      {/* Everything below is scoped inside .report-main */}
       <main className="report-main" ref={mainRef}>
         {/* Header */}
         <div className="header">

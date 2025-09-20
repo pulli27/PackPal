@@ -1,12 +1,14 @@
-// src/Components/PurchaseItems/PurchaseItems.js
 import React, { useEffect, useRef } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import "./PurchaseItems.css";
 import { purchases } from "../../lib/purchases";
 
-// PDF libs
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+/**
+ * NOTE: We REMOVED the static imports of 'jspdf' and 'jspdf-autotable'.
+ * They are now lazy-loaded inside exportPDF() so your app boots even if users
+ * never click “Export Orders (PDF)”. Make sure you’ve run:
+ *   npm i jspdf jspdf-autotable
+ */
 
 export default function PurchaseItems() {
   const settingsRef = useRef({ currency: "USD", autoApprove: "off" });
@@ -79,7 +81,7 @@ export default function PurchaseItems() {
                 ? `<button class="btn btn-suc" data-action="approve" data-id="${o.id}">Approve</button>`
                 : ""
             }
-            <button class="btn btn-secon" data-action="edit" data-id="${o.id}">Edit</button>
+            <button class="btn btn-sec" data-action="edit" data-id="${o.id}">Edit</button>
             <button class="btn btn-danger" data-action="delete" data-id="${o.id}">Delete</button>
           </td>
         `;
@@ -110,8 +112,12 @@ export default function PurchaseItems() {
       }
     }
 
-    // ---------- PDF export (styled like screenshot) ----------
-    const exportPDF = () => {
+    // ---------- PDF export (now lazy-loaded) ----------
+    const exportPDF = async () => {
+      // lazy-load only when needed
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+
       const doc = new jsPDF("p", "pt");
       const orders = purchaseOrdersRef.current;
 
@@ -134,14 +140,12 @@ export default function PurchaseItems() {
       const pending = orders.filter((o) => o.status === "pending").length;
       const approved = orders.filter((o) => o.status === "approved").length;
       const delivered = orders.filter((o) => o.status === "delivered").length;
-      
 
       const metrics = [
         { label: "Total Orders", value: total },
         { label: "Pending", value: pending },
         { label: "Approved", value: approved },
         { label: "Delivered", value: delivered },
-       
       ];
 
       // Card grid (3 per row)
@@ -155,24 +159,20 @@ export default function PurchaseItems() {
       let y = startY;
 
       metrics.forEach((m, i) => {
-        // light card background
         doc.setDrawColor(225);
-        doc.setFillColor(246, 248, 252); // subtle light
+        doc.setFillColor(246, 248, 252);
         doc.roundedRect(x, y, cardW, cardH, 10, 10, "F");
 
-        // value
         doc.setTextColor(0);
-        doc.setFontSize(m.bold ? 14 : 16);
-        doc.setFont("helvetica", m.bold ? "bold" : "normal");
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
         doc.text(String(m.value), x + cardW / 2, y + 28, { align: "center" });
 
-        // label
         doc.setTextColor(110);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.text(m.label, x + cardW / 2, y + 48, { align: "center" });
 
-        // advance to next position
         x += cardW + gap;
         if ((i + 1) % 3 === 0) {
           x = startX;
@@ -180,16 +180,14 @@ export default function PurchaseItems() {
         }
       });
 
-      // Section title "Orders" with small icon
+      // Section title "Orders"
       let tableStartY = y + cardH + 25;
       doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(214, 48, 49); // small red icon color
-      doc.text("", 40, tableStartY); // emoji icon
       doc.setTextColor(33);
       doc.text("Orders", 60, tableStartY);
 
-      // table
+      // Table
       const tableData = orders.map((o) => [
         o.id,
         o.supplier,
@@ -205,7 +203,7 @@ export default function PurchaseItems() {
         startY: tableStartY + 10,
         styles: { fontSize: 11, cellPadding: 9, textColor: 30 },
         headStyles: {
-          fillColor: [237, 242, 255], // light indigo
+          fillColor: [237, 242, 255],
           textColor: 30,
           lineWidth: 0.5,
           lineColor: [203, 213, 225],
@@ -221,8 +219,7 @@ export default function PurchaseItems() {
           4: { cellWidth: 70 },
           5: { cellWidth: 65 },
         },
-        didDrawPage: (data) => {
-          // optional footer page number
+        didDrawPage: () => {
           const str = `Page ${doc.internal.getNumberOfPages()}`;
           doc.setFontSize(9);
           doc.setTextColor(120);
@@ -474,8 +471,7 @@ Delivery: ${o.deliveryDate ? fmt(o.deliveryDate) : "-"}`);
               <div className="metric-value" id="poCompleted">0</div>
               <div className="metric-label">Completed Orders</div>
             </div>
-            {/* If you want to show cancelled on page too, add another card:
-            <div className="metric-card">
+            {/* <div className="metric-card">
               <div className="metric-value" id="poCancelled">0</div>
               <div className="metric-label">Cancelled</div>
             </div> */}
