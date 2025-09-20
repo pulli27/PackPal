@@ -119,10 +119,130 @@ html, body {
 .pd input:focus, .pd select:focus, .pd textarea:focus { border-color:#cbd5e1; }
 .pd .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
 
+/* ---------- Quality Summary (neat & clean) ---------- */
+/* ---------- Quality Summary (stacked) ---------- */
+.qs { padding: 12px; }
+.qs-grid {
+  display: grid;
+  grid-template-columns: 1fr;   /* <- single column always */
+  gap: 16px;                    /* space between Passed and Failed cards */
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+/* ---------- Quality Summary (stacked) ---------- */
+.qs { padding: 12px; }
+.qs-grid {
+  display: grid;
+  grid-template-columns: 1fr;   /* <- single column always */
+  gap: 16px;                    /* space between Passed and Failed cards */
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+/* ---------- Quality Summary (stacked) ---------- */
+.qs { padding: 12px; }
+.qs-grid {
+  display: grid;
+  grid-template-columns: 1fr;   /* <- single column always */
+  gap: 16px;                    /* space between Passed and Failed cards */
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.qs-col {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.qs-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.qs-col-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.qs-count {
+  min-width: 36px;
+  height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.qs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.qs-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.qs-line {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: baseline;
+  gap: 6px 8px;
+  width: 100%;
+}
+
+/* Bag name truncates nicely; date sits at the end */
+.qs-bag {
+  font-weight: 700;
+  max-width: 260px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.qs-by {
+  color: var(--muted);
+  font-style: normal;
+}
+.qs-date {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+/* Failure note on its own row below, muted red */
+.qs-note {
+  grid-column: 1 / -1;
+  color: #b91c1c;
+  font-size: 12px;
+  margin-left: 0;
+}
+
+.qs-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+/* Reuse your dots, but keep spacing tight here */
+.qs .dot { width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:8px; margin-top: 6px; }
+.dot.ok { background:#16a34a; }
+.dot.bad { background:#ef4444; }
+
 /* Responsive */
 @media (max-width:1000px) {
   .pd .grid-2 { grid-template-columns:1fr; }
   .pd .search input { width:220px; }
   .pd .topbar { margin-left:0; width:100%; }
   .pd main.container { margin-left:0; }
+}
+@media (max-width: 900px) {
+  .qs-grid { grid-template-columns: 1fr; }
+  .qs-bag { max-width: 100%; }
 }

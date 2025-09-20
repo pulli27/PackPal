@@ -24,7 +24,9 @@ app.get("/health", (_req, res) =>
 );
 
 
-app.use("/api/sewing-instructions", sewingRouter);
+app.use("/api/sewing-instructions", require("./Routes/sewingInstructionRoutes"));
+app.use("/api/quality",              require("./Routes/qualityRoutes"));
+
 
 app.use((req, res) => res.status(404).json({ message: "Route not found", path: req.originalUrl }));
 
@@ -35,7 +37,7 @@ app.use((err, _req, res, _next) => {
 
 const MONGO_URI =
   process.env.MONGO_URI ||
-  "mongodb+srv://pulmivihansa27:H1234pul@cluster0.mz80y30.mongodb.net/PackPal?retryWrites=true&w=majority";
+  "mongodb+srv://hiruninwijesinghe_db_user:H1234pul@cluster1.bfmejns.mongodb.net/PackPal?retryWrites=true&w=majority&appName=Cluster1";
 
 mongoose.set("strictQuery", true);
 

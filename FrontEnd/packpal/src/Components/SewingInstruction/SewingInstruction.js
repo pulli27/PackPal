@@ -1,27 +1,24 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./SewingInstruction.css";
 import Sidebar from "../Sidebar/Sidebar";
-import { api } from "../../lib/api"; // ⬅️ use your shared axios client
+import { api } from "../../lib/api";
+
+// Normalize date for <input type="date"> and display
+const toDateInput = (d) => {
+  if (!d) return "";
+  try { return new Date(d).toISOString().slice(0, 10); } catch { return String(d).slice(0, 10); }
+};
 
 export default function SewingInstruction() {
-  // ---------- utilities ----------
-  const formatDate = (d) => {
-    if (!d) return "";
-    try {
-      return new Date(d).toISOString().slice(0, 10); // YYYY-MM-DD for <input type="date">
-    } catch {
-      return String(d).slice(0, 10);
-    }
-  };
-
-  // ---------- state ----------
-  const [items, setItems] = useState([]);        // now from server
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null);  // { id } or null
-  const [viewItem, setViewItem] = useState(null);
-
+  // ---------- dialogs ----------
   const formRef = useRef(null);
   const viewRef = useRef(null);
+
+  // ---------- state ----------
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null); // { id } | null
+  const [viewItem, setViewItem] = useState(null);
 
   const [form, setForm] = useState({
     bag: "",
@@ -32,7 +29,7 @@ export default function SewingInstruction() {
     status: "In Progress",
   });
 
-  // dialogs open/close
+  // ---------- open/close dialogs ----------
   useEffect(() => {
     if (!formRef.current) return;
     if (editing) formRef.current.showModal();
@@ -45,32 +42,45 @@ export default function SewingInstruction() {
     else if (viewRef.current.open) viewRef.current.close();
   }, [viewItem]);
 
-  // ---------- load from server on mount ----------
+  // ---------- load from server ----------
+  const load = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get("/api/sewing-instructions");
+      const mapped = (data.items || []).map((i) => ({
+        id: i._id,
+        bag: i.bag,
+        details: i.details || "",
+        person: i.person,
+        deadline: toDateInput(i.deadline),
+        priority: i.priority,
+        status: i.status,
+        createdAt: i.createdAt,
+      }));
+      setItems(mapped);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to load sewing instructions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // also refresh when other tabs/pages broadcast a change
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const { data } = await api.get("/api/sewing-instructions");
-        // Map server documents to UI structure (use _id as id)
-        const mapped = (data.items || []).map((i) => ({
-          id: i._id,
-          bag: i.bag,
-          details: i.details || "",
-          person: i.person,
-          deadline: formatDate(i.deadline),
-          priority: i.priority,
-          status: i.status,
-        }));
-        if (mounted) setItems(mapped);
-      } catch (e) {
-        console.error(e);
-        alert("Failed to load sewing instructions");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => (mounted = false);
+    const onBcast = () => load();
+    const onStorage = (e) => { if (e.key === "sewing:lastUpdate") load(); };
+    const onVis = () => { if (document.visibilityState === "visible") load(); };
+    window.addEventListener("sewing:changed", onBcast);
+    window.addEventListener("storage", onStorage);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("sewing:changed", onBcast);
+      window.removeEventListener("storage", onStorage);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   // ---------- helpers ----------
@@ -96,21 +106,26 @@ export default function SewingInstruction() {
     });
     setEditing({ id: row.id });
   };
-  const openView = (row) => setViewItem(row);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this instruction?")) return;
     try {
       await api.delete(`/api/sewing-instructions/${id}`);
       setItems((prev) => prev.filter((x) => x.id !== id));
+
+      // 🔔 notify dashboard + other tabs
+      window.dispatchEvent(new Event("sewing:changed"));
+      localStorage.setItem("sewing:lastUpdate", String(Date.now()));
     } catch (e) {
       console.error(e);
       alert("Delete failed");
     }
   };
 
-  const handleChange = (e) =>
-    setForm((f) => ({ ...f, [e.target.id.replace("f_", "")]: e.target.value }));
+  const handleChange = (e) => {
+    const key = e.target.id.replace("f_", "");
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -119,7 +134,6 @@ export default function SewingInstruction() {
       return;
     }
 
-    // Payload in the same shape as backend expects
     const payload = {
       bag: form.bag,
       details: form.details || "",
@@ -142,9 +156,10 @@ export default function SewingInstruction() {
                   bag: updated.bag,
                   details: updated.details || "",
                   person: updated.person,
-                  deadline: formatDate(updated.deadline),
+                  deadline: toDateInput(updated.deadline),
                   priority: updated.priority,
                   status: updated.status,
+                  createdAt: updated.createdAt,
                 }
               : x
           )
@@ -159,18 +174,36 @@ export default function SewingInstruction() {
             bag: created.bag,
             details: created.details || "",
             person: created.person,
-            deadline: formatDate(created.deadline),
+            deadline: toDateInput(created.deadline),
             priority: created.priority,
             status: created.status,
+            createdAt: created.createdAt,
           },
           ...prev,
         ]);
       }
+
       setEditing(null);
+
+      // 🔔 notify dashboard + other tabs
+      window.dispatchEvent(new Event("sewing:changed"));
+      localStorage.setItem("sewing:lastUpdate", String(Date.now()));
     } catch (e) {
       console.error(e);
       alert("Save failed");
     }
+  };
+
+  // CSV export
+  const exportCSV = () => {
+    const header = ["Bag Type","Sewing Person","Deadline","Priority","Status","Details"];
+    const rows = (items||[]).map(i => [i.bag, i.person, i.deadline, i.priority, i.status, i.details || ""]);
+    const toCSV = (rows) => rows.map(r => r.map(x => `"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([toCSV([header, ...rows])], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "sewing_instructions.csv";
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
 
   const BadgePriority = ({ p }) => {
@@ -192,23 +225,21 @@ export default function SewingInstruction() {
     <svg viewBox="0 0 24 24"><path d="M3 6h18M9 6V4h6v2M7 6l1 14h8l1-14" /></svg>
   );
 
-  if (loading) return <div><Sidebar /><div className="container">Loading…</div></div>;
+  if (loading) return (
+    <div>
+      <Sidebar />
+      <div className="container">Loading…</div>
+    </div>
+  );
 
   return (
     <div>
-      <Sidebar/>
+      <Sidebar />
+
       <header className="topbar">
         <h1 className="page-title">Sewing Instructions</h1>
         <div className="topbar-actions">
-          <button className="btn btn-primary" onClick={()=>{
-            // simple CSV client-side export remains the same
-            const header = ["Bag Type","Sewing Person","Deadline","Priority","Status","Details"];
-            const rows = (items||[]).map(i=>[i.bag,i.person,i.deadline,i.priority,i.status,i.details||""]);
-            const toCSV = rows => rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n");
-            const blob = new Blob([toCSV([header, ...rows])],{type:"text/csv;charset=utf-8;"});
-            const url = URL.createObjectURL(blob); const a = document.createElement("a");
-            a.href=url; a.download="sewing_instructions.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-          }}>
+          <button className="btn btn-primary" onClick={exportCSV}>
             <span className="icon">📄</span> Generate Report
           </button>
           <button className="avatar" title="Profile">👤</button>
@@ -257,7 +288,9 @@ export default function SewingInstruction() {
                   </tr>
                 ))}
                 {items.length === 0 && (
-                  <tr><td colSpan="6" style={{textAlign:"center", padding:"16px"}}>No instructions yet.</td></tr>
+                  <tr>
+                    <td colSpan="6" style={{textAlign:"center", padding:"16px"}}>No instructions yet.</td>
+                  </tr>
                 )}
               </tbody>
             </table>

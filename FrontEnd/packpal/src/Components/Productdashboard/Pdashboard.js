@@ -1,150 +1,192 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import "./Pdashboard.css";
 import Sidebar from "../Sidebar/Sidebar";
+import { api } from "../../lib/api"; // your shared axios instance
 
 const uid = () =>
-  typeof crypto !== "undefined" && crypto.randomUUID
+  (typeof crypto !== "undefined" && crypto.randomUUID)
     ? crypto.randomUUID()
     : `id-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 
+const formatDate = (d) => {
+  if (!d) return "";
+  try { return new Date(d).toISOString().slice(0, 10); } catch { return String(d).slice(0,10); }
+};
+
 export default function Pdashboard() {
-  // ----- Mock data -----
-  const initialInstructions = [
-    {
-      id: uid(),
-      bag: "Leather Handbag",
-      details: "Brown leather, gold hardware,…",
-      person: "Maria Santos",
-      deadline: "2025-08-25",
-      priority: "High",
-    },
-    {
-      id: uid(),
-      bag: "Canvas Tote",
-      details: "Navy canvas, cotton straps,…",
-      person: "John Chen",
-      deadline: "2025-08-23",
-      priority: "Medium",
-    },
-    {
-      id: uid(),
-      bag: "Crossbody Purse",
-      details: "Black synthetic leather, adjustable…",
-      person: "Lisa Rodriguez",
-      deadline: "2025-08-22",
-      priority: "High",
-    },
-  ];
-
-  const initialQueue = [
-    { id: uid(), bag: "Evening Clutch", person: "Sarah Kim", status: "Passed" },
-    { id: uid(), bag: "Backpack", person: "Mike Johnson", status: "Failed" },
-    { id: uid(), bag: "Wallet", person: "Anna Park", status: "Pending Review" },
-  ];
-
-  const [instructions, setInstructions] = useState(initialInstructions);
-  const [qualityQueue] = useState(initialQueue);
+  // -------- State --------
+  const [items, setItems] = useState([]);     // sewing instructions from server
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
 
-  // ----- Form state -----
+  // Quick-add modal
+  const dialogRef = useRef(null);
   const [fBag, setFBag] = useState("");
   const [fPerson, setFPerson] = useState("");
   const [fDeadline, setFDeadline] = useState("");
   const [fPriority, setFPriority] = useState("High");
   const [fDetails, setFDetails] = useState("");
 
-  // Dialog
-  const dialogRef = useRef(null);
   const openAdd = () => {
-    setFBag("");
-    setFPerson("");
-    setFDeadline("");
-    setFPriority("High");
-    setFDetails("");
+    setFBag(""); setFPerson(""); setFDeadline(""); setFPriority("High"); setFDetails("");
     dialogRef.current?.showModal?.();
   };
   const closeModal = () => dialogRef.current?.close?.();
 
-  // ----- Derived -----
-  const filteredInst = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return instructions;
-    return instructions.filter(
-      (x) => x.bag.toLowerCase().includes(q) || x.person.toLowerCase().includes(q)
-    );
-  }, [instructions, query]);
+  // -------- Fetch from API --------
+  const fetchItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get("/api/sewing-instructions");
+      const mapped = (data.items || []).map((i) => ({
+        id: i._id,
+        bag: i.bag,
+        details: i.details || "",
+        person: i.person,
+        deadline: formatDate(i.deadline),
+        priority: i.priority,
+        status: i.status,
+        createdAt: i.createdAt,
+        qcDate: i.qcDate || null,
+        qcNote: i.qcNote || "",
+      }));
+      setItems(mapped);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const filteredQueue = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return qualityQueue;
-    return qualityQueue.filter(
-      (x) => x.bag.toLowerCase().includes(q) || x.person.toLowerCase().includes(q)
-    );
-  }, [qualityQueue, query]);
+  useEffect(() => { fetchItems(); }, [fetchItems]);
 
+  // Live refresh when other pages/tabs change data
+  useEffect(() => {
+    const onBcast = () => fetchItems();
+    const onStorage = (e) => {
+      if (e.key === "sewing:lastUpdate" || e.key === "qc:lastUpdate") fetchItems();
+    };
+    const onVis = () => { if (document.visibilityState === "visible") fetchItems(); };
+
+    window.addEventListener("sewing:changed", onBcast);
+    window.addEventListener("quality:changed", onBcast);
+    window.addEventListener("storage", onStorage);
+    document.addEventListener("visibilitychange", onVis);
+
+    const t = setInterval(fetchItems, 30000);
+    return () => {
+      window.removeEventListener("sewing:changed", onBcast);
+      window.removeEventListener("quality:changed", onBcast);
+      window.removeEventListener("storage", onStorage);
+      document.removeEventListener("visibilitychange", onVis);
+      clearInterval(t);
+    };
+  }, [fetchItems]);
+
+  // -------- Derived values --------
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (x) =>
+        x.bag.toLowerCase().includes(q) ||
+        x.person.toLowerCase().includes(q) ||
+        (x.details || "").toLowerCase().includes(q)
+    );
+  }, [items, query]);
+
+  const top5 = useMemo(() => {
+    const copy = [...filtered].sort((a, b) => {
+      const ad = a.deadline || "";
+      const bd = b.deadline || "";
+      if (ad < bd) return -1;
+      if (ad > bd) return 1;
+      const ac = a.createdAt || "";
+      const bc = b.createdAt || "";
+      return (bc > ac ? 1 : bc < ac ? -1 : 0);
+    });
+    return copy.slice(0, 5);
+  }, [filtered]);
+
+  // --- Quality buckets for dashboard containers ---
+  const passedList = useMemo(
+    () => items
+      .filter((x) => x.status === "Done")
+      .sort((a, b) => (b.qcDate || b.createdAt || "").localeCompare(a.qcDate || a.createdAt || "")),
+    [items]
+  );
+  const failedList = useMemo(
+    () => items
+      .filter((x) => x.status === "Failed")
+      .sort((a, b) => (b.qcDate || b.createdAt || "").localeCompare(a.qcDate || a.createdAt || "")),
+    [items]
+  );
+
+  // KPI counts
   const kpi = useMemo(() => {
-    const passed = qualityQueue.filter((x) => x.status === "Passed").length;
-    const failed = qualityQueue.filter((x) => x.status === "Failed").length;
-    return { active: instructions.length, passed, failed, ready: passed };
-  }, [instructions, qualityQueue]);
+    const active = items.length;
+    const passed = passedList.length;                // Done
+    const failed = failedList.length;                // Failed
+    const ready = passed;                            // Ready for inventory == passed
+    return { active, passed, failed, ready };
+  }, [items, passedList, failedList]);
 
-  // ----- Helpers -----
+  // -------- Badges --------
   const badgePriority = (p) => {
     const cls = p === "High" ? "high" : p === "Medium" ? "medium" : "low";
     return <span className={`badge ${cls}`}>{p}</span>;
   };
 
   const badgeStatus = (s) => {
-    const map = { Passed: "passed", Failed: "failed", "Pending Review": "pending" };
-    return <span className={`badge ${map[s] || ""}`}>{s}</span>;
+    const map = { "In Progress": "info", Pending: "pending", "Quality Check": "qc", Done: "low", Failed: "failed" };
+    return <span className={`badge ${map[s] || "pending"}`}>{s}</span>;
   };
 
+  // -------- Export CSV --------
   const onGenerateReport = () => {
-    const header1 = ["Bag", "Person", "Deadline", "Priority", "Details"];
-    const rows1 = instructions.map((i) => [
-      i.bag,
-      i.person,
-      i.deadline,
-      i.priority,
-      i.details || "",
-    ]);
-
-    const header2 = ["Bag", "Person", "Status"];
-    const rows2 = qualityQueue.map((q) => [q.bag, q.person, q.status]);
-
-    const toCSV = (rows) =>
-      rows.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
-
+    const hdr = ["Bag", "Person", "Deadline", "Priority", "Status", "Details"];
+    const rowsFull = items.map((i) => [i.bag, i.person, i.deadline, i.priority, i.status, i.details || ""]);
+    const rowsTop = top5.map((i) => [i.bag, i.person, i.deadline, i.priority, i.status, i.details || ""]);
+    const toCSV = (rows) => rows.map(r => r.map(x => `"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n");
     const csv =
-      `Sewing Instructions\n${toCSV([header1, ...rows1])}\n\n` +
-      `Quality Queue\n${toCSV([header2, ...rows2])}\n`;
-
+      `Dashboard — Sewing Instructions (All)\n${toCSV([hdr, ...rowsFull])}\n\n` +
+      `Top 5 by Deadline\n${toCSV([hdr, ...rowsTop])}\n`;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = "dashboard_report.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = "sewing_dashboard_report.csv";
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
 
-  const onSubmit = (e) => {
+  // -------- Quick add --------
+  const onSubmit = async (e) => {
     e.preventDefault();
     if (!fBag || !fPerson || !fDeadline) return;
-
-    const newItem = {
-      id: uid(),
-      bag: fBag,
-      details: fDetails,
-      person: fPerson,
-      deadline: fDeadline,
-      priority: fPriority,
-    };
-    setInstructions((prev) => [newItem, ...prev]);
-    closeModal();
+    try {
+      await api.post("/api/sewing-instructions", {
+        bag: fBag,
+        person: fPerson,
+        deadline: fDeadline,
+        priority: fPriority,
+        details: fDetails || "",
+        status: "In Progress",
+      });
+      closeModal();
+      await fetchItems();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create instruction");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="pd">
+        <Sidebar />
+        <main className="container">Loading…</main>
+      </div>
+    );
+  }
 
   return (
     <div className="pd">
@@ -199,7 +241,7 @@ export default function Pdashboard() {
         {/* Toolbar */}
         <section className="toolbar card">
           <p className="muted">
-            Welcome back! Track production, run quality checks, and export reports.
+            Welcome back! Track production, check quality, and export reports.
           </p>
 
           <div className="toolbar-right">
@@ -207,19 +249,15 @@ export default function Pdashboard() {
               <span className="icon">🔎</span>
               <input
                 type="search"
-                placeholder="Search by bag or person…"
-                aria-label="Search by bag or person"
+                placeholder="Search by bag, person, or details…"
+                aria-label="Search sewing instructions"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
 
-            <button className="btn btn-ghost" onClick={() => alert("Go to Manage Instructions")}>
+            <button className="btn btn-ghost" onClick={() => window.location.assign("/sewing-instructions")}>
               ✂️ <span className="hide-sm">Manage Instructions</span>
-            </button>
-
-            <button className="btn btn-ghost" onClick={() => alert("Go to Quality Queue")}>
-              🧪 <span className="hide-sm">Quality Queue</span>
             </button>
 
             <button className="btn btn-primary" onClick={openAdd}>
@@ -230,11 +268,11 @@ export default function Pdashboard() {
 
         {/* Tables */}
         <section className="grid-2">
-          {/* Sewing Instructions */}
+          {/* Top 5 Sewing Instructions */}
           <article className="card">
             <header className="card-header">
-              <h2>Sewing Instructions (Top 5)</h2>
-              <span className="muted">{instructions.length} total</span>
+              <h2>Sewing Instructions (Top 5 by Deadline)</h2>
+              <span className="muted">{items.length} total</span>
             </header>
 
             <div className="table-wrap">
@@ -245,11 +283,11 @@ export default function Pdashboard() {
                     <th>Person</th>
                     <th>Deadline</th>
                     <th>Priority</th>
-                    <th></th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredInst.map((row) => (
+                  {top5.map((row) => (
                     <tr key={row.id}>
                       <td>
                         <p className="bag-title">{row.bag}</p>
@@ -258,62 +296,83 @@ export default function Pdashboard() {
                       <td>{row.person}</td>
                       <td className="nowrap">{row.deadline}</td>
                       <td>{badgePriority(row.priority)}</td>
-                      <td>
-                        <button
-                          className="link"
-                          onClick={() => alert(`Open Instruction: ${row.bag}`)}
-                        >
-                          View
-                        </button>
-                      </td>
+                      <td>{badgeStatus(row.status)}</td>
                     </tr>
                   ))}
+                  {top5.length === 0 && (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: "center", padding: 16 }}>
+                        No instructions found.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </article>
 
-          {/* Quality Queue */}
+          {/* Quality Summary (neat & clean) */}
           <article className="card">
             <header className="card-header">
-              <h2>Quality Queue</h2>
-              <span className="muted">{qualityQueue.length} total</span>
+              <h2>Quality Summary</h2>
+              <span className="muted">latest updates</span>
             </header>
 
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Bag</th>
-                    <th>Person</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredQueue.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.bag}</td>
-                      <td>{row.person}</td>
-                      <td>{badgeStatus(row.status)}</td>
-                      <td>
-                        <button
-                          className="link"
-                          onClick={() => alert(`Open Quality Review: ${row.bag}`)}
-                        >
-                          Review
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="qs">
+              <div className="qs-grid">
+                {/* PASSED */}
+                <section className="qs-col">
+                  <header className="qs-col-head">
+                    <h3>Quality Passed</h3>
+                    <span className="qs-count">{passedList.length}</span>
+                  </header>
+                  <ul className="qs-list">
+                    {passedList.slice(0, 5).map((it) => (
+                      <li className="qs-item" key={it.id} title={`${it.bag} • ${it.person}`}>
+                        <span className="dot ok" />
+                        <span className="qs-line">
+                          <strong className="qs-bag">{it.bag}</strong>
+                          <em className="qs-by">by {it.person}</em>
+                          <small className="qs-date">
+                            {(it.qcDate || it.createdAt || "").slice(0, 10)}
+                          </small>
+                        </span>
+                      </li>
+                    ))}
+                    {passedList.length === 0 && <li className="qs-empty">No passed items yet.</li>}
+                  </ul>
+                </section>
+
+                {/* FAILED */}
+                <section className="qs-col">
+                  <header className="qs-col-head">
+                    <h3>Quality Failed</h3>
+                    <span className="qs-count">{failedList.length}</span>
+                  </header>
+                  <ul className="qs-list">
+                    {failedList.slice(0, 5).map((it) => (
+                      <li className="qs-item" key={it.id} title={`${it.bag} • ${it.person}`}>
+                        <span className="dot bad" />
+                        <span className="qs-line">
+                          <strong className="qs-bag">{it.bag}</strong>
+                          <em className="qs-by">by {it.person}</em>
+                          <small className="qs-date">
+                            {(it.qcDate || it.createdAt || "").slice(0, 10)}
+                          </small>
+                          {it.qcNote && <span className="qs-note">❌ {it.qcNote}</span>}
+                        </span>
+                      </li>
+                    ))}
+                    {failedList.length === 0 && <li className="qs-empty">No failures 🎉</li>}
+                  </ul>
+                </section>
+              </div>
             </div>
           </article>
         </section>
       </main>
 
-      {/* Modal */}
+      {/* Quick Add Modal */}
       <dialog ref={dialogRef} className="modal" onClose={closeModal}>
         <form className="modal-card" onSubmit={onSubmit} method="dialog">
           <h3 id="formTitle">Add Instruction</h3>
