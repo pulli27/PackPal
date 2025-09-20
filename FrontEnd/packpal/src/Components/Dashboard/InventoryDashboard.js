@@ -1,4 +1,3 @@
-// src/Components/InventoryDashboard/InventoryDashboard.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import "./InventoryDashboard.css";
@@ -10,8 +9,8 @@ const INVENTORY_ITEMS_PATH    = "/api/inventory";  // inventory items/materials
 
 /* ---------- Helpers ---------- */
 function statusOf(stock) {
-  if (stock === 0) return "out-of-stock";
-  if (stock <= 20) return "low-stock";
+  if (Number(stock) === 0) return "out-of-stock";
+  if (Number(stock) <= 20) return "low-stock";
   return "in-stock";
 }
 
@@ -35,20 +34,11 @@ function discountedUnitPrice(p) {
     type === "pc" ||
     type === "pct";
 
-  const isFlat =
-    type === "flat" ||
-    type === "amount" ||
-    type === "value" ||
-    type === "lkr" ||
-    type === "rs" ||
-    type === "rs." ||
-    type === "priceoff";
-
   if (isPercent) {
     const pct = Math.max(0, Math.min(100, value));
     return Math.max(0, base * (1 - pct / 100));
   }
-  // flat or unknown: treat as flat
+  // flat or unknown → treat as flat amount off
   return Math.max(0, base - value);
 }
 
@@ -198,11 +188,20 @@ export default function InventoryDashboard() {
     const ctx = canvas.getContext("2d");
     const total = donutSegments.reduce((s, d) => s + d.value, 0) || 1;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // ensure crisp canvas
+    const dpr = window.devicePixelRatio || 1;
+    const size = 250;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    ctx.scale(dpr, dpr);
 
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const r = Math.min(canvas.width, canvas.height) * 0.38;
+    ctx.clearRect(0, 0, size, size);
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = Math.min(size, size) * 0.38;
 
     let start = -Math.PI / 2;
     donutSegments.forEach((seg) => {
@@ -253,40 +252,50 @@ export default function InventoryDashboard() {
           </header>
 
           {error && (
-            <div style={{ margin: "12px 0", padding: 12, borderRadius: 10, background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca" }}>
+            <div
+              role="alert"
+              style={{
+                margin: "12px 0",
+                padding: 12,
+                borderRadius: 10,
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fecaca",
+              }}
+            >
               {error}
             </div>
           )}
 
           {/* ===== Metrics ===== */}
           <section className="metrics-row">
-            <article className="metric-card">
+            <article className="metric-card" aria-label="Total Products">
               <div className="metric-value">{metrics.totalProductUnits.toLocaleString()}</div>
               <div className="metric-label">Total Products</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card" aria-label="Total Items">
               <div className="metric-value">{metrics.totalItemUnits.toLocaleString()}</div>
               <div className="metric-label">Total Items</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card" aria-label="Low Stock Products">
               <div className="metric-value">{metrics.lowStockProducts.toLocaleString()}</div>
               <div className="metric-label">Low Stock Products</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card" aria-label="Out of Stock Products">
               <div className="metric-value">{metrics.outOfStockProducts.toLocaleString()}</div>
               <div className="metric-label">Out of Stock</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card" aria-label="Total Value of Items">
               <div className="metric-value">{money(metrics.totalInventoryValue)}</div>
-              <div className="metric-label">Total Value of Inventory</div>
+              <div className="metric-label">Total Value of Items</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card" aria-label="Total Value of Products">
               <div className="metric-value">{money(metrics.totalProductValue)}</div>
-              <div className="metric-label">Total Value of Product</div>
+              <div className="metric-label">Total Value of Products</div>
             </article>
-            <article className="metric-card">
+            <article className="metric-card" aria-label="Total Value of Inventory">
               <div className="metric-value">{money(metrics.totalValueOfStock)}</div>
-              <div className="metric-label">Total Value of Stock</div>
+              <div className="metric-label">Total Value of Inventory</div>
             </article>
           </section>
 
