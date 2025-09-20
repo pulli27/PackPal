@@ -229,4 +229,4 @@ export default function DiscountsPage() {
       </section>
     </div>
   );
-}
+} 
