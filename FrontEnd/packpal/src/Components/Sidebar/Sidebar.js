@@ -30,9 +30,9 @@ export default function Sidebar({
       "/productinventory": "productInventory",
       "/purchase": "purchase",
       "/supplier": "suppliers",
-      "/report": "report",
+    
       "/settings": "settings",
-      "/payment": "payment",
+      
       "/orders": "orders",
       "/login": "login",
       "/usermanagement": "usermanagement",
@@ -74,9 +74,8 @@ export default function Sidebar({
     productInventory: "Product Inventory",
     purchase: "Purchase Items",
     suppliers: "Suppliers",
-    report: "Report & Analytics",
+    
     settings: "Settings",
-    payment: "Payments",
     orders: "Orders",
     login: "Login",
     usermanagement: "User Management",
@@ -169,28 +168,10 @@ export default function Sidebar({
             <i className="fa-solid fa-right-to-bracket" /> <span>Login</span>
           </NavLink>
 
-          {/* Payment with credit-card icon */}
-          <NavLink
-            to="/payment"
-            className={({ isActive }) =>
-              `nav-item ${isActive || active === "payment" ? "active" : ""}`
-            }
-            onClick={() => handleNavigate("payment")}
-          >
-            <i className="fa-solid fa-credit-card paymentIcon" aria-hidden="true" />{" "}
-            <span>Payments</span>
-          </NavLink>
+         
+       
 
-          <NavLink
-            to="/analytics"
-            className={({ isActive }) =>
-              `nav-item ${isActive || active === "report" ? "active" : ""}`
-            }
-            onClick={() => handleNavigate("analytics")}
-          >
-            <i className="fa-solid fa-chart-line" /> <span>Report &amp; Analytics</span>
-          </NavLink>
-
+         
           <NavLink
             to="/settings"
             className={({ isActive }) =>

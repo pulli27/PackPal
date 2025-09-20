@@ -1,19 +1,34 @@
+// src/pages/Login.js
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import "./Login.css";  
+import { useNavigate, Link } from "react-router-dom";
+import "./Login.css";
 
 export default function Login() {
+  // ------- login state -------
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | success
+
+  // ------- forgot password state -------
+  // 0 = login screen, 1 = enter email, 2 = enter code, 3 = set new password
+  const [forgotStep, setForgotStep] = useState(0);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [fpLoading, setFpLoading] = useState(false);
+  const [fpMsg, setFpMsg] = useState(""); // helper text (success/error/info)
+
   const containerRef = useRef(null);
   const navigate = useNavigate();
 
+  // 👉 change this if your route is different (e.g., "/user-management")
+  const USER_MGMT_ROUTE = "/usermanagement";
+
   useEffect(() => {
-    // subtle mount animation hook
     containerRef.current?.classList.add("mounted");
   }, []);
 
+  /* ---------------- Login submit ---------------- */
   const handleSubmit = (e) => {
     e.preventDefault();
     if (status === "loading") return;
@@ -22,19 +37,110 @@ export default function Login() {
     // TODO: replace with real auth call
     setTimeout(() => {
       setStatus("success");
-      // navigate to dashboard after a beat
-      setTimeout(() => navigate("/dashboard"), 1200);
+      // ✅ redirect straight to User Management
+      setTimeout(() => navigate(USER_MGMT_ROUTE), 1200);
     }, 1500);
   };
 
-  const handleForgotPassword = (e) => {
+  /* --------------- Forgot Password: Step 1 (send code) --------------- */
+  const handleSendCode = async (e) => {
     e.preventDefault();
-    alert("Password reset would be implemented here");
+    if (!resetEmail) {
+      setFpMsg("Please enter your email.");
+      return;
+    }
+    setFpMsg("");
+    setFpLoading(true);
+
+    try {
+      // 🔗 Hook to backend (replace with your API)
+      // const res = await fetch(`${API_ROOT}/api/auth/forgot-password`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email: resetEmail }),
+      // });
+      // const data = await res.json();
+      // if (!res.ok) throw new Error(data.message || "Failed to send code");
+
+      // Mock sending email code:
+      await new Promise((r) => setTimeout(r, 900));
+      setFpMsg(`We emailed a verification code to ${resetEmail}.`);
+      setForgotStep(2);
+    } catch (err) {
+      setFpMsg(err.message || "Could not send code. Try again.");
+    } finally {
+      setFpLoading(false);
+    }
   };
 
-  const handleSignup = (e) => {
+  /* --------------- Step 2 (verify code) --------------- */
+  const handleVerifyCode = async (e) => {
     e.preventDefault();
-    alert("Registration page would be implemented here");
+    if (!resetCode) {
+      setFpMsg("Enter the verification code you received.");
+      return;
+    }
+    setFpMsg("");
+    setFpLoading(true);
+
+    try {
+      // 🔗 Backend verify (replace)
+      // const res = await fetch(`${API_ROOT}/api/auth/verify-reset-code`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email: resetEmail, code: resetCode }),
+      // });
+      // const data = await res.json();
+      // if (!res.ok) throw new Error(data.message || "Invalid code");
+
+      // Mock verify:
+      await new Promise((r) => setTimeout(r, 700));
+      setFpMsg("Code verified. Please set a new password.");
+      setForgotStep(3);
+    } catch (err) {
+      setFpMsg(err.message || "Invalid or expired code.");
+    } finally {
+      setFpLoading(false);
+    }
+  };
+
+  /* --------------- Step 3 (set new password) --------------- */
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setFpMsg("Password must be at least 6 characters.");
+      return;
+    }
+    setFpMsg("");
+    setFpLoading(true);
+
+    try {
+      // 🔗 Backend update (replace)
+      // const res = await fetch(`${API_ROOT}/api/auth/reset-password`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email: resetEmail, code: resetCode, newPassword }),
+      // });
+      // const data = await res.json();
+      // if (!res.ok) throw new Error(data.message || "Reset failed");
+
+      // Mock update:
+      await new Promise((r) => setTimeout(r, 900));
+      setFpMsg("Password updated. Redirecting to login…");
+      // clear flow state & go back to login after a beat
+      setTimeout(() => {
+        setForgotStep(0);
+        setResetEmail("");
+        setResetCode("");
+        setNewPassword("");
+        setFpMsg("");
+        navigate("/login");
+      }, 900);
+    } catch (err) {
+      setFpMsg(err.message || "Could not update password. Try again.");
+    } finally {
+      setFpLoading(false);
+    }
   };
 
   const btnText =
@@ -48,7 +154,7 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      {/* floating background */}
+      {/* background anim */}
       <div className="bg-animation">
         <div className="floating-bag" />
         <div className="floating-bag" />
@@ -58,36 +164,10 @@ export default function Login() {
         <div className="floating-bag" />
       </div>
 
-      {/* card */}
       <div className="login-container" ref={containerRef}>
-        {/* left brand panel */}
+        {/* Left brand panel */}
         <div className="brand-side">
-          <div className="brand-bg-scroll">
-            <div className="scroll-column-brand">
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1596663133071-3b3d70ab7d8e?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1570704320094-e14e45f4b9c1?w=200&h=200&fit=crop')" }} />
-            </div>
-            <div className="scroll-column-brand">
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200&h=200&fit=crop')" }} />
-            </div>
-            <div className="scroll-column-brand">
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1596663133071-3b3d70ab7d8e?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1570704320094-e14e45f4b9c1?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=200&h=200&fit=crop')" }} />
-              <div className="brand-image" style={{ backgroundImage:"url('https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=200&h=200&fit=crop')" }} />
-            </div>
-          </div>
-
           <div className="brand-overlay" />
-
           <div className="brand-content">
             <div className="brand-icon">🛍</div>
             <div className="brand-title">PackPal</div>
@@ -97,59 +177,162 @@ export default function Login() {
           </div>
         </div>
 
-        {/* right form panel */}
+        {/* Right panel */}
         <div className="login-side">
-          <div className="login-header">
-            <h2>Welcome Back</h2>
-            <p>Sign in to your PackPal account</p>
-          </div>
+          {/* ---------- LOGIN SCREEN ---------- */}
+          {forgotStep === 0 && (
+            <>
+              <div className="login-header">
+                <h2>Welcome Back</h2>
+                <p>Sign in to your PackPal account</p>
+              </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="email">Email Address</label>
-              <div className="input-container">
+              <form onSubmit={handleSubmit} noValidate>
+                <div className="form-group">
+                  <label htmlFor="email">Email Address</label>
+                  <div className="input-container">
+                    <input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e)=>setEmail(e.target.value)}
+                      required
+                      autoComplete="username"
+                    />
+                    <div className="input-icon" aria-hidden>✉</div>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="password">Password</label>
+                  <div className="input-container">
+                    <input
+                      id="password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e)=>setPassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                    />
+                    <div className="input-icon" aria-hidden>🔒</div>
+                  </div>
+                </div>
+
+                <button type="submit" className={btnClass} disabled={status==="loading"}>
+                  {btnText}
+                </button>
+              </form>
+
+              <div className="forgot-link">
+                <a
+                  href="#"
+                  onClick={(e)=>{e.preventDefault(); setResetEmail(email || ""); setForgotStep(1);}}
+                >
+                  Forgot your password?
+                </a>
+              </div>
+
+              <div className="divider"><span>OR</span></div>
+
+              <div className="signup-section">
+                Don&apos;t have an account? <Link to="/createaccount">Create Account</Link>
+              </div>
+            </>
+          )}
+
+          {/* ---------- FORGOT: STEP 1 (EMAIL) ---------- */}
+          {forgotStep === 1 && (
+            <form onSubmit={handleSendCode} className="forgot-form" noValidate>
+              <h2>Reset Password</h2>
+              <p>Enter your registered email. We’ll send a verification code.</p>
+
+              <div className="form-group">
+                <label htmlFor="resetEmail">Email</label>
                 <input
-                  id="email"
+                  id="resetEmail"
                   type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e)=>setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  value={resetEmail}
+                  onChange={(e)=>setResetEmail(e.target.value)}
                   required
                 />
-                <div className="input-icon">✉</div>
               </div>
-            </div>
 
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <div className="input-container">
+              {fpMsg && <div className="helper-text">{fpMsg}</div>}
+
+              <div className="row-actions">
+                <button type="button" className="btn-secondary" onClick={()=>setForgotStep(0)}>
+                  Back
+                </button>
+                <button type="submit" className="btn-primary" disabled={fpLoading}>
+                  {fpLoading ? "Sending…" : "Send Code"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ---------- FORGOT: STEP 2 (CODE) ---------- */}
+          {forgotStep === 2 && (
+            <form onSubmit={handleVerifyCode} className="forgot-form" noValidate>
+              <h2>Enter Verification Code</h2>
+              <p>We sent a code to <strong>{resetEmail}</strong>.</p>
+
+              <div className="form-group">
+                <label htmlFor="resetCode">Verification Code</label>
                 <input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e)=>setPassword(e.target.value)}
+                  id="resetCode"
+                  type="text"
+                  placeholder="6-digit code"
+                  value={resetCode}
+                  onChange={(e)=>setResetCode(e.target.value)}
                   required
                 />
-                <div className="input-icon">🔒</div>
               </div>
-            </div>
 
-            <button type="submit" className={btnClass} disabled={status==="loading"}>
-              {btnText}
-            </button>
-          </form>
+              {fpMsg && <div className="helper-text">{fpMsg}</div>}
 
-          <div className="forgot-link">
-            <a href="#" onClick={handleForgotPassword}>Forgot your password?</a>
-          </div>
+              <div className="row-actions">
+                <button type="button" className="btn-secondary" onClick={()=>setForgotStep(1)}>
+                  Back
+                </button>
+                <button type="submit" className="btn-primary" disabled={fpLoading}>
+                  {fpLoading ? "Verifying…" : "Verify Code"}
+                </button>
+              </div>
+            </form>
+          )}
 
-          <div className="divider"><span>OR</span></div>
+          {/* ---------- FORGOT: STEP 3 (NEW PASSWORD) ---------- */}
+          {forgotStep === 3 && (
+            <form onSubmit={handleResetPassword} className="forgot-form" noValidate>
+              <h2>Create New Password</h2>
 
-          <div className="signup-section">
-            Don&apos;t have an account?{" "}
-            <a href="#" onClick={handleSignup}>Create one now</a>
-          </div>
+              <div className="form-group">
+                <label htmlFor="newPass">New Password</label>
+                <input
+                  id="newPass"
+                  type="password"
+                  placeholder="At least 6 characters"
+                  value={newPassword}
+                  onChange={(e)=>setNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              {fpMsg && <div className="helper-text">{fpMsg}</div>}
+
+              <div className="row-actions">
+                <button type="button" className="btn-secondary" onClick={()=>setForgotStep(2)}>
+                  Back
+                </button>
+                <button type="submit" className="btn-primary" disabled={fpLoading}>
+                  {fpLoading ? "Updating…" : "Update Password"}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

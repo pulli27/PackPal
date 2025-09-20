@@ -96,7 +96,6 @@ body{
 .login-side{ flex:1; padding:60px 100px; display:flex; flex-direction:column; justify-content:center; background:#fff; }
 .login-header{ text-align:center; margin-bottom:46px; }
 
-/* Bigger "Welcome Back" */
 .login-header h2{
   font-size: clamp(2.6rem, 4vw, 3.4rem);
   line-height: 1.1;
@@ -125,7 +124,7 @@ body{
 .input-icon{ position:absolute; right:18px; top:50%; transform:translateY(-50%); color:#bdc3c7; font-size:1.2rem; transition:color .3s; }
 .form-group input:focus + .input-icon{ color:#667eea; }
 
-/* Button */
+/* Login button */
 .login-btn{
   width:100%; padding:18px; background:linear-gradient(135deg,#667eea,#764ba2); border:none; border-radius:12px;
   color:#fff; font-size:1.1rem; font-weight:700; cursor:pointer; transition:.3s; text-transform:uppercase; letter-spacing:1px;
@@ -138,7 +137,6 @@ body{
 .login-btn:hover{ transform:translateY(-2px); box-shadow:0 12px 30px rgba(102,126,234,.4); background:linear-gradient(135deg,#5a7ae8,#6b44a0); }
 .login-btn:hover::before{ left:100%; }
 
-/* Loading / success states */
 .login-btn.loading{ position:relative; pointer-events:none; opacity:.9; }
 .login-btn.loading::after{
   content:''; position:absolute; top:50%; left:50%; width:20px; height:20px; margin:-10px 0 0 -10px;
@@ -160,6 +158,71 @@ body{
 .signup-section a{ color:#667eea; text-decoration:none; font-weight:600; transition:color .3s; }
 .signup-section a:hover{ color:#764ba2; text-decoration:underline; }
 
+/* --- Forgot Password forms --- */
+.forgot-form {
+  max-width: 420px;
+  margin: 0 auto;
+  text-align: center;
+}
+.forgot-form h2 {
+  font-size: 2rem;
+  color: #2c3e50;
+  margin-bottom: 15px;
+}
+.forgot-form p {
+  color: #7f8c8d;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+}
+.forgot-form input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e8ecef;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  font-size: 1rem;
+}
+.forgot-form input:focus {
+  border-color: #667eea;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(102,126,234,.15);
+}
+.helper-text {
+  font-size: 0.9rem;
+  margin-bottom: 15px;
+  color: #e74c3c; /* error red by default */
+}
+.row-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+.btn-primary,
+.btn-secondary {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.btn-primary {
+  background: linear-gradient(135deg,#667eea,#764ba2);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg,#5a7ae8,#6b44a0);
+  box-shadow: 0 8px 20px rgba(102,126,234,.3);
+}
+.btn-secondary {
+  background: #ecf0f1;
+  color: #2c3e50;
+}
+.btn-secondary:hover {
+  background: #dfe6e9;
+}
+
 /* Shake animation (optional) */
 @keyframes shake{
   0%,100%{ transform:translateX(0); }
@@ -169,9 +232,9 @@ body{
 
 /* Balance layout on wide screens */
 @media (min-width:1100px){
-  .brand-side{ padding:60px 140px; } /* less side padding so content breathes */
-  .brand-side{ flex:0.55; }          /* give brand a bit more room */
-  .login-side{ flex:0.45; }          /* form still roomy */
+  .brand-side{ padding:60px 140px; }
+  .brand-side{ flex:0.55; }
+  .login-side{ flex:0.45; }
 }
 
 /* Responsive */

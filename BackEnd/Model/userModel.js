@@ -1,37 +1,29 @@
+// BackEnd/Model/userModel.js
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
 
-const userSchema = new Schema({
-    First_Name:{
-        type: String,
-     
+const userSchema = new mongoose.Schema(
+  {
+    firstName: { type: String, required: true, trim: true },
+    lastName:  { type: String, required: true, trim: true },
+    email:     { type: String, required: true, unique: true, lowercase: true, trim: true },
+    password:  { type: String, required: true, minlength: 8, select: false },
+    role:      {
+      type: String,
+      enum: [
+        "Inventory Manager",
+        "Finance Manager",
+        "Product Manager",
+        "Cart Manager",
+        "User Manager",
+        "customer",
+        "admin",
+        "staff"
+      ],
+      default: "customer"
+    },
+    status:    { type: String, enum: ["active", "inactive", "blocked", "pending", "suspended"], default: "active" },
+  },
+  { timestamps: true }
+);
 
-    },
-       Last_Name:{
-        type: String,
-        
-
-    }, Gmail:{
-        type: String,
-        required:true,//validate
-
-         }, Role:{
-        type: String,
-      
-      
-
-         }, Status:{
-        type: String,
-        required:true,//validate
-
-
-
-
-}
-});
-module.exports=mongoose.model(
-"userModel",//file name
- userSchema//function schema
-
-
-)
+module.exports = mongoose.model("User", userSchema);
