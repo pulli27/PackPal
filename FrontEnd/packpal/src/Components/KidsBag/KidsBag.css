@@ -1,0 +1,172 @@
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --brand-1:#60a5fa; --brand-2:#1d4ed8; --brand-3:#0ea5e9; --brand-4:#2563eb;
+  --ink:#0f172a; --muted:#64748b; --bg:#f0f5ff; --card:#ffffff;
+}
+
+body{
+  font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background: radial-gradient(1200px 380px at 10% -10%, #e0ecff 0%, transparent 60%),
+              radial-gradient(900px 340px at 90% 0%, #e5e9ff 0%, transparent 60%),
+              linear-gradient(180deg,#f8fbff 0%, #eef4ff 100%);
+  color:var(--ink); line-height:1.6;
+}
+
+/* ========= KidsBags Page Wrap (namespaced) ========= */
+.kidsbags-root .kb-wrap{
+  max-width: 1280px;
+  margin: 28px auto 40px;
+  background: var(--card);
+  border: 1px solid #e8eef8;
+  border-radius: 20px;
+  overflow: clip; /* keeps sticky header shadows clean inside */
+  box-shadow: 0 25px 60px rgba(37,99,235,.08);
+}
+
+/* Header (namespaced) */
+.kidsbags-root .kb-header{
+  background:var(--card);
+  box-shadow:0 2px 20px rgba(0,0,0,.07);
+  position: sticky; top:0; z-index:1000;
+}
+.kidsbags-root .kb-nav{
+  max-width: 1280px;
+  margin:0 auto; display:flex; justify-content:space-between; align-items:center;
+  padding:1rem 1.5rem;
+}
+.kidsbags-root .kb-logo{
+  font-family:'Baloo 2',cursive; font-size:2.0rem; font-weight:700;
+  background:linear-gradient(135deg,var(--brand-1),var(--brand-4));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.kidsbags-root .kb-nav-menu{display:flex;list-style:none;gap:1.6rem}
+.kidsbags-root .kb-nav-menu a{color:var(--muted);text-decoration:none;font-weight:600;position:relative}
+.kidsbags-root .kb-nav-menu a:hover,.kidsbags-root .kb-nav-menu a.active{color:var(--brand-4)}
+.kidsbags-root .kb-nav-menu a::after{
+  content:'';position:absolute;left:0;bottom:-6px;height:3px;width:0;border-radius:3px;
+  background:linear-gradient(90deg,var(--brand-1),var(--brand-2),var(--brand-4));transition:width .3s
+}
+.kidsbags-root .kb-nav-menu a:hover::after,.kidsbags-root .kb-nav-menu a.active::after{width:100%}
+
+/* HERO */
+.kidsbags-root .hero{
+  position:relative;overflow:hidden;color:#fff;text-align:center;
+  padding:3.2rem 1.5rem 1.8rem;
+  background:
+    radial-gradient(1200px 380px at 10% 0%, #93c5fd 0%, transparent 60%),
+    radial-gradient(900px 340px at 90% 10%, #a5b4fc 0%, transparent 60%),
+    linear-gradient(135deg,#1d4ed8 0%,#2563eb 45%,#60a5fa 100%);
+  isolation:isolate;
+}
+.kidsbags-root .hero-content{position:relative;z-index:2;max-width:980px;margin:0 auto}
+.kidsbags-root .hero h1{font-family:'Baloo 2',cursive;font-size:2.6rem;margin-bottom:.75rem}
+.kidsbags-root .hero p{opacity:.98;font-size:1.02rem;margin-bottom:1.2rem}
+.kidsbags-root .search-container{max-width:680px;margin:0 auto;position:relative}
+.kidsbags-root .search-input{
+  width:100%;padding:1.05rem 4rem 1.05rem 1.1rem;border:none;border-radius:50px;
+  background:rgba(255,255,255,.96);backdrop-filter:blur(8px);
+  box-shadow:0 10px 30px rgba(0,0,0,.12);font-size:1rem;outline:none
+}
+.kidsbags-root .search-input:focus{box-shadow:0 14px 40px rgba(0,0,0,.18)}
+.kidsbags-root .search-btn{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;color:#fff;
+  background:linear-gradient(135deg,var(--brand-4),var(--brand-2));
+  display:flex;align-items:center;justify-content:center
+}
+
+/* Main */
+.kidsbags-root .main-content{max-width:1280px;margin:0 auto;padding:2rem 1.5rem 2.4rem}
+.kidsbags-root .filter-wrap{display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.5rem}
+.kidsbags-root .filter-row{display:flex;flex-wrap:wrap;gap:.6rem;justify-content:center}
+.kidsbags-root .filter-btn{
+  padding:.65rem 1.2rem;background:#fff;border:2px solid #e2e8f0;border-radius:999px;
+  cursor:pointer;font-weight:700;color:var(--muted);transition:.25s
+}
+.kidsbags-root .filter-btn:hover{border-color:var(--brand-4);color:var(--brand-4);transform:translateY(-1px)}
+.kidsbags-root .filter-btn.active{
+  background:linear-gradient(135deg,var(--brand-2),var(--brand-4));color:#fff;border-color:transparent;
+  box-shadow:0 6px 18px rgba(37,99,235,.35)
+}
+.kidsbags-root .results-info{text-align:center;color:var(--muted)}
+
+.kidsbags-root .products-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.4rem
+}
+.kidsbags-root .product-card{
+  background:var(--card);border:1px solid #f1f5f9;border-radius:18px;overflow:hidden;
+  box-shadow:0 4px 18px rgba(0,0,0,.06);transform:translateY(18px);opacity:0;
+  animation:fadeInUp .6s ease forwards
+}
+.kidsbags-root .product-card:hover{transform:translateY(-6px);box-shadow:0 18px 48px rgba(0,0,0,.12)}
+@keyframes fadeInUp{to{opacity:1;transform:translateY(0)}}
+
+.kidsbags-root .product-media{position:relative;background:#fff;overflow:hidden;aspect-ratio:4/3}
+.kidsbags-root .product-media img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s}
+.kidsbags-root .product-card:hover .product-media img{transform:scale(1.06)}
+.kidsbags-root .badge{
+  position:absolute;top:12px;left:12px;padding:.35rem .6rem;border-radius:14px;font-size:.75rem;font-weight:800;
+  color:#fff;letter-spacing:.4px;background:linear-gradient(135deg,#ef4444,#dc2626)!important;
+  box-shadow:0 6px 16px rgba(239,68,68,.28);
+}
+
+.kidsbags-root .product-info{padding:1.05rem 1.1rem 1.15rem}
+.kidsbags-root .product-category{font-size:.78rem;font-weight:800;color:var(--brand-4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem}
+.kidsbags-root .product-title{font-size:1.16rem;font-weight:800;margin:.2rem 0 .45rem}
+.kidsbags-root .rating{display:flex;align-items:center;gap:.4rem;color:#f59e0b;margin-bottom:.55rem}
+.kidsbags-root .price-row{display:flex;align-items:center;gap:.7rem;margin:.3rem 0 .55rem}
+.kidsbags-root .price{font-size:1.18rem;font-weight:900}
+.kidsbags-root .desc{display:none !important}
+.kidsbags-root .actions{display:flex;gap:.55rem;margin-top:.15rem}
+.kidsbags-root .btn{border:none;border-radius:12px;cursor:pointer;font-weight:800;transition:.2s}
+.kidsbags-root .btn-primary{flex:1;padding:.8rem;background:linear-gradient(135deg,var(--brand-4),#1e40af);color:#fff}
+.kidsbags-root .btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(37,99,235,.35)}
+.kidsbags-root .btn-heart{width:48px;height:48px;background:#fff;border:2px solid #e2e8f0;color:#ef4444;font-size:1.1rem}
+.kidsbags-root .btn-heart:hover{transform:scale(1.05);background:#fff0f0;border-color:#fecaca}
+.kidsbags-root .btn-secondary{flex:1;padding:.8rem;background:#fff;border:2px solid #e2e8f0;color:var(--brand-4)}
+.kidsbags-root .btn-secondary:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(37,99,235,.15);border-color:var(--brand-4)}
+
+/* Modal */
+.kidsbags-root .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:2000;display:flex;align-items:center;justify-content:center}
+.kidsbags-root .modal-content{
+  background:#fff;border-radius:20px;padding:1.5rem;max-width:520px;width:92%;max-height:80vh;overflow:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.3)
+}
+.kidsbags-root .modal-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:.8rem;border-bottom:2px solid #f1f5f9;margin-bottom:.8rem}
+.kidsbags-root .close-btn{width:40px;height:40px;border-radius:50%;border:none;background:#f1f5f9;color:#0f172a;font-size:1.2rem;cursor:pointer}
+
+/* details modal layout */
+.kidsbags-root .detail-top{display:grid;grid-template-columns:120px 1fr;gap:1rem;align-items:start}
+.kidsbags-root .detail-top img{width:120px;height:120px;object-fit:cover;border-radius:14px;border:1px solid #e2e8f0}
+.kidsbags-root .detail-title{font-size:1.22rem;font-weight:900;margin-bottom:.2rem}
+.kidsbags-root .detail-sub{color:var(--muted);margin:.2rem 0 .6rem}
+.kidsbags-root .detail-tags{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 .2rem}
+.kidsbags-root .tag-chip{border:2px solid #e2e8f0;background:#fff;border-radius:999px;padding:.35rem .7rem;font-weight:800;font-size:.8rem;color:var(--brand-4);cursor:pointer}
+.kidsbags-root .tag-chip:hover{border-color:var(--brand-4)}
+.kidsbags-root .detail-specs{margin:.8rem 0 .2rem;padding-left:1.1rem}
+.kidsbags-root .detail-specs li{margin:.25rem 0}
+.kidsbags-root .detail-actions{display:flex;gap:.6rem;margin-top:.8rem}
+
+/* Toast (outside wrap; sticks to viewport) */
+.kidsbags-root .toast{
+  position:fixed;top:26px;right:24px;
+  background:linear-gradient(135deg,var(--brand-3),#0284c7);color:#fff;
+  padding:.85rem 1.1rem;border-radius:14px;box-shadow:0 10px 30px rgba(2,132,199,.3);
+  transform:translateX(420px);transition:transform .3s;z-index:3000;font-weight:800
+}
+.kidsbags-root .toast.show{transform:translateX(0)}
+
+@media (max-width:1024px){
+  .kidsbags-root .kb-wrap{margin:18px 14px 28px;border-radius:16px}
+  .kidsbags-root .kb-nav{padding:0.9rem 1.1rem}
+}
+@media (max-width:768px){
+  .kidsbags-root .hero h1{font-size:2.2rem}
+  .kidsbags-root .main-content{padding:1.4rem 1rem 1.8rem}
+  .kidsbags-root .products-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .kidsbags-root .detail-top{grid-template-columns:1fr}
+  .kidsbags-root .detail-top img{width:100%;height:180px}
+}
+
+/* Entrance aid */
+.kidsbags-mounted .product-card{opacity:1;transform:translateY(0)}

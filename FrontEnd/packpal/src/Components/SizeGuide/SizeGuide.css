@@ -1,0 +1,395 @@
+/* --- Page Wrap (namespaced) --- */
+.sizeguide-root .sg-wrap {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 24px;
+}
+
+.sizeguide-root .sg-card {
+  width: 100%;
+  max-width: 1280px;
+  background: transparent; /* content cards handle their own backgrounds */
+  border-radius: 20px;
+}
+
+/* --- Original styles (scoped under .sizeguide-root) --- */
+.sizeguide-root * { box-sizing: border-box; }
+
+.sizeguide-root body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+  line-height: 1.6;
+}
+
+.sizeguide-root .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+.sizeguide-root .sg-header {
+  text-align: center;
+  padding: 60px 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  margin-bottom: 40px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.sizeguide-root .sg-header h1 {
+  font-size: 3.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 20px;
+  animation: fadeInUp 1s ease-out;
+}
+
+.sizeguide-root .sg-header p {
+  font-size: 1.3rem;
+  color: #666;
+  max-width: 600px;
+  margin: 0 auto;
+  animation: fadeInUp 1s ease-out 0.2s both;
+}
+
+.sizeguide-root .size-guide-section {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 40px;
+  margin-bottom: 40px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  animation: fadeInUp 1s ease-out 0.4s both;
+}
+
+.sizeguide-root .section-title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 30px;
+  text-align: center;
+  position: relative;
+}
+
+.sizeguide-root .section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 4px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 2px;
+}
+
+.sizeguide-root .size-tabs {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 40px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sizeguide-root .tab-btn {
+  padding: 15px 30px;
+  background: transparent;
+  border: 2px solid #667eea;
+  border-radius: 50px;
+  color: #667eea;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1.1rem;
+}
+
+.sizeguide-root .tab-btn.active,
+.sizeguide-root .tab-btn:hover {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.sizeguide-root .size-content { display: none; animation: fadeIn 0.5s ease-out; }
+.sizeguide-root .size-content.active { display: block; }
+
+.sizeguide-root .size-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.sizeguide-root .size-card {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.sizeguide-root .size-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border-color: #667eea;
+}
+
+.sizeguide-root .bag-visual {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sizeguide-root .bag-shape {
+  width: 60%;
+  height: 70%;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.sizeguide-root .bag-shape::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 20%;
+  right: 20%;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+}
+
+.sizeguide-root .size-info h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.sizeguide-root .size-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.sizeguide-root .detail-item {
+  background: #f8f9fa;
+  padding: 10px 15px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sizeguide-root .detail-label { font-weight: 600; color: #555; }
+.sizeguide-root .detail-value { font-weight: 700; color: #667eea; }
+
+.sizeguide-root .capacity-info {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 15px;
+  border-radius: 10px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.sizeguide-root .measurement-tool {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  margin-top: 40px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.sizeguide-root .measurement-tool h3 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.sizeguide-root .measurement-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.sizeguide-root .input-group { position: relative; }
+
+.sizeguide-root .input-group label {
+  display: block;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.sizeguide-root .input-group input {
+  width: 100%;
+  padding: 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.sizeguide-root .input-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.sizeguide-root .calculate-btn {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+  padding: 18px 40px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.sizeguide-root .calculate-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+}
+
+.sizeguide-root .result-display {
+  margin-top: 30px;
+  padding: 25px;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  border-radius: 15px;
+  text-align: center;
+  color: white;
+  font-weight: 600;
+  font-size: 1.3rem;
+  display: none;
+  animation: slideIn 0.5s ease-out;
+}
+
+.sizeguide-root .comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 30px;
+  background: white;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.sizeguide-root .comparison-table th {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 20px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.sizeguide-root .comparison-table td {
+  padding: 15px 20px;
+  text-align: center;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sizeguide-root .comparison-table tr:hover { background: #f8f9fa; }
+
+.sizeguide-root .tips-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px;
+  margin-top: 40px;
+}
+
+.sizeguide-root .tip-card {
+  background: white;
+  padding: 25px;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.sizeguide-root .tip-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.sizeguide-root .tip-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.sizeguide-root .tip-card h4 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.sizeguide-root .tip-card p { color: #666; line-height: 1.6; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sizeguide-root .visual-guide {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  margin-top: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.sizeguide-root .measurement-diagram {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .sizeguide-root .sg-header h1 { font-size: 2.5rem; }
+  .sizeguide-root .size-grid { grid-template-columns: 1fr; }
+  .sizeguide-root .size-tabs { flex-direction: column; align-items: center; }
+  .sizeguide-root .tab-btn { width: 200px; }
+}
