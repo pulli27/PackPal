@@ -1,4 +1,3 @@
-// src/components/Finance/Finance.js
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./Finance.css";
@@ -19,7 +18,7 @@ const unpackList = (payload) =>
     ? payload
     : payload?.transactions ?? payload?.items ?? payload?.data ?? [];
 
-// NOTE: method removed; status added (default "pending")
+// normalize to view model (method removed, status added)
 const toTx = (row) => ({
   id: String(
     row?.id ??
@@ -38,7 +37,7 @@ const toTx = (row) => ({
   status: (row?.status ?? "pending").toLowerCase(), // "pending" | "paid" | "refund"
 });
 
-// CSV helpers
+/* ---------- CSV & Print helpers ---------- */
 const csvEscape = (v) => {
   if (v == null) return "";
   const s = String(v).replace(/"/g, '""');
@@ -79,6 +78,7 @@ const printHtml = (inner) => {
   w.document.close();
   w.print();
 };
+/* ----------------------------------------- */
 
 export default function FinancePage() {
   const [txs, setTxs] = useState([]);
@@ -140,7 +140,7 @@ export default function FinancePage() {
         unitPrice: r.unitPrice,
         discount: r.discountPerUnit,
         total: r.total,
-        status: r.status, // export status instead of method
+        status: r.status,
       })),
       ["txId", "date", "customer", "product", "qty", "unitPrice", "discount", "total", "status"]
     );
@@ -188,10 +188,9 @@ export default function FinancePage() {
     setSaving(true);
     setErr(""); setOk("");
     try {
-      // find the original row so we PUT full record with updated status only
+      // find original row so we PUT full record with updated status only
       const orig = txs.find((t) => t.id === editing.id);
       const payload = {
-        // keep original values to satisfy PUT APIs
         date: orig?.date,
         customer: orig?.customer,
         productName: orig?.productName,
@@ -199,7 +198,7 @@ export default function FinancePage() {
         unitPrice: Number(orig?.unitPrice || 0),
         discountPerUnit: Number(orig?.discountPerUnit || 0),
         total: Number(orig?.total || (Number(orig?.unitPrice || 0) * Number(orig?.qty || 1))),
-        status: editing.status, // only change
+        status: editing.status,
       };
       await axios.put(`${TX_URL}/${editing.id}`, payload, {
         headers: { "Content-Type": "application/json" },
@@ -229,115 +228,114 @@ export default function FinancePage() {
     }
   };
 
- return (
-  /* === PAGE WRAP START === */
-  <div className="page-wrap finance-page">
-    {/* Left: Sidebar */}
-    <Sidebarsa />
+  return (
+    /* === PAGE WRAP START === */
+    <div className="page-wrap finance-page">
+      {/* Left: Sidebar */}
+      <Sidebarsa />
 
-    {/* Right: Main */}
-    <main className="finance-main">
-      <h1 className="page-title">Finance</h1>
-      <p className="muted">Payments recorded from checkout.</p>
+      {/* Right: Main */}
+      <main className="finance-main">
+        <h1 className="page-title">Finance</h1>
+        <p className="muted">Payments recorded from checkout.</p>
 
-      {err && <div className="error" style={{ marginBottom: 12 }}>{err}</div>}
-      {ok && <div className="ok" style={{ marginBottom: 12 }}>{ok}</div>}
+        {err && <div className="error" style={{ marginBottom: 12 }}>{err}</div>}
+        {ok && <div className="ok" style={{ marginBottom: 12 }}>{ok}</div>}
 
-      <section className="section">
-        <div className="head">
-          <h3>Transactions</h3>
-          <div className="actions">
-            <input
-              placeholder="Search by TX ID / customer / product"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              style={{ minWidth: 260 }}
-            />
-            <button className="btn" onClick={fetchTx}>Refresh</button>
-            <button className="btn" onClick={doExport}>Export CSV</button>
-            <button className="btn" onClick={doPrint}>Print</button>
-          </div>
-        </div>
-
-        <div className="body">
-          {loading ? (
-            <div className="muted">Loading transactions…</div>
-          ) : rows.length === 0 ? (
-            <div className="muted">No transactions yet.</div>
-          ) : (
-            <div className="table-wrap">
-              <table className="tx-table">
-                <thead>
-                  <tr>
-                    <th>TX ID</th>
-                    <th>Date</th>
-                    <th>Customer</th>
-                    <th>Product</th>
-                    <th className="right">Qty</th>
-                    <th className="right">Unit</th>
-                    <th className="right">Discounts</th>{/* ← fixed label */}
-                    <th className="right">Total</th>
-                    <th>Status</th>
-                    <th className="center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.rid}>
-                      <td className="center">{r.displayId}</td>
-                      <td>{r.date}</td>
-                      <td>{r.customer}</td>
-                      <td>{r.productName}</td>
-                      <td className="right">{r.qty}</td>
-                      <td className="right">{money(r.unitPrice)}</td>
-                      <td className="right">
-                        {r.discountPerUnit ? money(r.discountPerUnit) : "—"}
-                      </td>
-                      <td className="right">{money(r.total)}</td>
-                      <td><span className={`pill ${r.status}`}>{r.status}</span></td>
-                      <td className="center">
-                        <button className="btn small warning" onClick={() => openEdit(r)}>✏️ Edit</button>
-                        <button className="btn small danger" onClick={() => deleteTx(r.rid)}>🗑 Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <section className="section">
+          <div className="head">
+            <h3>Transactions</h3>
+            <div className="actions">
+              <input
+                placeholder="Search by TX ID / customer / product"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                style={{ minWidth: 260 }}
+              />
+              <button className="btn" onClick={fetchTx}>Refresh</button>
+              <button className="btn" onClick={doExport}>Export CSV</button>
+              <button className="btn" onClick={doPrint}>Print</button>
             </div>
-          )}
-        </div>
-      </section>
+          </div>
 
-      {/* STATUS-ONLY EDIT MODAL */}
-      {editing && (
-        <div className="modal-backdrop" onClick={closeEdit} role="dialog" aria-modal="true">
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Update Status</h3>
-            <div className="modal-grid one-col">
-              <div>
-                <label>Status</label>
-                <select
-                  value={editing.status}
-                  onChange={(e) => setEditing({ ...editing, status: e.target.value })}
-                >
-                  <option value="pending">pending</option>
-                  <option value="paid">paid</option>
-                  <option value="refund">refund</option>
-                </select>
+          <div className="body">
+            {loading ? (
+              <div className="muted">Loading transactions…</div>
+            ) : rows.length === 0 ? (
+              <div className="muted">No transactions yet.</div>
+            ) : (
+              <div className="table-wrap">
+                <table className="tx-table">
+                  <thead>
+                    <tr>
+                      <th>TX ID</th>
+                      <th>Date</th>
+                      <th>Customer</th>
+                      <th>Product</th>
+                      <th className="right">Qty</th>
+                      <th className="right">Unit</th>
+                      <th className="right">Discounts</th>
+                      <th className="right">Total</th>
+                      <th>Status</th>
+                      <th className="center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.rid}>
+                        <td className="center">{r.displayId}</td>
+                        <td>{r.date}</td>
+                        <td>{r.customer}</td>
+                        <td>{r.productName}</td>
+                        <td className="right">{r.qty}</td>
+                        <td className="right">{money(r.unitPrice)}</td>
+                        <td className="right">
+                          {r.discountPerUnit ? money(r.discountPerUnit) : "—"}
+                        </td>
+                        <td className="right">{money(r.total)}</td>
+                        <td><span className={`pill ${r.status}`}>{r.status}</span></td>
+                        <td className="center">
+                          <button className="btn small warning" onClick={() => openEdit(r)}>✏️ Edit</button>
+                          <button className="btn small danger" onClick={() => deleteTx(r.rid)}>🗑 Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* STATUS-ONLY EDIT MODAL */}
+        {editing && (
+          <div className="modal-backdrop" onClick={closeEdit} role="dialog" aria-modal="true">
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h3>Update Status</h3>
+              <div className="modal-grid one-col">
+                <div>
+                  <label>Status</label>
+                  <select
+                    value={editing.status}
+                    onChange={(e) => setEditing({ ...editing, status: e.target.value })}
+                  >
+                    <option value="pending">pending</option>
+                    <option value="paid">paid</option>
+                    <option value="refund">refund</option>
+                  </select>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button className="btn" onClick={closeEdit} disabled={saving}>Cancel</button>
+                <button className="btn success" onClick={saveEdit} disabled={saving}>
+                  {saving ? "Saving…" : "Save"}
+                </button>
               </div>
             </div>
-            <div className="modal-actions">
-              <button className="btn" onClick={closeEdit} disabled={saving}>Cancel</button>
-              <button className="btn success" onClick={saveEdit} disabled={saving}>
-                {saving ? "Saving…" : "Save"}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
-    </main>
-  </div>
-  /* === PAGE WRAP END === */
-);
-
+        )}
+      </main>
+    </div>
+    /* === PAGE WRAP END === */
+  );
 }
