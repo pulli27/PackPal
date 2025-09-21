@@ -1,4 +1,14 @@
-/* ===== Scope everything to this page ===== */
+/* EPF.css */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; }
+
+/* Use the same width var defined in Sidebar.css */
+:root { --sidebar-w: 280px; }
+
+/* ===== EPF page ===== */
 .epf, .epf * { box-sizing: border-box; }
 
 /* Root default font */
@@ -6,19 +16,26 @@
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
 }
 
-/* Align page with sidebar — keep this close so the table hugs the sidebar */
+/* ---- Page container aligned to the fixed sidebar ---- */
 .epf .container{
-  max-width: 1480px;
-  margin: 0 auto;
+  width: calc(100% - var(--sidebar-w));
+  max-width: 1440px;
+  margin: 0 16px 0 var(--sidebar-w);   /* sit next to the 280px sidebar */
   background: rgba(255,255,255,.95);
   backdrop-filter: blur(10px);
   border-radius: 20px;
-  padding: 30px;
+  padding: 24px 24px 24px 8px;         /* small left padding = table closer */
   box-shadow: 0 20px 40px rgba(0,0,0,.1);
-  margin-left: 260px;               /* ↓ a bit closer to the sidebar */
+  overflow: hidden;
 }
-@media (max-width: 768px){
-  .epf .container{ margin-left: 0; padding: 20px; }
+
+/* Small screens: stack full width */
+@media (max-width: 1024px){
+  .epf .container{
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+  }
 }
 
 /* ---- Header ---- */
@@ -69,30 +86,36 @@
 .epf .stat-details{ display:flex; justify-content:space-between; align-items:center; }
 .epf .positive{ color:#10b981 } .epf .negative{ color:#ef4444 } .epf .neutral{ color:#6b7280 }
 
-/* ---- Main content (LEFT: form+table, RIGHT: quick actions) ---- */
+/* ============================================================
+   MAIN LAYOUT: left stack (button + table) and right sidebar
+   ============================================================ */
 .epf .main-content{
-  display:grid;
-  grid-template-columns: minmax(0, 1fr) 340px;  /* left = table, right = quick actions */
-  column-gap: 14px;                             /* small gap so it sits close to sidebar */
-  align-items: start;
+  position: relative;
+  display: block;
+  padding-right: 360px;   /* reserve for right pinned column (340 + gap) */
   margin-bottom: 28px;
-  grid-auto-flow: row;                          /* place items top→bottom */
-}
-@media (max-width:1024px){
-  .epf .main-content{ grid-template-columns: 1fr; }
 }
 
-/* Force placement: form + table in LEFT column, quick actions in RIGHT column */
-.epf .new-payment-card,
-.epf .contributions-table { grid-column: 1 / 2; margin-left: -300px;}
-.epf .sidebar-content      { grid-column: 2 / 3; }
+/* Right pinned column */
+.epf .sidebar-content{
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 340px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.epf .sidebar-content > *{
+  position: sticky;
+  top: 18px;
+}
 
-/* ---------- Collapsible New Payment ---------- */
-.epf .new-payment-card{ margin-bottom:14px; }
+/* New payment block */
+.epf .new-payment-card{ margin-bottom:12px; margin-left: 290px; }
 .epf .new-payment-card.collapsed{ background: transparent; box-shadow: none; padding: 0; }
 .epf .npc-collapsed{ display:flex; justify-content:flex-start; }
 .epf .npc-cta{ padding: 10px 14px; border-radius: 10px; font-weight: 700; }
-
 .epf .new-payment-card.open{
   background:#fff; border-radius:16px; padding:16px 18px;
   box-shadow:0 8px 24px rgba(0,0,0,.08);
@@ -116,11 +139,12 @@
 .epf .npc-preview .ok{ color:#059669; }
 .epf .npc-actions{ margin-top:12px; display:flex; gap:10px; justify-content:flex-end; }
 
-/* ---- Contribution table card (LEFT column) ---- */
+/* ---- Contribution table (hugging the left) ---- */
 .epf .contributions-table{
   background:#fff; border-radius:16px; overflow:hidden;
   box-shadow:0 8px 24px rgba(0,0,0,.08);
-  margin-bottom: 300px;
+  width: 150%;
+  margin-left: -300px;
 }
 .epf .table-header{
   background:linear-gradient(135deg,#667eea,#764ba2);
@@ -155,15 +179,11 @@
 .epf .btn-view{ background:linear-gradient(135deg,#3b82f6,#2563eb); }
 .epf .btn-secondary{ background:linear-gradient(135deg,#f3f4f6,#e5e7eb); color:#374151; }
 
-/* ---- Quick Actions (RIGHT column) ---- */
-.epf .sidebar-content{
-  display:flex; flex-direction:column; gap:16px;
-  position: sticky; top: 18px;
-  align-self: start;
-}
+/* Right pinned actions */
 .epf .quick-actions{
   background:#fff; border-radius:16px; padding:18px;
   box-shadow:0 8px 24px rgba(0,0,0,.08);
+  margin-top: 60px;
 }
 .epf .quick-actions h3{
   font-size:18px; font-weight:700; color:#111; margin:0 0 12px;
@@ -176,3 +196,13 @@
 }
 .epf .action-btn-primary{ background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; }
 .epf .action-btn-secondary{ background:linear-gradient(135deg,#f3f4f6,#e5e7eb); color:#374151; }
+
+/* Responsive: stack sidebar below on small screens */
+@media (max-width: 1024px){
+  .epf .main-content{ padding-right: 0; }
+  .epf .sidebar-content{
+    position: static;
+    width: 100%;
+    gap: 16px;
+  }
+}

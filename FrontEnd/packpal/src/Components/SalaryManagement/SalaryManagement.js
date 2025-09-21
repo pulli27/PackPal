@@ -16,7 +16,12 @@ function numberToWords(num) {
     n < 100 ? tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "") :
     ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + chunk(n % 100) : "");
   let out = "", scales = [["Billion",1e9],["Million",1e6],["Thousand",1e3]];
-  for (const [name, val] of scales) { if (num >= val) { out += `${chunk(Math.floor(num / val))} ${name} `; num %= val; } }
+  for (const [name, val] of scales) {
+    if (num >= val) {
+      out += `${chunk(Math.floor(num / val))} ${name} `;
+      num %= val;
+    }
+  }
   if (num > 0) out += chunk(num);
   return out.trim();
 }
@@ -68,8 +73,7 @@ export default function SalaryManagement() {
     try {
       const blob = new Blob([html], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");  // no document.write
-      // revoke later (allow tab to load)
+      window.open(url, "_blank", "noopener,noreferrer");
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (e) {
       console.error("openSlip failed", e);
@@ -91,6 +95,10 @@ export default function SalaryManagement() {
     const periodLong  = now.toLocaleString("en-US", { month: "long", year: "numeric" });
     const amountWords = numberToWords(n.netPayable);
 
+    // Use an absolute URL to the logo so it loads from a Blob URL context
+    const origin = window.location.origin;
+    const logoUrl = `${origin}/new logo.png`; // place your file in /public/new logo.png
+
     const slipHTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Salary Slip - ${emp.name}</title>
 <style>
@@ -98,8 +106,11 @@ export default function SalaryManagement() {
  *{box-sizing:border-box}
  body{font-family:"Segoe UI",Arial,Helvetica,sans-serif;background:#fff;color:var(--ink);margin:0;padding:24px}
  .wrap{max-width:930px;margin:0 auto;background:var(--bg);border:1px solid var(--grid)}
- .company{font-size:28px;font-weight:800;text-align:center;margin:8px 0 0}
- .addr{font-size:14px;text-align:center;color:var(--muted);margin:2px 0 10px}
+ /* Header with logo + name */
+ .brandbar{display:flex; align-items:center; gap:14px; padding:14px 14px 6px 14px;}
+ .brandbar .logo{width:120px;height:120px;object-fit:contain;filter:drop-shadow(0 1px 3px rgba(0,0,0,.15))}
+ .company{font-size:28px;font-weight:800;margin:0;line-height:1;margin-left:500px;}
+ .addr{font-size:14px;color:var(--muted);margin:2px 0 10px 500px}
  .titlebar{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:6px 10px;font-weight:800}
  .titlebar .left{font-size:16px}.titlebar .right{font-size:14px}
  .bar{font-weight:800;border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:6px 10px;background:#f6f8ff}
@@ -132,8 +143,13 @@ export default function SalaryManagement() {
 </div>
 
 <div id="slip" class="wrap">
-  <div class="company">BagCorp (Pvt) Ltd</div>
-  <div class="addr">123 Leather Lane, Colombo 01 • +94 11 222 3344 • info@bagcorp.lk</div>
+  <div class="brandbar">
+    <img class="logo" src="${logoUrl}" alt="PackPal logo" onerror="this.style.display='none'">
+    <div>
+      <h1 class="company">PackPal (Pvt) Ltd</h1>
+      <div class="addr">No. 42, Elm Street, Colombo • +94 11 234 5678 • hello@packpal.lk</div>
+    </div>
+  </div>
 
   <div class="titlebar"><div class="left">Salary Slip For the month of</div><div class="right">${periodShort}</div></div>
 

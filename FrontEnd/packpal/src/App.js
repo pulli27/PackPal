@@ -1,8 +1,10 @@
 // src/App.js
+// src/App.js
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 
+/* pulli */
 /* pulli */
 import InventoryDashboard from "./Components/Dashboard/InventoryDashboard";
 import ItemInventory from "./Components/ItemInventory/ItemInventory";
@@ -12,6 +14,7 @@ import ProductInventory from "./Components/ProductInventory/ProductInventory";
 import Report from "./Components/Report/Report";
 import Settingspul from "./Components/Settings/Settingspul";
 
+/* sasangi */
 /* sasangi */
 import CartDashboard from "./Components/Dashboard/CartDashboard";
 import ProductList from "./Components/Product/ProductList";
@@ -23,13 +26,16 @@ import CustomerView from "./pages/CustomerView";
 import Cart from "./pages/Cart";
 
 /* isumi */
+/* isumi */
 import Udashboard from "./Components/Dashboard/Udashboard";
 import Login from "./Components/Login/Login";
 import UserManagement from "./Components/UserManagement/UserManagement";
 import Createaccount from "./Components/CreateAccount/Createaccount";
 import Orders from "./Components/Orders/Order";
 import Settingsis from "./Components/Settings/Settingsis";
+import Settingsis from "./Components/Settings/Settingsis";
 
+/* sanu */
 /* sanu */
 import FinanceDashboard from "./Components/Dashboard/FinanceDashboard";
 import SalaryCal from "./Components/SalaryCal/SalaryCal";
@@ -89,7 +95,7 @@ function NotFound() {
     <div style={{ padding: 24 }}>
       <h2>404 – Page not found</h2>
       <p>Route didn’t match.</p>
-      <a href="/maindashboard">Go to Dashboard</a>
+      <a href="/home">Go to Home</a>
     </div>
   );
 }

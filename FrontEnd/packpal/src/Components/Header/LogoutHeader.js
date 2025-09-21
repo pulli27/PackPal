@@ -1,4 +1,3 @@
-// src/Components/Header/Header.js
 import React from "react";
 import {
   FaHome, FaLayerGroup, FaPuzzlePiece, FaTags, FaGift,
@@ -6,7 +5,7 @@ import {
 } from "react-icons/fa";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import "./Header.css";
-import { useAuth } from "../../auth/AuthContext"; // << add
+import { useAuth } from "../../auth/AuthContext"; // <-- add
 
 export default function Header({
   cartCount = 0,
@@ -14,7 +13,7 @@ export default function Header({
   onDropdown = () => {},
 }) {
   const navigate = useNavigate();
-  const { isAuthed, user, logout } = useAuth(); // << read auth
+  const { isAuthed, user, logout } = useAuth(); // <-- read auth
 
   return (
     <div className="ppx-header">
@@ -31,12 +30,17 @@ export default function Header({
             <nav className="nav" aria-label="Primary">
               <ul className="nav-list">
                 <li className="nav-item">
-                  <NavLink to="/home" className="nav-link"><FaHome /> Home</NavLink>
+                  <NavLink to="/home" className="nav-link">
+                    <FaHome /> Home
+                  </NavLink>
                 </li>
+
                 <li className="nav-item">
                   <NavLink to="/collection" className="nav-link">
-                    <FaLayerGroup /> Collection <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
+                    <FaLayerGroup /> Collection{" "}
+                    <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
                   </NavLink>
+
                   <div className="dropdown" role="menu" aria-label="Collections">
                     <NavLink to="/kidsbag" className="dropdown-item" onClick={() => onDropdown("Kids Bag")}>
                       <div className="dropdown-title">Kids Bag</div>
@@ -56,9 +60,22 @@ export default function Header({
                     </NavLink>
                   </div>
                 </li>
-                <li className="nav-item"><NavLink to="/accessories" className="nav-link"><FaPuzzlePiece /> Accessories</NavLink></li>
-                <li className="nav-item"><NavLink to="/sale" className="nav-link"><FaTags /> Sales</NavLink></li>
-                <li className="nav-item"><NavLink to="/aboutpage" className="nav-link"><FaGift /> About Us</NavLink></li>
+
+                <li className="nav-item">
+                  <NavLink to="/accessories" className="nav-link">
+                    <FaPuzzlePiece /> Accessories
+                  </NavLink>
+                </li>
+                <li className="nav-item">
+                  <NavLink to="/sale" className="nav-link">
+                    <FaTags /> Sales
+                  </NavLink>
+                </li>
+                <li className="nav-item">
+                  <NavLink to="/aboutpage" className="nav-link">
+                    <FaGift /> About Us
+                  </NavLink>
+                </li>
               </ul>
             </nav>
 
@@ -75,7 +92,7 @@ export default function Header({
                 </>
               ) : (
                 <>
-                  {/* optional user chip */}
+                  {/* Optional user chip */}
                   <div className="user-chip">
                     <span className="user-dot" />
                     {user?.name || user?.email || "Logged in"}
@@ -89,9 +106,10 @@ export default function Header({
                   </button>
                 </>
               )}
+
               <button className="cart-btn" onClick={onCartClick} aria-label="Open cart">
                 <FaShoppingCart />
-                <div className="cart-badge" aria-live="polite">{cartCount}</div>
+                <div className="cart-badge" id="cartBadge" aria-live="polite">{cartCount}</div>
               </button>
             </div>
           </div>
