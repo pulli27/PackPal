@@ -69,14 +69,7 @@ export default function Header({
                   <div className="dropdown-desc">Fun and colorful bags for children</div>
                 </NavLink>
 
-                <NavLink
-                  to="/school-laptop"
-                  className="dropdown-item"
-                  onClick={() => onDropdown("School Bag/Laptop Bag")}
-                >
-                  <div className="dropdown-title">School Bag/Laptop Bag</div>
-                  <div className="dropdown-desc">Durable bags for students and professionals</div>
-                </NavLink>
+                
 
                 <NavLink
                   to="/totebag"
