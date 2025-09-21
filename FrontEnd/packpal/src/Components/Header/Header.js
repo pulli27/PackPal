@@ -34,7 +34,7 @@ export default function Header({
                   <NavLink to="/home" className="nav-link"><FaHome /> Home</NavLink>
                 </li>
                 <li className="nav-item">
-                  <NavLink to="/collection" className="nav-link">
+                  <NavLink to="" className="nav-link">
                     <FaLayerGroup /> Collection <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
                   </NavLink>
                   <div className="dropdown" role="menu" aria-label="Collections">
