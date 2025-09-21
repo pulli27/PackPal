@@ -30,7 +30,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   // 👉 routes
-  const DEFAULT_ROUTE = "/usermanagement";
+  const DEFAULT_ROUTE = "/home"; // ⬅️ unknown/new users go here
   const USER_ROUTES = {
     "pulmi.vihansa@packpal.com": { password: "Pulmi@1234", route: "/maindashboard" },
     "sanugi.silva@packpal.com":  { password: "Sanugi@1234", route: "/sanudashboard" },
@@ -97,7 +97,7 @@ export default function Login() {
         return;
       }
 
-      // otherwise: mock success to default route if both filled (and already validated)
+      // otherwise: mock success -> go to /home (DEFAULT_ROUTE)
       setStatus("success");
       setTimeout(() => navigate(DEFAULT_ROUTE), 600);
     }, 600);
@@ -194,6 +194,7 @@ export default function Login() {
 
   return (
     <div className="login">
+      
       <div className="login-page">
         {/* background anim */}
         <div className="bg-animation">

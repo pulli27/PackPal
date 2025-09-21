@@ -80,9 +80,9 @@ export default function Home() {
 
   return (
     <div className="pph">
+      <Header />
       <div className="home-page">
-        <Header/>
-
+       
         {/* MAIN */}
         <main className="main">
           {/* HERO with background video */}
@@ -354,7 +354,7 @@ export default function Home() {
         {/* Toast */}
         {notice && <div className="notification">{notice}</div>}
       </div>
-      <Footer/>
+      <Footer />
     </div>
   );
 }
