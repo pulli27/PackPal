@@ -1,5 +1,5 @@
 /* Root wrapper to avoid any leakage to other pages */
-.settingsanu { /* optional page-level styling if needed */ }
+
 
 /* Scope everything to Settings page only */
 .settingsanu .settings-main,

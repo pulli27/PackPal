@@ -59,17 +59,17 @@ export default function Advance() {
     loadAdvances();
   }, []);
 
-  const empIndex = useMemo(() => {
-    const m = new Map();
-    for (const e of employees) m.set(e.EmpId, e);
-    return m;
-  }, [employees]);
+ // const empIndex = useMemo(() => {
+   // const m = new Map();
+    //for (const e of employees) m.set(e.EmpId, e);
+    //return m;
+  //}, [employees]);
 
   // compute & create (server does the calc+insert)
   async function addCalculatedRow() {
     if (!selectedEmpId) return toast("Select an employee first", "warning");
     try {
-      const { data } = await api.post("/advance/compute", { empId: selectedEmpId });
+     // const { data } = await api.post("/advance/compute", { empId: selectedEmpId });
       // Optionally append optimistically:
       // setRows(prev => [...prev, { ...map data ... }]);
       // But then immediately normalize with a reload:

@@ -41,8 +41,8 @@ function Revenue() {
   const productRef = useRef(null);
   const dateFromRef = useRef(null);
   const dateToRef   = useRef(null);
-  const deptRef     = useRef(null);
-  const channelRef  = useRef(null);
+  //const deptRef     = useRef(null);
+  //const channelRef  = useRef(null);
   const chartsRef   = useRef({});
 
   /* ---------- Toast helper ---------- */
@@ -284,11 +284,11 @@ function Revenue() {
   }, [revLine, catBars, baseOptions]);
 
   /* ---------- Filters (UI only unless you wire server params) ---------- */
-  const applyFilters = async () => {
-    const start = dateFromRef.current?.value || "";
-    const end   = dateToRef.current?.value || "";
-    notify(`Filters applied: ${start || "—"} → ${end || "—"} (Category/Channel not wired)`, "info");
-  };
+  //const applyFilters = async () => {
+    //const start = dateFromRef.current?.value || "";
+    //const end   = dateToRef.current?.value || "";
+    //notify(`Filters applied: ${start || "—"} → ${end || "—"} (Category/Channel not wired)`, "info");
+  //};
 
   /* ---------- Actions: View / Invoice / PDF ---------- */
   const viewOrder = (tx) => setSelectedTx(tx);

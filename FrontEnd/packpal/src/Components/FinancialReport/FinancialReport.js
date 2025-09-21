@@ -762,12 +762,12 @@ body{background:#f6f7fb;margin:0;padding:24px;font-family:-apple-system,BlinkMac
     toast("Report ready.", "success");
   };
 
-  const onLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
-      toast("Logging out...", "info");
-      setTimeout(() => { alert("You have been logged out successfully!"); }, 600);
-    }
-  };
+  //const onLogout = () => {
+   // if (window.confirm("Are you sure you want to logout?")) {
+    //  toast("Logging out...", "info");
+    //  setTimeout(() => { alert("You have been logged out successfully!"); }, 600);
+    //}
+  //};
 
   /* ---------- Quick Cards ---------- */
   const quickCards = useMemo(() => ([

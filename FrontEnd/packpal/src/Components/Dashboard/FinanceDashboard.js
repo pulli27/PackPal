@@ -81,7 +81,7 @@ export default function FinanceDashboard() {
     loading: true,
   });
 
-  const lastUpdated = useMemo(() => new Date().toLocaleDateString(), []);
+  //const lastUpdated = useMemo(() => new Date().toLocaleDateString(), []);
 
   // Net Profit derived (Revenue - Expenses)
   const netProfit = useMemo(() => {
