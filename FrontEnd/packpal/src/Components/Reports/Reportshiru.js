@@ -1,23 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import "./Reports.css";
-import Sidebar from "../Sidebar/Sidebar";
+import "./Reportshiru.css";
+import Sidebarhiru from "../Sidebar/Sidebarhiru";
 
 export default function Reports() {
   // ---------- Sample data (replace with API) ----------
   const products = useMemo(
     () => [
-      { product: "Leather Tote",   category:"Bag", manager:"Aisha", completed:"2025-08-10", status:"Active", quality:"Passed", inventory:"Ready" },
-      { product: "Canvas Backpack",category:"Bag", manager:"John",  completed:"2025-08-12", status:"Active", quality:"Failed", inventory:"Not Ready" },
-      { product: "Travel Duffel",  category:"Bag", manager:"Maria", completed:"2025-08-15", status:"Active", quality:"Passed", inventory:"Ready" },
+      { product: "Leather Tote",   category:"Bag", manager:"Aisha", completed:"2025-08-10", status:"Active", quality:"Passed",         inventory:"Ready" },
+      { product: "Canvas Backpack",category:"Bag", manager:"John",  completed:"2025-08-12", status:"Active", quality:"Failed",         inventory:"Not Ready" },
+      { product: "Travel Duffel",  category:"Bag", manager:"Maria", completed:"2025-08-15", status:"Active", quality:"Passed",         inventory:"Ready" },
       { product: "Wallet",         category:"Small Goods", manager:"Anna",  completed:"2025-08-18", status:"Active", quality:"Pending Review", inventory:"Not Ready" },
-      { product: "Crossbody Purse",category:"Bag", manager:"Lisa",  completed:"2025-08-19", status:"Active", quality:"Passed", inventory:"Ready" },
-      { product: "Evening Clutch", category:"Small Goods", manager:"Sarah", completed:"2025-08-20", status:"Active", quality:"Passed", inventory:"Ready" },
-      { product: "Laptop Sleeve",  category:"Accessories", manager:"Mike",  completed:"2025-08-21", status:"Active", quality:"Failed", inventory:"Not Ready" },
-      { product: "Belt",           category:"Accessories", manager:"Aisha", completed:"2025-08-22", status:"Active", quality:"Passed", inventory:"Ready" },
+      { product: "Crossbody Purse",category:"Bag", manager:"Lisa",  completed:"2025-08-19", status:"Active", quality:"Passed",         inventory:"Ready" },
+      { product: "Evening Clutch", category:"Small Goods", manager:"Sarah", completed:"2025-08-20", status:"Active", quality:"Passed",  inventory:"Ready" },
+      { product: "Laptop Sleeve",  category:"Accessories", manager:"Mike",  completed:"2025-08-21", status:"Active", quality:"Failed",  inventory:"Not Ready" },
+      { product: "Belt",           category:"Accessories", manager:"Aisha", completed:"2025-08-22", status:"Active", quality:"Passed",  inventory:"Ready" },
       { product: "Key Holder",     category:"Accessories", manager:"Anna",  completed:"2025-08-23", status:"Active", quality:"Pending Review", inventory:"Not Ready" },
-      { product: "Messenger Bag",  category:"Bag", manager:"John",  completed:"2025-08-24", status:"Active", quality:"Failed", inventory:"Not Ready" },
-      { product: "Camera Strap",   category:"Accessories", manager:"Lisa",  completed:"2025-08-25", status:"Active", quality:"Passed", inventory:"Ready" },
-      { product: "Weekender",      category:"Bag", manager:"Mike",  completed:"2025-08-26", status:"Active", quality:"Failed", inventory:"Not Ready" },
+      { product: "Messenger Bag",  category:"Bag", manager:"John",  completed:"2025-08-24", status:"Active", quality:"Failed",         inventory:"Not Ready" },
+      { product: "Camera Strap",   category:"Accessories", manager:"Lisa",  completed:"2025-08-25", status:"Active", quality:"Passed",  inventory:"Ready" },
+      { product: "Weekender",      category:"Bag", manager:"Mike",  completed:"2025-08-26", status:"Active", quality:"Failed",         inventory:"Not Ready" },
     ],
     []
   );
@@ -137,119 +137,122 @@ export default function Reports() {
   const exportPDF = () => window.print();
 
   return (
-    <div>
-      <Sidebar/>
-      <header className="topbar">
-        <h1 className="page-title">Reports</h1>
-        <div className="topbar-actions">
-          <button className="btn btn-primary" onClick={exportCSV}>
-            <span className="icon">📄</span> Generate Report
-          </button>
-          <button className="avatar" title="Profile">👤</button>
-        </div>
-      </header>
+    <div className="rpt">
+      <Sidebarhiru/>
 
-      <main className="container" id="reportContent">
-        {/* Filters */}
-        <section className="filters card">
-          <label><span>Start date</span><input type="date" value={startDate} onChange={(e)=>setStartDate(e.target.value)} /></label>
-          <label><span>End date</span><input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} /></label>
-          <label>
-            <span>Quality</span>
-            <select value={quality} onChange={(e)=>setQuality(e.target.value)}>
-              <option>All</option><option>Passed</option><option>Failed</option><option>Pending Review</option>
-            </select>
-          </label>
-          <label>
-            <span>Inventory</span>
-            <select value={inventory} onChange={(e)=>setInventory(e.target.value)}>
-              <option>All</option><option>Ready</option><option>Not Ready</option>
-            </select>
-          </label>
-        </section>
+      <div className="page">
+        <header className="topbar">
+          <h1 className="page-title">Reports</h1>
+          <div className="topbar-actions">
+            <button className="btn btn-primary" onClick={exportCSV}>
+              <span className="icon">📄</span> Generate Report
+            </button>
+            <button className="avatar" title="Profile">👤</button>
+          </div>
+        </header>
 
-        {/* KPIs */}
-        <section className="kpis">
-          <article className="kpi card"><p className="muted">Total Products</p><p className="kpi-value">{total}</p></article>
-          <article className="kpi card"><p className="muted">Active</p><p className="kpi-value">{active}</p></article>
-          <article className="kpi card"><p className="muted">Inventory Ready</p><p className="kpi-value">{ready}</p></article>
-          <article className="kpi card"><p className="muted">Pass Rate</p><p className="kpi-value">{passRate}%</p></article>
-        </section>
+        <main className="container" id="reportContent">
+          {/* Filters */}
+          <section className="filters card">
+            <label><span>Start date</span><input type="date" value={startDate} onChange={(e)=>setStartDate(e.target.value)} /></label>
+            <label><span>End date</span><input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} /></label>
+            <label>
+              <span>Quality</span>
+              <select value={quality} onChange={(e)=>setQuality(e.target.value)}>
+                <option>All</option><option>Passed</option><option>Failed</option><option>Pending Review</option>
+              </select>
+            </label>
+            <label>
+              <span>Inventory</span>
+              <select value={inventory} onChange={(e)=>setInventory(e.target.value)}>
+                <option>All</option><option>Ready</option><option>Not Ready</option>
+              </select>
+            </label>
+          </section>
 
-        {/* Charts */}
-        <section className="charts">
-          <article className="card">
-            <header className="card-header"><h3>Quality Outcomes</h3></header>
-            <div className="bar-wrap">
-              <canvas
-                ref={barRef}
-                width="560"
-                height="200"
-                aria-label="Quality chart"
-                onMouseMove={onBarMove}
-                onMouseLeave={onBarLeave}
-              />
-              {tip.show && (
-                <div className="chart-tooltip" style={{ left: tip.x, top: tip.y }}>
-                  <div className="tip-title">{tip.label}</div>
-                  <div><strong>{tip.value}</strong> items</div>
-                  <div className="muted">{tip.percent}% of total</div>
-                </div>
-              )}
-            </div>
-          </article>
+          {/* KPIs */}
+          <section className="kpis">
+            <article className="kpi card"><p className="muted">Total Products</p><p className="kpi-value">{total}</p></article>
+            <article className="kpi card"><p className="muted">Active</p><p className="kpi-value">{active}</p></article>
+            <article className="kpi card"><p className="muted">Inventory Ready</p><p className="kpi-value">{ready}</p></article>
+            <article className="kpi card"><p className="muted">Pass Rate</p><p className="kpi-value">{passRate}%</p></article>
+          </section>
 
-          <article className="card">
-            <header className="card-header"><h3>Inventory Readiness</h3></header>
-            <div className="donut-wrap">
-              <div className="donut-canvas">
+          {/* Charts */}
+          <section className="charts">
+            <article className="card">
+              <header className="card-header"><h3>Quality Outcomes</h3></header>
+              <div className="bar-wrap">
                 <canvas
-                  ref={donutRef}
-                  width="200"
+                  ref={barRef}
+                  width="560"
                   height="200"
-                  aria-label="Inventory donut"
-                  onMouseMove={onDonutMove}
-                  onMouseLeave={onDonutLeave}
+                  aria-label="Quality chart"
+                  onMouseMove={onBarMove}
+                  onMouseLeave={onBarLeave}
                 />
-                {dtip.show && (
-                  <div className="chart-tooltip" style={{ left: dtip.x, top: dtip.y }}>
-                    <div className="tip-title">{dtip.label}</div>
-                    <div><strong>{dtip.value}</strong> items</div>
-                    <div className="muted">{dtip.percent}% of total</div>
+                {tip.show && (
+                  <div className="chart-tooltip" style={{ left: tip.x, top: tip.y }}>
+                    <div className="tip-title">{tip.label}</div>
+                    <div><strong>{tip.value}</strong> items</div>
+                    <div className="muted">{tip.percent}% of total</div>
                   </div>
                 )}
               </div>
-              <div className="legend">
-                <div><span className="dot dot-ready"></span> Ready</div>
-                <div><span className="dot dot-not"></span> Not Ready</div>
-              </div>
-            </div>
-          </article>
-        </section>
+            </article>
 
-        {/* Table */}
-        <section className="card table-card">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>PRODUCT</th><th>CATEGORY</th><th>MANAGER</th><th>COMPLETED</th>
-                  <th>STATUS</th><th>QUALITY</th><th>INVENTORY</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((r, i) => (
-                  <tr key={`${r.product}-${i}`}>
-                    <td>{r.product}</td><td>{r.category}</td><td>{r.manager}</td><td>{r.completed}</td><td>{r.status}</td>
-                    <td><span className={`badge ${r.quality==="Passed"?"green":r.quality==="Failed"?"red":"amber"}`}>{r.quality}</span></td>
-                    <td><span className={`badge ${r.inventory==="Ready"?"ready":"not"}`}>{r.inventory}</span></td>
+            <article className="card">
+              <header className="card-header"><h3>Inventory Readiness</h3></header>
+              <div className="donut-wrap">
+                <div className="donut-canvas">
+                  <canvas
+                    ref={donutRef}
+                    width="200"
+                    height="200"
+                    aria-label="Inventory donut"
+                    onMouseMove={onDonutMove}
+                    onMouseLeave={onDonutLeave}
+                  />
+                  {dtip.show && (
+                    <div className="chart-tooltip" style={{ left: dtip.x, top: dtip.y }}>
+                      <div className="tip-title">{dtip.label}</div>
+                      <div><strong>{dtip.value}</strong> items</div>
+                      <div className="muted">{dtip.percent}% of total</div>
+                    </div>
+                  )}
+                </div>
+                <div className="legend">
+                  <div><span className="dot dot-ready"></span> Ready</div>
+                  <div><span className="dot dot-not"></span> Not Ready</div>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          {/* Table */}
+          <section className="card table-card">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>PRODUCT</th><th>CATEGORY</th><th>MANAGER</th><th>COMPLETED</th>
+                    <th>STATUS</th><th>QUALITY</th><th>INVENTORY</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </main>
+                </thead>
+                <tbody>
+                  {filteredRows.map((r, i) => (
+                    <tr key={`${r.product}-${i}`}>
+                      <td>{r.product}</td><td>{r.category}</td><td>{r.manager}</td><td>{r.completed}</td><td>{r.status}</td>
+                      <td><span className={`badge ${r.quality==="Passed"?"green":r.quality==="Failed"?"red":"amber"}`}>{r.quality}</span></td>
+                      <td><span className={`badge ${r.inventory==="Ready"?"ready":"not"}`}>{r.inventory}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
   );
 }
@@ -346,7 +349,7 @@ function drawDonutChart(canvas, rows){
 
   // nothing to draw
   if (total === 0) {
-    // draw a faint ring background
+    // faint ring background
     ctx.beginPath();
     ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
     ctx.arc(cx, cy, rInner, Math.PI * 2, 0, true);
@@ -357,8 +360,8 @@ function drawDonutChart(canvas, rows){
   }
 
   const segs = [
-    { label: "Ready",     value: ready,    color: "#3b264eff" }, // green
-    { label: "Not Ready", value: notReady, color: "#3c3a9aff" }, // red
+    { label: "Ready",     value: ready,    color: "#6d8bff" },
+    { label: "Not Ready", value: notReady, color: "#cbd5ff" },
   ];
 
   // draw segments
@@ -381,7 +384,7 @@ function drawDonutChart(canvas, rows){
     start = end;
   });
 
-  // optional center text (small, subtle)
+  // center text
   ctx.fillStyle = "#374151";
   ctx.font = "14px system-ui, Segoe UI, sans-serif";
   ctx.textAlign = "center";
@@ -390,4 +393,3 @@ function drawDonutChart(canvas, rows){
 
   return { segments, cx, cy, rInner, rOuter, total };
 }
-

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import "./Pdashboard.css";
-import Sidebar from "../Sidebar/Sidebar";
-import { api } from "../../lib/api"; // your shared axios instance
+import Sidebarhiru from "../Sidebar/Sidebarhiru";
+import { api } from "../../lib/api2"; // your shared axios instance
 
 const uid = () =>
   (typeof crypto !== "undefined" && crypto.randomUUID)
@@ -182,7 +182,7 @@ export default function Pdashboard() {
   if (loading) {
     return (
       <div className="pd">
-        <Sidebar />
+        <Sidebarhiru />
         <main className="container">Loading…</main>
       </div>
     );
@@ -190,7 +190,7 @@ export default function Pdashboard() {
 
   return (
     <div className="pd">
-      <Sidebar />
+      <Sidebarhiru />
 
       <header className="topbar">
         <h1 className="title">Dashboard</h1>

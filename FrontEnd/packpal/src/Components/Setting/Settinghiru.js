@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import "./Setting.css";
-import Sidebar from "../Sidebar/Sidebar";
+import "./Settinghiru.css";
+import Sidebarhiru from "../Sidebar/Sidebarhiru";
 
 // ---------- Translations (outside component) ----------
 const translations = {
@@ -401,7 +401,7 @@ export default function Setting() {
 
       {/* Shell: Sidebar + Main content */}
       <div className="settings-shell">
-        <Sidebar />
+        <Sidebarhiru />
 
         <main className="settings-main" ref={mainRef}>
           <div className="settings-container">

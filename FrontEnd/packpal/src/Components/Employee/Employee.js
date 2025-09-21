@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import "./Employee.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebarhiru from "../Sidebar/Sidebarhiru";
 
 export default function Employee() {
   // ----- data (replace with API later) -----
@@ -93,7 +93,9 @@ export default function Employee() {
       e.skills.join(" | "),
     ]);
     const toCSV = (rows) =>
-      rows.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
+      rows
+        .map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
     const blob = new Blob([toCSV([header, ...rows])], {
       type: "text/csv;charset=utf-8;",
     });
@@ -115,62 +117,66 @@ export default function Employee() {
   );
 
   return (
-    <div>
-      <Sidebar/>
-      <header className="topbar">
-        <h1 className="page-title">Inventory</h1>
-        <div className="topbar-actions">
-          <button className="btn btn-primary" onClick={downloadCSV}>
-            <span className="icon">📄</span> Generate Report
-          </button>
-          <button className="avatar" title="Profile">
-            👤
-          </button>
-        </div>
-      </header>
+    <div className="emp">
+      <Sidebarhiru />
 
-      <main className="container">
-        <section className="section-head">
-          <h2>Employees</h2>
-          <span className="muted">
-            {employees.length} shown • {employees.length} total
-          </span>
-        </section>
+      {/* Page wrapper that respects the sidebar width */}
+      <div className="page">
+        <header className="topbar">
+          <h1 className="page-title">Inventory</h1>
+          <div className="topbar-actions">
+            <button className="btn btn-primary" onClick={downloadCSV}>
+              <span className="icon">📄</span> Generate Report
+            </button>
+            <button className="avatar" title="Profile" aria-label="Profile">
+              👤
+            </button>
+          </div>
+        </header>
 
-        <section className="cards">
-          {employees.map((e) => (
-            <article key={e.id} className="card">
-              <img className="avatar-lg" src={e.avatar} alt={e.name} />
-              <div className="card-main">
-                <div className="card-title">
-                  <h3>{e.name}</h3>
-                  <span className="badge-age">{e.yearsLabel}</span>
+        <main className="container" role="main">
+          <section className="section-head">
+            <h2>Employees</h2>
+            <span className="muted">
+              {employees.length} shown • {employees.length} total
+            </span>
+          </section>
+
+          <section className="cards">
+            {employees.map((e) => (
+              <article key={e.id} className="card">
+                <img className="avatar-lg" src={e.avatar} alt={e.name} />
+                <div className="card-main">
+                  <div className="card-title">
+                    <h3>{e.name}</h3>
+                    <span className="badge-age">{e.yearsLabel}</span>
+                  </div>
+                  <p className="card-sub">
+                    Age {e.age} • Service {e.service} years
+                  </p>
+                  <div className="skill-wrap">
+                    {e.skills.map((s) => (
+                      <span key={s} className="skill">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <p className="card-sub">
-                  Age {e.age} • Service {e.service} years
-                </p>
-                <div className="skill-wrap">
-                  {e.skills.map((s) => (
-                    <span key={s} className="skill">
-                      {s}
-                    </span>
-                  ))}
+                <div className="actions">
+                  <button className="view" onClick={() => openView(e)}>
+                    <EyeIcon /> <span>View</span>
+                  </button>
                 </div>
-              </div>
-              <div className="actions">
-                <button className="view" onClick={() => openView(e)}>
-                  <EyeIcon /> <span>View</span>
-                </button>
-              </div>
-            </article>
-          ))}
-        </section>
-      </main>
+              </article>
+            ))}
+          </section>
+        </main>
+      </div>
 
       {/* View dialog */}
-      <dialog ref={modalRef} className="modal" onClose={closeView}>
-        <div className="modal-card">
-          <h3>{selected?.name ?? "Employee"}</h3>
+      <dialog ref={modalRef} className="modal" onClose={closeView} aria-modal="true">
+        <div className="modal-card" role="dialog" aria-labelledby="empTitle">
+          <h3 id="empTitle">{selected?.name ?? "Employee"}</h3>
           <p className="muted">
             {selected ? `Age ${selected.age} • Service ${selected.service} years` : ""}
           </p>

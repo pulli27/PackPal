@@ -1,8 +1,7 @@
-// src/Components/Quality/Quality.js
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import "./Quality.css";
-import Sidebar from "../Sidebar/Sidebar";
-import { api } from "../../lib/api";
+import Sidebarhiru from "../Sidebar/Sidebarhiru";
+import { api } from "../../lib/api2";
 
 export default function Quality() {
   // Items currently in "Quality Check" (from backend)
@@ -36,8 +35,10 @@ export default function Quality() {
   }, []);
 
   const ensureCountKeys = useCallback(() => {
-    if (localStorage.getItem("qc:passed") == null) localStorage.setItem("qc:passed", "0");
-    if (localStorage.getItem("qc:failed") == null) localStorage.setItem("qc:failed", "0");
+    if (localStorage.getItem("qc:passed") == null)
+      localStorage.setItem("qc:passed", "0");
+    if (localStorage.getItem("qc:failed") == null)
+      localStorage.setItem("qc:failed", "0");
   }, []);
 
   const pullCounts = useCallback(() => {
@@ -68,7 +69,11 @@ export default function Quality() {
   // Also refresh if another tab updates QC
   useEffect(() => {
     const onS = (e) => {
-      if (e.key === "qc:lastUpdate" || e.key === "qc:passed" || e.key === "qc:failed") {
+      if (
+        e.key === "qc:lastUpdate" ||
+        e.key === "qc:passed" ||
+        e.key === "qc:failed"
+      ) {
         pullCounts();
       }
     };
@@ -91,7 +96,9 @@ export default function Quality() {
             id: after._id || id,
             bag: after.bag,
             person: after.person,
-            date: new Date(after.qcDate || Date.now()).toISOString().slice(0, 10),
+            date: new Date(after.qcDate || Date.now())
+              .toISOString()
+              .slice(0, 10),
           },
           ...prev,
         ]);
@@ -110,7 +117,9 @@ export default function Quality() {
     async (id) => {
       const reason = window.prompt("Enter failure reason:", "") || "";
       try {
-        const { data } = await api.post(`/api/quality/${id}/fail`, { note: reason });
+        const { data } = await api.post(`/api/quality/${id}/fail`, {
+          note: reason,
+        });
         // Remove from QC list
         setQcItems((list) => list.filter((it) => it._id !== id && it.id !== id));
 
@@ -121,7 +130,9 @@ export default function Quality() {
             id: after._id || id,
             bag: after.bag,
             person: after.person,
-            date: new Date(after.qcDate || Date.now()).toISOString().slice(0, 10),
+            date: new Date(after.qcDate || Date.now())
+              .toISOString()
+              .slice(0, 10),
             note: after.qcNote || reason || "",
           },
           ...prev,
@@ -150,7 +161,9 @@ export default function Quality() {
       if (window.jspdf) jsPDFCtor = window.jspdf.jsPDF;
     }
     if (!jsPDFCtor) {
-      alert("PDF libs not found. Run: npm i jspdf jspdf-autotable (or add CDN scripts).");
+      alert(
+        "PDF libs not found. Run: npm i jspdf jspdf-autotable (or add CDN scripts)."
+      );
       return;
     }
 
@@ -159,7 +172,13 @@ export default function Quality() {
     doc.setFontSize(18);
     doc.text("Quality Control — Queue", 40, 40);
 
-    const rows = qcRows.map((r) => [r.bag, r.person, r.deadline?.slice(0, 10) || r.date || "-", "Quality Check", r.details || "-"]);
+    const rows = qcRows.map((r) => [
+      r.bag,
+      r.person,
+      r.deadline?.slice(0, 10) || r.date || "-",
+      "Quality Check",
+      r.details || "-",
+    ]);
 
     if (autoTableFn) {
       autoTableFn(doc, {
@@ -210,98 +229,116 @@ export default function Quality() {
 
   if (loading) {
     return (
-      <div>
-        <Sidebar />
-        <header className="topbar">
-          <div className="container">
-            <h1 className="title">Quality Control</h1>
-          </div>
-        </header>
-        <main className="container pad">Loading…</main>
+      <div className="quality">
+        <Sidebarhiru />
+        <div className="page">
+          <header className="topbar">
+            <div className="container">
+              <h1 className="title">Quality Control</h1>
+            </div>
+          </header>
+          <main className="container pad">Loading…</main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <Sidebar />
-      <header className="topbar">
-        <div className="container">
-          <h1 className="title">Quality Control</h1>
-          <div className="actions-right">
-            <button onClick={generatePdf} className="btn btn-primary" id="reportBtn">
-              <svg viewBox="0 0 24 24" className="ico">
-                <path
-                  d="M6 2h7l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM13 2v6h6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Generate Report
-            </button>
-            <div className="avatar" title="Profile">
-              <svg viewBox="0 0 24 24" className="ico">
-                <path
-                  d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5C21 16.5 17 14 12 14Z"
-                  fill="currentColor"
-                />
-              </svg>
+    <div className="quality">
+      <Sidebarhiru />
+
+      <div className="page">
+        <header className="topbar">
+          <div className="container">
+            <h1 className="title">Quality Control</h1>
+            <div className="actions-right">
+              <button
+                onClick={generatePdf}
+                className="btn btn-primary"
+                id="reportBtn"
+              >
+                <svg viewBox="0 0 24 24" className="ico" aria-hidden="true">
+                  <path
+                    d="M6 2h7l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM13 2v6h6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Generate Report
+              </button>
+              <div className="avatar" title="Profile" aria-label="Profile">
+                <svg viewBox="0 0 24 24" className="ico" aria-hidden="true">
+                  <path
+                    d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5C21 16.5 17 14 12 14Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="container pad">
-        {/* QC Queue Table (items in "Quality Check") */}
-        <div className="table-card">
-          <table className="qc-table">
-            <thead>
-              <tr>
-                <th>BAG TYPE</th>
-                <th>SEWING PERSON</th>
-                <th>DEADLINE</th>
-                <th>STATUS</th>
-                <th className="txt-r">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {qcRows.map((item) => (
-                <tr key={item._id || item.id}>
-                  <td>{item.bag}</td>
-                  <td>{item.person}</td>
-                  <td>{(item.deadline || item.date || "").slice(0, 10)}</td>
-                  <td>
-                    <Pill status={"Quality Check"} />
-                    {item.details && <div className="mini-note">{item.details}</div>}
-                  </td>
-                  <td className="txt-r">
-                    <div className="actions-group">
-                      <button className="btn-mini btn-pass" onClick={() => markPass(item._id || item.id)}>
-                        Pass
-                      </button>
-                      <button className="btn-mini btn-fail" onClick={() => markFail(item._id || item.id)}>
-                        Fail
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {qcRows.length === 0 && (
+        <main className="container pad">
+          {/* QC Queue Table (items in "Quality Check") */}
+          <div className="table-card">
+            <table className="qc-table">
+              <thead>
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: 16 }}>
-                    No items in Quality Check.
-                  </td>
+                  <th>BAG TYPE</th>
+                  <th>SEWING PERSON</th>
+                  <th>DEADLINE</th>
+                  <th>STATUS</th>
+                  <th className="txt-r">ACTIONS</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {qcRows.map((item) => (
+                  <tr key={item._id || item.id}>
+                    <td>{item.bag}</td>
+                    <td>{item.person}</td>
+                    <td>{(item.deadline || item.date || "").slice(0, 10)}</td>
+                    <td>
+                      <Pill status={"Quality Check"} />
+                      {item.details && (
+                        <div className="mini-note">{item.details}</div>
+                      )}
+                    </td>
+                    <td className="txt-r">
+                      <div className="actions-group">
+                        <button
+                          className="btn-mini btn-pass"
+                          onClick={() => markPass(item._id || item.id)}
+                        >
+                          Pass
+                        </button>
+                        <button
+                          className="btn-mini btn-fail"
+                          onClick={() => markFail(item._id || item.id)}
+                        >
+                          Fail
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {qcRows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", padding: 16 }}>
+                      No items in Quality Check.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-    
-      </main>
+          {/* Optional recent logs (kept for future use) */}
+          {/* <pre>{JSON.stringify({ passedLog, failedLog, totalPassed, totalFailed }, null, 2)}</pre> */}
+        </main>
+      </div>
     </div>
   );
 }
