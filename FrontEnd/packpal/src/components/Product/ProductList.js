@@ -1,4 +1,3 @@
-// src/components/Product/ProductList.js
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -43,11 +42,10 @@ const unpackList = (payload) =>
   Array.isArray(payload) ? payload : payload?.products ?? payload?.items ?? payload?.data ?? [];
 
 /* ===================== Validation helpers ===================== */
-// Accept: data URLs, images/…, http(s)
 const isAcceptableImageRef = (s) => {
   if (!s) return true;
-  if (s.startsWith("data:image/")) return true; // ✅ base64 data url
-  if (s.startsWith("images/")) return true;     // static file placed under /public/images
+  if (s.startsWith("data:image/")) return true;
+  if (s.startsWith("images/")) return true;
   try {
     const u = new URL(s);
     return u.protocol === "http:" || u.protocol === "https:";
@@ -66,7 +64,7 @@ const validateProduct = (f) => {
   const rating = Number(f.rating);
 
   if (!name) errs.name = "Product name is required.";
-  if (String(price).trim() === "" || Number.isNaN(price)) errs.price = "Enter a valid price.";
+  if (String(f.price).trim() === "" || Number.isNaN(price)) errs.price = "Enter a valid price.";
   else if (price < 0) errs.price = "Price must be ≥ 0.";
 
   if (String(stock).trim() !== "") {
@@ -74,7 +72,7 @@ const validateProduct = (f) => {
     if (Number.isNaN(iv) || iv < 0) errs.stock = "Stock must be an integer ≥ 0.";
   }
 
-  if (String(rating).trim() !== "") {
+  if (String(f.rating).trim() !== "") {
     if (Number.isNaN(rating) || rating < 0 || rating > 5) errs.rating = "Rating must be 0–5.";
   }
 
@@ -106,6 +104,11 @@ function ProductModal({ open, onClose, onSave, product }) {
   const [touched, setTouched] = useState({});
   const [previewSrc, setPreviewSrc] = useState("");
 
+  // Regexes for input filtering
+  const PRICE_RX = /^\d{0,9}(\.\d{0,2})?$/;          // up to 9 digits + optional . and 2 decimals
+  const STOCK_RX = /^\d{0,9}$/;                      // integers only
+  const RATING_RX = /^(?:[0-4](?:\.\d{0,1})?|5(?:\.0?)?)?$/; // 0–5, one decimal allowed
+
   const syncValidate = (next) => {
     const e = validateProduct(next);
     setErrors(e);
@@ -126,7 +129,6 @@ function ProductModal({ open, onClose, onSave, product }) {
       setTouched({});
       syncValidate(initial);
 
-      // preview: support data url, images/, http(s)
       if (!initial.img) setPreviewSrc("");
       else if (initial.img.startsWith("data:image/")) setPreviewSrc(initial.img);
       else if (initial.img.startsWith("images/")) setPreviewSrc("/" + initial.img);
@@ -136,24 +138,30 @@ function ProductModal({ open, onClose, onSave, product }) {
 
   if (!open) return null;
 
-  const hasErrors = Object.keys(errors).length > 0;
   const setField = (key, val) => {
     const next = { ...form, [key]: val };
     setForm(next);
     syncValidate(next);
-    if (key === "img") {
-      if (!val) setPreviewSrc("");
-      else if (val.startsWith("data:image/")) setPreviewSrc(val);
-      else if (val.startsWith("images/")) setPreviewSrc("/" + val);
-      else setPreviewSrc(val);
-    }
   };
   const markTouched = (key) => setTouched((t) => ({ ...t, [key]: true }));
   const fieldClass = (key) => (touched[key] && errors[key] ? "input error" : "input");
   const errorText = (key) =>
     touched[key] && errors[key] ? <div className="err-text">{errors[key]}</div> : null;
 
-  // ✅ Read the file as a Data URL (base64) and store that string in form.img
+  // Price/Stock/Rating: block invalid typing & paste
+  const handlePriceChange = (e) => {
+    const v = e.target.value.trim();
+    if (v === "" || PRICE_RX.test(v)) setField("price", v);
+  };
+  const handleStockChange = (e) => {
+    const v = e.target.value.trim();
+    if (v === "" || STOCK_RX.test(v)) setField("stock", v);
+  };
+  const handleRatingChange = (e) => {
+    const v = e.target.value.trim();
+    if (v === "" || RATING_RX.test(v)) setField("rating", v);
+  };
+
   const handlePickFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -168,8 +176,6 @@ function ProductModal({ open, onClose, onSave, product }) {
 
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <Sidebarsa />
-
       <div className="modal">
         <div className="modal-head">
           <h3>{product ? `Edit Product #${product.id}` : "Add Product"}</h3>
@@ -188,6 +194,7 @@ function ProductModal({ open, onClose, onSave, product }) {
                 placeholder="e.g., Leather Handbag"
                 required
                 maxLength={120}
+                inputMode="text"
               />
               {errorText("name")}
             </div>
@@ -201,6 +208,7 @@ function ProductModal({ open, onClose, onSave, product }) {
                 onBlur={() => markTouched("category")}
                 placeholder="e.g., Handbags"
                 maxLength={50}
+                inputMode="text"
               />
               {errorText("category")}
             </div>
@@ -214,10 +222,11 @@ function ProductModal({ open, onClose, onSave, product }) {
               <input
                 className={fieldClass("img")}
                 style={{ marginTop: 6 }}
-                placeholder='data:image/png;base64,... or images/photo.png or https://...'
+                placeholder="data:image/png;base64,... or images/photo.png or https://..."
                 value={form.img}
                 onChange={(e) => setField("img", e.target.value)}
                 onBlur={() => markTouched("img")}
+                inputMode="url"
               />
               {previewSrc ? (
                 <div style={{ marginTop: 8 }}>
@@ -234,15 +243,20 @@ function ProductModal({ open, onClose, onSave, product }) {
 
             <div>
               <label>Price (LKR) <span style={{ color: "#b91c1c" }}>*</span></label>
+              {/* Use text + inputMode=decimal for strict control */}
               <input
                 className={fieldClass("price")}
-                type="number"
-                step="0.01"
-                min="0"
-                required
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
                 value={form.price}
-                onChange={(e) => setField("price", e.target.value)}
+                onChange={handlePriceChange}
                 onBlur={() => markTouched("price")}
+                // prevent dropping invalid paste
+                onPaste={(e) => {
+                  const v = (e.clipboardData.getData("text") || "").trim();
+                  if (!(v === "" || PRICE_RX.test(v))) e.preventDefault();
+                }}
               />
               {errorText("price")}
             </div>
@@ -251,12 +265,16 @@ function ProductModal({ open, onClose, onSave, product }) {
               <label>Stock</label>
               <input
                 className={fieldClass("stock")}
-                type="number"
-                min="0"
-                step="1"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
                 value={form.stock}
-                onChange={(e) => setField("stock", e.target.value)}
+                onChange={handleStockChange}
                 onBlur={() => markTouched("stock")}
+                onPaste={(e) => {
+                  const v = (e.clipboardData.getData("text") || "").trim();
+                  if (!(v === "" || STOCK_RX.test(v))) e.preventDefault();
+                }}
               />
               {errorText("stock")}
             </div>
@@ -265,13 +283,16 @@ function ProductModal({ open, onClose, onSave, product }) {
               <label>Rating (0–5)</label>
               <input
                 className={fieldClass("rating")}
-                type="number"
-                step="0.1"
-                min="0"
-                max="5"
+                type="text"
+                inputMode="decimal"
+                placeholder="4.5"
                 value={form.rating}
-                onChange={(e) => setField("rating", e.target.value)}
+                onChange={handleRatingChange}
                 onBlur={() => markTouched("rating")}
+                onPaste={(e) => {
+                  const v = (e.clipboardData.getData("text") || "").trim();
+                  if (!(v === "" || RATING_RX.test(v))) e.preventDefault();
+                }}
               />
               {errorText("rating")}
             </div>
@@ -282,8 +303,8 @@ function ProductModal({ open, onClose, onSave, product }) {
           <button className="btn" onClick={onClose}>Cancel</button>
           <button
             className="btn primary"
-            disabled={hasErrors}
-            title={hasErrors ? "Fix validation errors to save" : "Save"}
+            disabled={Object.keys(errors).length > 0}
+            title={Object.keys(errors).length ? "Fix validation errors to save" : "Save"}
             onClick={() => {
               setTouched({ name: true, category: true, img: true, price: true, stock: true, rating: true });
               const errs = validateProduct(form);
@@ -293,7 +314,7 @@ function ProductModal({ open, onClose, onSave, product }) {
                 name: form.name.trim(),
                 category: form.category.trim(),
                 img: form.img.trim(),
-                price: parseFloat(form.price),
+                price: parseFloat(form.price || 0),
                 stock: parseInt(form.stock || 0, 10),
                 rating: parseFloat(form.rating || 0),
               };
@@ -384,7 +405,6 @@ export default function ProductList() {
     }
   };
 
-  // ✅ render data URLs, images/…, or http(s)
   const imgSrc = (val) => {
     if (!val) return "https://via.placeholder.com/64";
     if (val.startsWith("data:image/")) return val;
@@ -392,123 +412,117 @@ export default function ProductList() {
     return val;
   };
 
- return (
-  /* === PAGE WRAP START === */
-  <div className="page-wrap products-page">
-    {/* Left: Sidebar */}
-    <Sidebarsa />
+  return (
+    <div className="page-wrap products-page">
+      <Sidebarsa />
 
-    {/* Right: Main */}
-    <main className="content products-page">
-      <h1 className="page-title">Products</h1>
-      <p className="muted">Admin CRUD (Customer view moved to a separate page)</p>
+      <main className="content products-page">
+        <h1 className="page-title">Products</h1>
+        <p className="muted">Admin (Customer view moved to a separate page)</p>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button className="btn" onClick={() => navigate("/customer")}>👀 Open Customer View</button>
-      </div>
-
-      {loading && <div className="muted">Loading products…</div>}
-      {err && <div className="error" style={{ color: "#b91c1c", marginBottom: 8 }}>{err}</div>}
-
-      {/* Admin CRUD */}
-      <section className="section">
-        <div className="head">
-          <h3>Manage Products (CRUD)</h3>
-          <div className="actions">
-            <button className="btn primary" onClick={() => setModal({ open: true, product: null })}>➕ Add Product</button>
-            <button className="btn" onClick={fetchAll}>Reload</button>
-          </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <button className="btn" onClick={() => navigate("/customer")}>👀 Open Customer View</button>
         </div>
-        <div className="body">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th><th>IMAGE</th><th>NAME</th><th>CATEGORY</th>
-                <th className="right">PRICE (LKR)</th>
-                <th className="center">DISC</th>
-                <th className="center">STOCK</th>
-                <th className="center">RATING</th>
-                <th>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productsWithSeq.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.seq}</td>
-                  <td><img className="pimg" src={imgSrc(p.img)} alt="" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")} /></td>
-                  <td>{p.name}</td>
-                  <td>{p.category || ""}</td>
-                  <td className="right">{money(p.price)}</td>
-                  <td className="center">
-                    {p.discountType === "percentage" ? pct(p.discountValue)
-                      : p.discountType === "fixed" ? "LKR " + Number(p.discountValue).toLocaleString()
-                      : "—"}
-                  </td>
-                  <td className="center">{p.stock || 0}</td>
-                  <td className="center">{(p.rating || 0).toFixed(1)}</td>
-                  <td>
-                    <div className="actions">
-                      <button className="btn" onClick={() => setModal({ open: true, product: p })}>Edit</button>
-                      <button className="btn red" onClick={() => onDelete(p.id)}>Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!loading && !err && productsWithSeq.length === 0 && (
-                <tr><td colSpan={9} className="muted">No products</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
-      {/* Active Discounts */}
-      {discounted.length > 0 && (
+        {loading && <div className="muted">Loading products…</div>}
+        {err && <div className="error" style={{ color: "#b91c1c", marginBottom: 8 }}>{err}</div>}
+
         <section className="section">
-          <div className="head"><h3>Active Discounts</h3></div>
+          <div className="head">
+            <h3>Manage Products</h3>
+            <div className="actions">
+              <button className="btn primary" onClick={() => setModal({ open: true, product: null })}>➕ Add Product</button>
+              <button className="btn" onClick={fetchAll}>Reload</button>
+            </div>
+          </div>
           <div className="body">
             <table>
               <thead>
                 <tr>
-                  <th>ID</th><th>PRODUCT</th>
-                  <th className="right">BASE PRICE</th>
-                  <th>TYPE</th>
-                  <th className="right">VALUE</th>
-                  <th className="right">NEW PRICE</th>
-                  <th className="right">YOU SAVE</th>
+                  <th>ID</th><th>IMAGE</th><th>NAME</th><th>CATEGORY</th>
+                  <th className="right">PRICE (LKR)</th>
+                  <th className="center">DISC</th>
+                  <th className="center">STOCK</th>
+                  <th className="center">RATING</th>
+                  <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
-                {discounted.map((p, i) => {
-                  const ep = effectivePrice(p);
-                  const sv = saving(p);
-                  return (
-                    <tr key={p.id}>
-                      <td>{i + 1}</td>
-                      <td>{p.name}</td>
-                      <td className="right">{money(p.price)}</td>
-                      <td>{p.discountType === "percentage" ? "Percentage" : "Fixed"}</td>
-                      <td className="right">{p.discountType === "percentage" ? pct(p.discountValue) : money(p.discountValue)}</td>
-                      <td className="right">{money(ep)}</td>
-                      <td className="right">{money(sv)}</td>
-                    </tr>
-                  );
-                })}
+                {productsWithSeq.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.seq}</td>
+                    <td><img className="pimg" src={imgSrc(p.img)} alt="" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")} /></td>
+                    <td>{p.name}</td>
+                    <td>{p.category || ""}</td>
+                    <td className="right">{money(p.price)}</td>
+                    <td className="center">
+                      {p.discountType === "percentage" ? pct(p.discountValue)
+                        : p.discountType === "fixed" ? "LKR " + Number(p.discountValue).toLocaleString()
+                        : "—"}
+                    </td>
+                    <td className="center">{p.stock || 0}</td>
+                    <td className="center">{(p.rating || 0).toFixed(1)}</td>
+                    <td>
+                      <div className="actions">
+                        <button className="btn" onClick={() => setModal({ open: true, product: p })}>Edit</button>
+                        <button className="btn red" onClick={() => onDelete(p.id)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!loading && !err && productsWithSeq.length === 0 && (
+                  <tr><td colSpan={9} className="muted">No products</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </section>
-      )}
 
-      <ProductModal
-        open={modal.open}
-        product={modal.product}
-        onClose={() => setModal({ open: false, product: null })}
-        onSave={onSaveModal}
-      />
-    </main>
-  </div>
-  /* === PAGE WRAP END === */
-);
+        {/* Active Discounts */}
+        {discounted.length > 0 && (
+          <section className="section">
+            <div className="head"><h3>Active Discounts</h3></div>
+            <div className="body">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th><th>PRODUCT</th>
+                    <th className="right">BASE PRICE</th>
+                    <th>TYPE</th>
+                    <th className="right">VALUE</th>
+                    <th className="right">NEW PRICE</th>
+                    <th className="right">YOU SAVE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {discounted.map((p, i) => {
+                    const ep = effectivePrice(p);
+                    const sv = saving(p);
+                    return (
+                      <tr key={p.id}>
+                        <td>{i + 1}</td>
+                        <td>{p.name}</td>
+                        <td className="right">{money(p.price)}</td>
+                        <td>{p.discountType === "percentage" ? "Percentage" : "Fixed"}</td>
+                        <td className="right">{p.discountType === "percentage" ? pct(p.discountValue) : money(p.discountValue)}</td>
+                        <td className="right">{money(ep)}</td>
+                        <td className="right">{money(sv)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
+        <ProductModal
+          open={modal.open}
+          product={modal.product}
+          onClose={() => setModal({ open: false, product: null })}
+          onSave={onSaveModal}
+        />
+      </main>
+    </div>
+  );
 }
