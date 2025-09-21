@@ -8,24 +8,23 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 
 // ---- Modern routers (current) ----
+//pulli
 const inventoryRoutes     = require("./Route/InventoryRoute");
 const purchaseRoutes      = require("./Route/PurchaseRoute");
 const productRoutes       = require("./Route/ProductRoute");
+//sasangi
 const cartRoutes          = require("./Routes/CartRoutes");
 const transactionRoutes   = require("./Routes/TransactionsRoutes");
+//isumi
 const userRouter          = require("./Routes/userRouter");
+//sanugi
 
-const financeRoutes       = require("./Route/FinanceSalaryRoute");
-const attendanceRoutes    = require("./Route/AttendanceRoute");
-const advanceRoutes       = require("./Route/AdvanceRoute");
-const salaryRoutes        = require("./Route/SalaryRoute");
-const transferRoutes      = require("./Route/TransferRoute");
-const contributions       = require("./Route/contributions");
-
-// ---- Legacy routers (kept, mounted under /legacy) ----
-const inventoryRoutesLegacy    = require("./Routes/Inventory");
-const transactionnRoutesLegacy = require("./Route/transactions");
-const purchaseeRoutesLegacy    = require("./Routes/Purchases");
+const financeRoutes = require("./Route/FinanceSalaryRoute");
+const attendanceRoutes = require("./Route/AttendanceRoute");
+const advanceRoutes = require("./Route/AdvanceRoute");
+const salaryRoutes = require("./Route/SalaryRoute");
+const transferRoutes = require("./Route/TransferRoute");
+const contributions = require("./Route/contributions");
 
 if (!process.env.MONGO_URI) {
   console.error("FATAL: MONGO_URI is missing in BackEnd/.env");
@@ -54,43 +53,22 @@ app.use(
 app.options("*", cors());
 
 app.use(express.json());
-
-// =========================
-//       API  ( /api )
-// =========================
+//pulli
 app.use("/api/inventory",     inventoryRoutes);
 app.use("/api/purchases",     purchaseRoutes);
 app.use("/api/products",      productRoutes);
-app.use("/api/transactions",  transactionRoutes);   // for /transactions/revenue
-app.use("/api/salary",        salaryRoutes);        // for /salary/summary
-app.use("/api/contributions", contributions);       // for /contributions/summary
-
-// (Optional) expose others under /api too if you need them later:
-app.use("/api/finances",      financeRoutes);
-app.use("/api/attendance",    attendanceRoutes);
-app.use("/api/advance",       advanceRoutes);
-app.use("/api/transfers",     transferRoutes);
-
-// =========================
-//  Non-API (back-compat)
-// =========================
+//sasangi
 app.use("/carts",             cartRoutes);
 app.use("/transactions",      transactionRoutes);
+//isumi
 app.use("/users",             userRouter);
-
-app.use("/finances",          financeRoutes);
-app.use("/attendance",        attendanceRoutes);
-app.use("/advance",           advanceRoutes);
-app.use("/salary",            salaryRoutes);
-app.use("/transfers",         transferRoutes);
-app.use("/contributions",     contributions);
-
-// =========================
-//       Legacy mounts
-// =========================
-app.use("/legacy/inventory",    inventoryRoutesLegacy);
-app.use("/legacy/transactions", transactionnRoutesLegacy);
-app.use("/legacy/purchases",    purchaseeRoutesLegacy);
+//sanugi
+app.use("/api/finances", financeRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/advance", advanceRoutes);
+app.use("/api/salary", salaryRoutes);
+app.use("/api/transfers", transferRoutes);
+app.use("/api/contributions", contributions);
 
 // Health
 app.get("/health", (_req, res) => res.json({ ok: true }));
