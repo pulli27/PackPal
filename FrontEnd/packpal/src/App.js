@@ -43,6 +43,14 @@ import FinancialReport from "./Components/FinancialReport/FinancialReport";
 import Revenue from "./Components/Revenue/Revenue";
 import Setting from "./Components/Settings/Settingsanu";
 
+//hiruni
+import Pdashboard from "./Components/Productdashboard/Pdashboard";
+import SewingInstruction from "./Components/SewingInstruction/SewingInstruction";
+import Employee from "./Components/Employee/Employee";
+import Reportshiru from "./Components/Reports/Reportshiru";
+import Quality from "./Components/Quality/Quality";
+import Settinghiru from "./Components/Setting/Settinghiru";
+
 /* 404 fallback */
 function NotFound() {
   return (
@@ -101,6 +109,14 @@ export default function App() {
             <Route path="/finance/advance" element={<Advance />} />
             <Route path="/finance/transfers" element={<SalaryTransfer />} />
             <Route path="/finance/salary" element={<SalaryManagement />} /> 
+
+
+             <Route path="/hirudashboard" element={<Pdashboard />} />
+      <Route path="/sewing" element={<SewingInstruction />} />
+      <Route path="/employee" element={<Employee />} />
+      <Route path="/reportshiru" element={<Reportshiru />} />
+      <Route path="/quality" element={<Quality />} />
+      <Route path="/settinghiru" element={<Settinghiru />} />
 
       {/* catch-all */}
       <Route path="*" element={<NotFound />} />
