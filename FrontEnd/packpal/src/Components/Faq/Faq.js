@@ -243,7 +243,7 @@ export default function Faq() {
 
         <div className="hero-content">
           <h1>FAQ</h1>
-          <p>Your bag doubts, unzipped! Check out our FAQ before you shop</p>
+          <p>Your bag doubts, unzipped! Check out our FAQ before you shop.</p>
           {/* (search removed as requested) */}
         </div>
       </section>

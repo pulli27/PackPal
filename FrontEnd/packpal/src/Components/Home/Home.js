@@ -1,8 +1,9 @@
 // src/Components/Home/Home.js
 import React, { useEffect, useRef, useState } from "react";
 import "./Home.css";
-import Footer from "../Footer/Footer";
 import Header from "../Header/Header";
+import Footer from "../Footer/Footer";
+
 
 import {
   FaShoppingBag, FaSearch, FaUser, FaUserPlus, FaShoppingCart, FaHome, FaLayerGroup,

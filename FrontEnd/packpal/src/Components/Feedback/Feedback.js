@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import Footer from "../Footer/Footer";
+import Header from "../Header/Header";
 import "./Feedback.css";
 
 export default function Feedback() {
@@ -170,6 +171,7 @@ export default function Feedback() {
 
   return (
     <div>
+        <Header/>
       {/* Hero with KidsBags-like gradient & dots */}
       <section className="hero" aria-labelledby="feedback-title">
         <div className="dots" aria-hidden="true">{dots}</div>
