@@ -1,12 +1,11 @@
-// Routes/Purchases.js
+// BackEnd/Routes/Purchases.js
 const express = require("express");
-const mongoose = require("mongoose");
 const router = express.Router();
 
-// flexible schema; uses the 'purchases' collection
-const purchaseSchema = new mongoose.Schema({}, { strict: false });
-const Purchase = mongoose.model("Purchase", purchaseSchema, "purchases");
+// ✅ Use the canonical model (do NOT define it here)
+const Purchase = require("../Model/PurchaseModel");
 
+// --- helpers ---
 const toNum = (v) => {
   const n = Number(String(v ?? 0).replace(/[^\d.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
@@ -21,7 +20,7 @@ router.get("/summary", async (req, res) => {
   try {
     const { start, end } = req.query;
 
-    // try to filter by createdAt OR date, whichever your docs have
+    // Build a date filter (checks createdAt OR date fields if present)
     const q = {};
     if (start || end) {
       const s = start ? new Date(start) : new Date("1970-01-01");
@@ -45,9 +44,9 @@ router.get("/summary", async (req, res) => {
       if (!t && Array.isArray(d.items)) {
         let sub = 0;
         for (const it of d.items) {
-          const q = toNum(it.qty ?? it.quantity ?? 1);
-          const p = toNum(it.unitPrice ?? it.price ?? it.cost);
-          sub += q * p;
+          const qn = toNum(it.qty ?? it.quantity ?? 1);
+          const pr = toNum(it.unitPrice ?? it.price ?? it.cost);
+          sub += qn * pr;
         }
         if (sub) {
           total += sub;

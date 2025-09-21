@@ -1,11 +1,12 @@
 // src/lib/api.js
 import axios from "axios";
 
-// CRA uses REACT_APP_* env vars.
-// Set REACT_APP_API_URL=http://localhost:5000 in a .env file (next step).
-const baseURL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+// Use REACT_APP_API_URL without trailing slash (e.g., http://localhost:5000)
+const raw = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const base = raw.replace(/\/+$/, ""); // trim trailing slash
 
 export const api = axios.create({
-  baseURL,
+  baseURL: `${base}/api`,       // << include /api prefix
+  withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });

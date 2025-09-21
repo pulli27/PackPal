@@ -17,3 +17,6 @@ const transactionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 module.exports = mongoose.model('Transaction', transactionSchema);
+// BackEnd/Model/TransactionModel.js
+// Re-export the canonical Transaction model to avoid double registration.
+module.exports = require("./Transaction");

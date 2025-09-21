@@ -4,16 +4,16 @@ const mongoose = require("mongoose");
 const PurchaseSchema = new mongoose.Schema(
   {
     // Business-friendly ID like "O-001"
-    id: { type: String, required: true, unique: true, index: true },
+    id:        { type: String, required: true, unique: true, index: true },
 
-    // Who you're buying from
-    supplier: { type: String, required: true },
+    // Supplier
+    supplier:  { type: String, required: true },
 
-    // Free-text items list (e.g., "Zippers (25), Buckles (40)")
-    items: { type: String, default: "" },
+    // Either a free-text items list OR an array (keep flexible for legacy)
+    items:     { type: mongoose.Schema.Types.Mixed, default: "" },
 
     // Dates
-    orderDate: { type: Date, default: Date.now },
+    orderDate:    { type: Date, default: Date.now },
     deliveryDate: { type: Date },
 
     // Workflow status
@@ -24,17 +24,25 @@ const PurchaseSchema = new mongoose.Schema(
       index: true,
     },
 
-    // UI shows a priority field in your modal
+    // Optional priority shown in UI
     priority: { type: String, enum: ["normal", "high", "urgent"], default: "normal" },
 
     // Optional notes
     notes: { type: String, default: "" },
+
+    // Optional totals for summary route compatibility
+    total:      { type: Number },
+    amount:     { type: Number },
+    grandTotal: { type: Number },
+    date:       { type: Date }, // some legacy docs may use this field
   },
   { timestamps: true, versionKey: false }
 );
 
-// Helpful search
-PurchaseSchema.index({ supplier: "text", items: "text", id: "text" });
+// Helpful text search
+PurchaseSchema.index({ supplier: "text", id: "text" });
 
-// Collection name = "purchases"
-module.exports = mongoose.model("Purchase", PurchaseSchema, "purchases");
+// ✅ Single guarded registration
+module.exports =
+  mongoose.models.Purchase ||
+  mongoose.model("Purchase", PurchaseSchema, "purchases");
