@@ -108,7 +108,7 @@
   font-size: 1.3rem;
   line-height: 1.6;
   letter-spacing: 0.2px;
-  color: #141248;
+  color: #ffffff;
   text-shadow: 0 3px 14px rgba(0,0,0,.35);
   opacity: .98;
   max-width: 420px;
@@ -210,6 +210,40 @@
 .login .signup-section{ text-align:center; color:#7f8c8d; font-size:.95rem; }
 .login .signup-section a{ color:#667eea; text-decoration:none; font-weight:600; transition:color .3s; }
 .login .signup-section a:hover{ color:#764ba2; text-decoration:underline; }
+
+/* Show red state when invalid */
+.login .form-group input.invalid {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, .12);
+}
+
+/* Eye button (already present earlier; keep if you have it) */
+.login .input-container .eye-btn{
+  position:absolute;
+  right:12px;
+  top:50%;
+  transform:translateY(-50%);
+  height:32px;
+  width:38px;
+  border-radius:8px;
+  border:1px solid #e8ecef;
+  background:#fff;
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  font-size:16px;
+  z-index:2;
+}
+
+/* Make room for the eye + shift the right icon so they don't overlap */
+.login #password,
+.login #newPass{
+  padding-right: 64px;
+}
+.login #password ~ .input-icon,
+.login #newPass ~ .input-icon{
+  right: 56px;
+}
 
 /* --- Forgot Password forms --- */
 .login .forgot-form {

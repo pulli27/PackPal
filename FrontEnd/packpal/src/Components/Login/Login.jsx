@@ -13,6 +13,10 @@ export default function Login() {
   const [showPwd, setShowPwd] = useState(false);
   const [showNewPwd, setShowNewPwd] = useState(false);
 
+  // ------- validation state -------
+  const [touched, setTouched] = useState({ email: false, password: false });
+  const [submitted, setSubmitted] = useState(false);
+
   // ------- forgot password state -------
   // 0 = login screen, 1 = enter email, 2 = enter code, 3 = set new password
   const [forgotStep, setForgotStep] = useState(0);
@@ -39,7 +43,7 @@ export default function Login() {
     containerRef.current?.classList.add("mounted");
   }, []);
 
-  // ✅ Always start with blank fields & reset UI state on mount
+  // ✅ Always start clean on mount
   useEffect(() => {
     setEmail("");
     setPassword("");
@@ -48,12 +52,37 @@ export default function Login() {
     setForgotStep(0);
     setShowPwd(false);
     setShowNewPwd(false);
+    setTouched({ email: false, password: false });
+    setSubmitted(false);
   }, []);
+
+  // --- Validators ---
+  const emailValid = /^\S+@\S+\.\S+$/.test(email);
+  const passwordValid = password.length >= 6;
+
+  const errors = {
+    email: !email ? "Email is required."
+      : !emailValid ? "Enter a valid email address."
+      : "",
+    password: !password ? "Password is required."
+      : !passwordValid ? "Password must be at least 6 characters."
+      : "",
+  };
+
+  const formValid = Object.values(errors).every((e) => e === "");
+  const shouldShow = (field) => (touched[field] || submitted) && errors[field];
 
   /* ---------------- Login submit ---------------- */
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (status === "loading") return;
+    setSubmitted(true);
+
+    if (!formValid || status === "loading") {
+      setStatus("error");
+      setErrMsg("Please fix the highlighted fields.");
+      return;
+    }
+
     setErrMsg("");
     setStatus("loading");
 
@@ -68,15 +97,9 @@ export default function Login() {
         return;
       }
 
-      // otherwise: mock success to default route if both filled
-      if (inputEmail && password) {
-        setStatus("success");
-        setTimeout(() => navigate(DEFAULT_ROUTE), 600);
-      } else {
-        setStatus("error");
-        setErrMsg("Invalid email or password.");
-        setTimeout(() => setStatus("idle"), 1200);
-      }
+      // otherwise: mock success to default route if both filled (and already validated)
+      setStatus("success");
+      setTimeout(() => navigate(DEFAULT_ROUTE), 600);
     }, 600);
   };
 
@@ -148,6 +171,8 @@ export default function Login() {
         setErrMsg("");
         setShowPwd(false);
         setShowNewPwd(false);
+        setTouched({ email: false, password: false });
+        setSubmitted(false);
         navigate("/login");
       }, 900);
     } catch (err) {
@@ -228,12 +253,18 @@ export default function Login() {
                         placeholder="Enter your email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        onBlur={() => setTouched((t) => ({ ...t, email: true }))}
                         required
                         autoComplete="off"
                         inputMode="email"
+                        aria-invalid={!!shouldShow("email")}
+                        className={shouldShow("email") ? "invalid" : ""}
                       />
                       <div className="input-icon" aria-hidden>✉</div>
                     </div>
+                    {shouldShow("email") && (
+                      <div className="helper-text error">{errors.email}</div>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -246,8 +277,11 @@ export default function Login() {
                         placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        onBlur={() => setTouched((t) => ({ ...t, password: true }))}
                         required
                         autoComplete="new-password"
+                        aria-invalid={!!shouldShow("password")}
+                        className={shouldShow("password") ? "invalid" : ""}
                       />
                       {/* 👁️ eye toggle */}
                       <button
@@ -260,6 +294,9 @@ export default function Login() {
                         {showPwd ? "🙈" : "👁"}
                       </button>
                     </div>
+                    {shouldShow("password") && (
+                      <div className="helper-text error">{errors.password}</div>
+                    )}
                   </div>
 
                   {status === "error" && errMsg && (
