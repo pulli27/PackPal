@@ -43,6 +43,10 @@ import FinancialReport from "./Components/FinancialReport/FinancialReport";
 import Revenue from "./Components/Revenue/Revenue";
 import Setting from "./Components/Settings/Settingsanu";
 
+
+//// e.g. src/Components/Totebags/Totebags.js
+import Totebags from "./Components/Totebags/Totebags";
+
 /* 404 fallback */
 function NotFound() {
   return (
@@ -102,7 +106,11 @@ export default function App() {
             <Route path="/finance/transfers" element={<SalaryTransfer />} />
             <Route path="/finance/salary" element={<SalaryManagement />} /> 
 
-      {/* catch-all */}
+      
+     {/*Totebags*/}
+        <Route path="/" element={<Navigate to="/totes" replace />} />
+        <Route path="/totes" element={<Totebags />} />
+        {/* catch-all */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
