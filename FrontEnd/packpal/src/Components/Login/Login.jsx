@@ -1,3 +1,4 @@
+// src/Components/Login/Login.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./Login.css";
@@ -30,7 +31,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   // 👉 routes
-  const DEFAULT_ROUTE = "/home"; // ⬅️ unknown/new users go here
+  const DEFAULT_ROUTE = "/home"; // unknown/new users go here
   const USER_ROUTES = {
     "pulmi.vihansa@packpal.com": { password: "Pulmi@1234", route: "/maindashboard" },
     "sanugi.silva@packpal.com":  { password: "Sanugi@1234", route: "/sanudashboard" },
@@ -43,7 +44,7 @@ export default function Login() {
     containerRef.current?.classList.add("mounted");
   }, []);
 
-  // ✅ Always start clean on mount
+  // start clean on mount
   useEffect(() => {
     setEmail("");
     setPassword("");
@@ -86,20 +87,26 @@ export default function Login() {
     setErrMsg("");
     setStatus("loading");
 
+    // mock async
     setTimeout(() => {
       const inputEmail = email.trim().toLowerCase();
 
-      // exact matches go to specific dashboards
+      // exact matches go to specific dashboards (staff)
       const userCfg = USER_ROUTES[inputEmail];
       if (userCfg && password === userCfg.password) {
+        // mark staff auth
+        localStorage.setItem("pp:token", "staff-" + Date.now());
+        localStorage.setItem("pp:role", "staff");
         setStatus("success");
-        setTimeout(() => navigate(userCfg.route), 600);
+        setTimeout(() => navigate(userCfg.route), 500);
         return;
       }
 
-      // otherwise: mock success -> go to /home (DEFAULT_ROUTE)
+      // otherwise: treat as CUSTOMER login (storefront)
+      localStorage.setItem("pp:token", "cust-" + Date.now());
+      localStorage.setItem("pp:role", "customer");
       setStatus("success");
-      setTimeout(() => navigate(DEFAULT_ROUTE), 600);
+      setTimeout(() => navigate(DEFAULT_ROUTE), 500);
     }, 600);
   };
 
@@ -194,7 +201,6 @@ export default function Login() {
 
   return (
     <div className="login">
-      
       <div className="login-page">
         {/* background anim */}
         <div className="bg-animation">
