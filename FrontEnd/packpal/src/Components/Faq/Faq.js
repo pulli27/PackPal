@@ -618,8 +618,9 @@ export default function Faq() {
             </div>
           </div>
         </section>
-        <Footer/>
+        
       </div>
+      <Footer/>
     </main>
   );
 }
