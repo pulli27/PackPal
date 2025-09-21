@@ -66,7 +66,7 @@ export default function App() {
   return (
     <Routes>
       {/* default: go to dashboard */}
-      <Route path="/" element={<Navigate to="/maindashboard" replace />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
 
       {/* Core inventory routes */}
