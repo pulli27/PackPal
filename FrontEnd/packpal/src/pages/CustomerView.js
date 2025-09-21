@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Customerview.css";
-import Sidebarsa from "../Components/Sidebar/Sidebarsa";
 
 const URL = "http://localhost:5000/carts";
 const STORAGE_KEY = "packPalCart";
@@ -10,7 +9,10 @@ const WISHLIST_KEY = "packPalWishlist";
 
 const money = (n) =>
   "LKR" +
-  Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(n || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const pct = (n) => `${Number(n || 0).toFixed(0)}%`;
 
@@ -22,6 +24,19 @@ const effectivePrice = (p) => {
   return price;
 };
 
+/* discount helpers + compact summary text */
+const discountText = (p) => {
+  if (!p || p.discountType === "none" || !Number(p.discountValue)) return "No discount";
+  return p.discountType === "percentage" ? `${pct(p.discountValue)} off` : `${money(p.discountValue)} off`;
+};
+const summaryLine = (p) => {
+  const now = money(effectivePrice(p));
+  const was = p.discountType !== "none" && Number(p.discountValue) ? ` (was ${money(p.price)})` : "";
+  const dsc = discountText(p);
+  return `${p.name} · ${now}${was} · ${dsc}`;
+};
+
+/* default UI mapping */
 const toUI = (row) => ({
   id: String(row?.id ?? row?._id ?? row?.productId ?? Math.random().toString(36).slice(2, 10)),
   name: row?.name ?? "Unnamed",
@@ -29,14 +44,19 @@ const toUI = (row) => ({
   img: row?.img ?? "",
   price: Number(row?.price ?? 0),
   rating: Number(row?.rating ?? 4.5),
-  reviews: Number(row?.reviews ?? row?.ratingCount ?? 0),
+  reviews: Number(row?.reviews ?? row?.ratingCount ?? 95),
   discountType: row?.discountType ?? "none",
   discountValue: Number(row?.discountValue ?? 0),
   badge: row?.badge ?? row?.tag ?? "",
   description:
     row?.description ??
     row?.shortDescription ??
-    "Durable, comfy straps, and playful design — perfect for school & play.",
+    "Sunny twin-panel clutch to brighten any outfit. Satin lining and a detachable chain let you go handheld or shoulder, your choice.",
+  /* specs kept in data but not displayed anymore */
+  color: row?.color ?? "Sunflower",
+  strap: row?.strap ?? "Golden chain",
+  material: row?.material ?? "PU",
+  weight: String(row?.weight ?? "290g"),
 });
 
 const imgSrc = (val) => {
@@ -48,10 +68,26 @@ const imgSrc = (val) => {
 };
 
 const readJSON = (key, fallback) => {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
-  catch { return fallback; }
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
 };
-const writeJSON = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} };
+const writeJSON = (key, val) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch {}
+};
+
+/* render stars like 4.5 => ★★★★½ */
+const stars = (val = 0) => {
+  const n = Math.max(0, Math.min(5, Number(val)));
+  const full = "★".repeat(Math.floor(n));
+  const half = n % 1 >= 0.5 ? "½" : "";
+  const rest = "☆".repeat(5 - Math.ceil(n));
+  return `${full}${half}${rest}`;
+};
 
 export default function CustomerView() {
   const [products, setProducts] = useState([]);
@@ -63,7 +99,6 @@ export default function CustomerView() {
   const [wishlist, setWishlist] = useState(() => new Set(readJSON(WISHLIST_KEY, [])));
   const navigate = useNavigate();
 
-  // ⛔️ No need to toggle body classes anymore; page wrap isolates layout.
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -77,16 +112,22 @@ export default function CustomerView() {
             ? `404 Not Found: ${URL} — check your backend route`
             : e?.response?.data?.message || e.message || "Failed to load";
         if (mounted) setErr(msg);
-      } finally { if (mounted) setLoading(false); }
+      } finally {
+        if (mounted) setLoading(false);
+      }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return products;
     return products.filter(
-      (p) => (p.name || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q)
+      (p) =>
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
     );
   }, [products, search]);
 
@@ -112,22 +153,6 @@ export default function CustomerView() {
     navigate("/cart", { state: { justAdded: newItem }, replace: false });
   };
 
-  const addAllFiltered = () => {
-    const list = readCart();
-    const map = new Map(list.map((x) => [String(x.id), x]));
-    filtered.forEach((p) => {
-      const id = String(p.id);
-      if (map.has(id)) map.get(id).quantity = Math.max(1, Number(map.get(id).quantity || 1) + 1);
-      else map.set(id, {
-        id, name: p.name, price: Number(effectivePrice(p)), quantity: 1,
-        icon: "🎒", img: imgSrc(p.img), category: p.category || "",
-        description: p.description || "Added from Kids Bags",
-      });
-    });
-    writeCart(Array.from(map.values()));
-    navigate("/cart", { state: { addedMany: true }, replace: false });
-  };
-
   const isWished = (id) => wishlist.has(String(id));
   const toggleWishlist = (p) => {
     const id = String(p.id);
@@ -141,12 +166,7 @@ export default function CustomerView() {
   const closeMore = () => { setShow(false); setActive(null); };
 
   return (
-    /* === PAGE WRAP START (sidebar + main) === */
-    <div className="page-wrap cv-page">
-      {/* Left: Sidebar */}
-      <Sidebarsa />
-
-      {/* Right: Main customer area */}
+    <div className="page-wrap cv-page no-sidebar">
       <main className="cv-main">
         <header className="cv-hero">
           <div className="cv-hero-inner">
@@ -168,14 +188,6 @@ export default function CustomerView() {
               />
               <button type="button" aria-label="Search">🔍</button>
             </div>
-
-            {!loading && filtered.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <button type="button" className="btn primary" onClick={addAllFiltered}>
-                  Add All To Cart
-                </button>
-              </div>
-            )}
           </div>
         </header>
 
@@ -225,7 +237,7 @@ export default function CustomerView() {
                     <h3 className="title">{p.name}</h3>
 
                     <div className="rating-row">
-                      <span className="stars" aria-hidden="true">★★★★★</span>
+                      <span className="stars" aria-hidden="true">{stars(p.rating)}</span>
                       <span className="reviews">({p.reviews})</span>
                     </div>
 
@@ -258,48 +270,62 @@ export default function CustomerView() {
           )}
         </section>
 
+        {/* ===== BIG DETAILS MODAL (only one description; no spec grid; no add-all) ===== */}
         {show && active && (
-          <div
-            role="dialog" aria-modal="true" onClick={closeMore}
-            className="cv-modal"
-          >
-            <div className="cv-modal-card" onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: "flex", gap: 16 }}>
+          <div role="dialog" aria-modal="true" onClick={closeMore} className="cv-modal">
+            <div className="cv-modal-card big" onClick={(e) => e.stopPropagation()}>
+              {/* Left: big image */}
+              <div className="cv-modal-hero">
                 <img
-                  src={imgSrc(active.img)} alt={active.name}
-                  style={{ width: 160, height: 120, objectFit: "cover", borderRadius: 12 }}
-                  onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/800x600?text=Bag"; }}
+                  src={imgSrc(active.img)}
+                  alt={active.name}
+                  onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/1000x800?text=Bag"; }}
                   draggable={false}
                 />
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: "0 0 6px" }}>{active.name}</h3>
-                  <div style={{ color: "#61708b", marginBottom: 12 }}>{active.description}</div>
-                  <div style={{ fontWeight: 700 }}>
-                    {money(effectivePrice(active))}
+              </div>
+
+              {/* Right: details */}
+              <div className="cv-modal-body">
+                {/* compact all-in-one line (name + price + discount) */}
+                <div className="muted" style={{ fontWeight: 700, marginBottom: 6 }}>
+                  {summaryLine(active)}
+                </div>
+
+                <h2 className="mb-4" style={{ marginTop: 0 }}>{active.name}</h2>
+
+                <div className="rating-and-price">
+                  <div className="rating-badge">
+                    <span className="stars">{stars(active.rating)}</span>
+                    <span className="muted"> · {active.reviews} reviews</span>
+                  </div>
+                  <div className="price-stack">
+                    <div className="price-main">{money(effectivePrice(active))}</div>
                     {active.discountType !== "none" && (
-                      <span style={{ marginLeft: 8, textDecoration: "line-through", color: "#98a2b3" }}>
-                        {money(active.price)}
-                      </span>
+                      <div className="price-was">{money(active.price)}</div>
                     )}
                   </div>
-                  <div style={{ marginTop: 16 }}>
-                    <button type="button" className="btn primary" onClick={() => addToCart(active)}>
-                      Add to Cart
-                    </button>
-                    <button type="button" className="btn" style={{ marginLeft: 8 }} onClick={closeMore}>
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn heart${isWished(active.id) ? " active" : ""}`}
-                      aria-pressed={isWished(active.id)}
-                      title={isWished(active.id) ? "Remove from wishlist" : "Add to wishlist"}
-                      onClick={() => toggleWishlist(active)}
-                      style={{ marginLeft: 8 }}
-                    >
-                      {isWished(active.id) ? "♥" : "♡"}
-                    </button>
-                  </div>
+                </div>
+
+                {/* single short description */}
+                <p className="muted" style={{ marginTop: 10 }}>{active.description}</p>
+
+                <div className="mt-3">
+                  <button type="button" className="btn primary" onClick={() => addToCart(active)}>
+                    Add to Cart
+                  </button>
+                  <button type="button" className="btn" onClick={closeMore} style={{ marginLeft: 8 }}>
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn heart${isWished(active.id) ? " active" : ""}`}
+                    aria-pressed={isWished(active.id)}
+                    title={isWished(active.id) ? "Remove from wishlist" : "Add to wishlist"}
+                    onClick={() => toggleWishlist(active)}
+                    style={{ marginLeft: 8 }}
+                  >
+                    {isWished(active.id) ? "♥" : "♡"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -307,6 +333,5 @@ export default function CustomerView() {
         )}
       </main>
     </div>
-    /* === PAGE WRAP END === */
   );
 }

@@ -1,4 +1,3 @@
-// src/components/Finance/Finance.js
 import React, { useEffect, useMemo, useState } from "react";
 import "./Finance.css";
 import Sidebarsa from "../Sidebar/Sidebarsa";
@@ -17,6 +16,7 @@ const unpackList = (payload) =>
     ? payload
     : payload?.transactions ?? payload?.items ?? payload?.data ?? [];
 
+
 const toTx = (row) => ({
   id: String(
     row?.id ??
@@ -34,6 +34,7 @@ const toTx = (row) => ({
   total: Number(row?.total ?? 0),
   status: (row?.status ?? "pending").toLowerCase(), // "pending" | "paid" | "refund"
 });
+
 
 // Try multiple path variants; return { path, data }
 async function getWithFallbacks(paths) {
@@ -57,6 +58,7 @@ async function getWithFallbacks(paths) {
   }
   throw lastErr || new Error("All endpoints failed");
 }
+
 
 export default function FinancePage() {
   const [txs, setTxs] = useState([]);
@@ -121,6 +123,7 @@ export default function FinancePage() {
     }));
   }, [rawRows, q]);
 
+
   const doExport = () => {
     const rowsForCsv = rows.map((r) => ({
       txId: r.displayId,
@@ -161,6 +164,7 @@ export default function FinancePage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
 
   const doPrint = () => {
     const body = rows
@@ -222,6 +226,7 @@ export default function FinancePage() {
     setErr("");
     setOk("");
     try {
+
       const orig = txs.find((t) => t.id === editing.id);
       const payload = {
         date: orig?.date,
@@ -230,10 +235,12 @@ export default function FinancePage() {
         qty: Number(orig?.qty || 1),
         unitPrice: Number(orig?.unitPrice || 0),
         discountPerUnit: Number(orig?.discountPerUnit || 0),
+
         total: Number(
           orig?.total ?? Number(orig?.unitPrice || 0) * Number(orig?.qty || 1)
         ),
         status: editing.status, // only change
+
       };
       await api.put(`${txBase}/${editing.id}`, payload, {
         headers: { "Content-Type": "application/json" },
@@ -269,6 +276,7 @@ export default function FinancePage() {
   return (
     /* === PAGE WRAP START === */
     <div className="page-wrap finance-page">
+
       <Sidebarsa />
       <main className="finance-main">
         <h1 className="page-title">Finance</h1>
@@ -283,6 +291,7 @@ export default function FinancePage() {
           </pre>
         )}
         {ok && <div className="ok" style={{ marginBottom: 12 }}>{ok}</div>}
+
 
         <section className="section">
           <div className="head">
@@ -335,6 +344,7 @@ export default function FinancePage() {
                           {r.discountPerUnit ? money(r.discountPerUnit) : "—"}
                         </td>
                         <td className="right">{money(r.total)}</td>
+
                         <td>
                           <span className={`pill ${r.status}`}>{r.status}</span>
                         </td>
@@ -345,6 +355,7 @@ export default function FinancePage() {
                           <button className="btn small danger" onClick={() => deleteTx(r.rid)}>
                             🗑 Delete
                           </button>
+
                         </td>
                       </tr>
                     ))}
@@ -354,6 +365,7 @@ export default function FinancePage() {
             )}
           </div>
         </section>
+
 
         {editing && (
           <div className="modal-backdrop" onClick={closeEdit} role="dialog" aria-modal="true">

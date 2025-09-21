@@ -1,42 +1,37 @@
-/* ===== Page wrap (sidebar + main) ================================= */
+/* ===== Page wrap (NO SIDEBAR) ==================================== */
 .page-wrap.cv-page{
   --bg:#f8fafc;
   --ink:#0f172a;
   --border:#e5e7eb;
-  --sidebar-w: 260px;           /* match Sidebarsa width */
 
-  display: flex;                /* sidebar (left) + main (right) */
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--ink);
+  /* was: display:flex for sidebar+main */
+  display:block;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--ink);
 }
 
-/* Sidebar column (assumes Sidebarsa renders .sidebar) */
-.page-wrap.cv-page .sidebar{
-  width: var(--sidebar-w);
-  flex: 0 0 var(--sidebar-w);
-  border-right: 1px solid var(--border);
-  background: #fff;
-}
+/* kill any leftover sidebar nodes gracefully (in case something renders it) */
+.page-wrap.cv-page .sidebar{ display:none !important; }
 
 /* Main column */
 .cv-main{
-  flex: 1 1 auto;
+  flex: 1 1 auto;            /* harmless when display:block */
   min-width: 0;
-  position: relative;           /* keep hero/overlap contained */
-  isolation: isolate;           /* create clean stacking context */
+  position: relative;         /* keep hero/overlap contained */
+  isolation: isolate;         /* clean stacking context */
 }
 
-/* ===== Existing styles updated to scope under .cv-main ============ */
+/* ===== Existing styles scoped under .cv-main ===================== */
 
 /* Hero */
 .cv-main .cv-hero{
   position: relative;
   padding: 48px 20px 64px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #ffffff;
-  overflow: hidden;
-  z-index: 1;
+  color:#fff;
+  overflow:hidden;
+  z-index:1;
 }
 .cv-main .cv-hero::after{
   content:"";
@@ -184,7 +179,7 @@
   background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;
 }
 
-/* Modal */
+/* Modal (base) */
 .cv-modal{
   position:fixed; inset:0; background:rgba(0,0,0,.45);
   display:flex; align-items:center; justify-content:center; z-index: 9999;
@@ -194,13 +189,65 @@
   box-shadow:0 20px 60px rgba(0,0,0,.3);
 }
 
-/* Mobile tweaks */
-@media (max-width: 1024px){
-  .page-wrap.cv-page{ flex-direction: column; }
-  .page-wrap.cv-page .sidebar{
-    width: 100%; flex: 0 0 auto; border-right: 0; border-bottom: 1px solid var(--border);
-  }
+/* ===== Big product details modal (for the More button) ===== */
+.cv-modal-card.big{
+  width: min(1100px, 96vw);
+  background:#fff;
+  border-radius:16px;
+  box-shadow:0 20px 60px rgba(2,6,23,.35);
+  overflow:hidden;
+  display:grid;
+  grid-template-columns: 1.15fr 1fr; /* image left, details right */
+  max-height: 90vh;
 }
+
+.cv-modal-hero{
+  background:#f2f4f7;
+  display:grid;
+  place-items:center;
+  padding:18px;
+}
+.cv-modal-hero img{
+  width:100%;
+  height:100%;
+  max-height:90vh;
+  object-fit:contain;
+  border-radius:12px;
+}
+
+.cv-modal-body{
+  padding:24px 28px;
+  overflow:auto;
+}
+.cv-modal-body h2{ margin:0 0 6px; font-size:28px; color:#0f172a; }
+
+.rating-and-price{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.rating-badge .stars{ font-size:18px; letter-spacing:1px; }
+.muted{ color:#667085; }
+.mt-2{ margin-top:8px; }
+.mt-3{ margin-top:12px; }
+
+.price-stack .price-main{ font-size:22px; font-weight:800; color:#0f172a; }
+.price-stack .price-was{ text-decoration:line-through; color:#98a2b3; font-weight:600; }
+
+.cv-spec-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; margin:18px 0 10px;
+}
+.cv-spec-grid .k{ font-size:13px; color:#667085; }
+.cv-spec-grid .v{
+  background:#f8fafc; border:1px solid #e5e7eb; padding:10px 12px;
+  border-radius:10px; font-weight:600; color:#0f172a;
+}
+
+/* Mobile: stack image over details */
+@media (max-width: 900px){
+  .cv-modal-card.big{ grid-template-columns:1fr; }
+  .cv-modal-hero img{ max-height:50vh; }
+}
+
+/* Mobile tweaks (no sidebar logic needed anymore) */
 @media (max-width: 768px){
   .cv-main .cv-hero{ padding: 36px 16px 54px; }
   .cv-main .cv-hero-search{ width: 100%; }

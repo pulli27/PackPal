@@ -7,6 +7,7 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 
+
 // ---- Modern routers (current) ----
 //pulli
 const inventoryRoutes     = require("./Route/InventoryRoute");
@@ -26,6 +27,7 @@ const salaryRoutes = require("./Route/SalaryRoute");
 const transferRoutes = require("./Route/TransferRoute");
 const contributions = require("./Route/contributions");
 
+
 if (!process.env.MONGO_URI) {
   console.error("FATAL: MONGO_URI is missing in BackEnd/.env");
   process.exit(1);
@@ -41,16 +43,18 @@ const devLocalhost = new Set([
   "http://localhost:3005", "http://127.0.0.1:3005",
   "http://localhost:5173", "http://127.0.0.1:5173",
 ]);
-
 app.use(
   cors({
-    origin: (origin, cb) => (!origin || devLocalhost.has(origin)) ? cb(null, true) : cb(null, false),
+    origin: (origin, cb) =>
+      !origin || devLocalhost.has(origin) ? cb(null, true) : cb(null, false),
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     credentials: true,
   })
 );
 app.options("*", cors());
+
+
 
 app.use(express.json());
 //pulli
@@ -74,12 +78,14 @@ app.use("/api/contributions", contributions);
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 // Error handler
+
 app.use((err, _req, res, _next) => {
   console.error("Unhandled error:", err);
   res.status(500).json({ message: "Internal server error" });
 });
 
-// Start
+
+// ---- START ----
 (async () => {
   try {
     mongoose.set("strictQuery", true);

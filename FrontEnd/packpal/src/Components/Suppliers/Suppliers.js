@@ -1,5 +1,5 @@
 // src/Components/Suppliers/Supplier.js
-import React, { useMemo, useState, useEffect, useCallback } from "react"; 
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import Sidebarpul from "../Sidebar/Sidebarpul";
 import "./Suppliers.css";
 
@@ -254,13 +254,10 @@ export default function Suppliers() {
           ${items
             .map(
               (s, i) => `
-              
             <div style="display:flex;align-items:flex-start;gap:10px;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:10px;">
               <div style="background:${
                 title.includes("Rated") ? "#10b981" : "#f59e0b"
-              };color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700">${
-                i + 1
-              }</div>
+              };color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700">${i + 1}</div>
               <div>
                 <div style="font-weight:700;color:#111827">${s.name}</div>
                 <div style="font-size:12px;color:#6b7280">${subtitle(s)}</div>
@@ -299,9 +296,6 @@ export default function Suppliers() {
       .join("");
 
     const directory = `
-    <br><br><br><br><br><br><br><br><br><br>
-      <br><br>
-      
       <div style="margin:22px 0">
         <h3 style="color:#334155;margin:0 0 10px 0">📋 Supplier Directory</h3>
         <table class="report-table" style="width:100%;border-collapse:collapse">
@@ -463,7 +457,6 @@ export default function Suppliers() {
   };
 
   return (
-    // ===== Page wrapper (scopes all styles) =====
     <div className="sup">
       <Sidebarpul />
 
@@ -527,8 +520,7 @@ export default function Suppliers() {
 
       {/* Supplier Details Modal */}
       <div
-        className="modal"
-        style={{ display: selected ? "flex" : "none" }}
+        className={`modal ${selected ? "open" : ""}`}
         onClick={() => setSelected(null)}
         aria-modal="true"
       >
@@ -697,8 +689,7 @@ export default function Suppliers() {
       {/* Report Modal (preview) */}
       <div
         id="supReportModal"
-        className="modal"
-        style={{ display: reportOpen ? "block" : "none" }}
+        className={`modal ${reportOpen ? "open" : ""}`}
         onClick={() => setReportOpen(false)}
       >
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
