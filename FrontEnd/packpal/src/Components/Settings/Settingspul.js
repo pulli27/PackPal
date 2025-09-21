@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import "./Settings.css";
-import Sidebar from "../Sidebar/Sidebar";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+ import "./Settingspul.css";
+import Sidebarpul from "../Sidebar/Sidebarpul";   // ✅ import the same name you render
 
 // ---------- Translations (outside component) ----------
 const translations = {
@@ -229,6 +229,22 @@ export default function Setting() {
   const avatarInputRef = useRef(null);
   const mainRef = useRef(null); // <-- scope target
 
+  // Toast helper (stable)
+  const showToast = useCallback((message) => {
+    setToast(message);
+    setTimeout(() => setToast(""), 3000);
+  }, []);
+
+  // Save action (stable)
+  const saveAllChanges = useCallback(() => {
+    setSaving(true);
+    showToast(t.saving);
+    setTimeout(() => {
+      setSaving(false);
+      showToast(t.saved);
+    }, 1000);
+  }, [t, showToast]);
+
   // Apply theme and handle 'auto' + system changes (scoped to Settings only)
   useEffect(() => {
     const root = mainRef.current;
@@ -270,13 +286,7 @@ export default function Setting() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  // Toast helper
-  function showToast(message) {
-    setToast(message);
-    setTimeout(() => setToast(""), 3000);
-  }
+  }, [saveAllChanges, showToast]);
 
   // Handlers
   function changeTheme(theme) {
@@ -289,14 +299,6 @@ export default function Setting() {
   }
   function toggle(name, value) {
     setToggles((t) => ({ ...t, [name]: value }));
-  }
-  function saveAllChanges() {
-    setSaving(true);
-    showToast(t.saving);
-    setTimeout(() => {
-      setSaving(false);
-      showToast(t.saved);
-    }, 1000);
   }
 
   // Profile image
@@ -401,7 +403,7 @@ export default function Setting() {
 
       {/* Shell: Sidebar + Main content */}
       <div className="settings-shell">
-        <Sidebar />
+        <Sidebarpul />
 
         <main className="settings-main" ref={mainRef}>
           <div className="settings-container">
@@ -440,7 +442,12 @@ export default function Setting() {
                       <p className="form-description">{t.general.companyNameDesc}</p>
                     </div>
                     <div className="form-control-section">
-                      <input type="text" className="form-input" defaultValue="BagCorp Industries" placeholder="Enter company name" />
+                      <input
+                        type="text"
+                        className="form-input"
+                        defaultValue="PackPal"
+                        placeholder="Enter company name"
+                      />
                     </div>
                   </div>
 
@@ -451,10 +458,10 @@ export default function Setting() {
                     </div>
                     <div className="form-control-section">
                       <select className="form-select" defaultValue="USD">
-                        <option value="USD">US Dollar ($)</option>
+                        <option value="USD">Sri Lankan Rupee (Rs.)</option>
                         <option value="EUR">Euro (€)</option>
                         <option value="GBP">British Pound (£)</option>
-                        <option value="LKR">Sri Lankan Rupee (Rs.)</option>
+                        <option value="LKR">US Dollar ($)</option>
                         <option value="INR">Indian Rupee (₹)</option>
                       </select>
                     </div>
@@ -650,7 +657,7 @@ export default function Setting() {
                             <p className="form-description">{t.profile.fullNameDesc}</p>
                           </div>
                           <div className="form-control-section">
-                            <input type="text" className="form-input" defaultValue="Hiruni Wijesinghe" placeholder="Enter your full name" />
+                            <input type="text" className="form-input" defaultValue="Pulmi Wijesinghe" placeholder="Enter your full name" />
                           </div>
                         </div>
                       </div>
@@ -665,7 +672,7 @@ export default function Setting() {
                             <input
                               type="email"
                               className="form-input"
-                              defaultValue="hiruniwijesinghe@gmail.com"
+                              defaultValue="pulmivihansa27@gmail.com"
                               placeholder="Enter email address"
                             />
                           </div>
@@ -679,12 +686,12 @@ export default function Setting() {
                             <p className="form-description">{t.profile.roleDesc}</p>
                           </div>
                           <div className="form-control-section">
-                            <select className="form-select" defaultValue="administrator">
-                              <option value="administrator">Product Manager</option>
-                              <option value="manager">Inventory Manager</option>
-                              <option value="employee">Finance Manager</option>
-                              <option value="viewer">User Manager</option>
-                              <option value="viewer">Cart Manager</option>
+                            <select className="form-select" defaultValue="inventory">
+                              <option value="inventory">Inventory Manager</option>
+                              <option value="finance">Finance Manager</option>
+                              <option value="product">Product Manager</option>
+                              <option value="cart">Cart Manager</option>
+                              <option value="user">User Manager</option>
                             </select>
                           </div>
                         </div>

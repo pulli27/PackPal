@@ -1,6 +1,6 @@
 // src/Components/Report/Report.js
 import React, { useEffect, useRef } from "react";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebarpul from "../Sidebar/Sidebarpul";
 import "./Report.css";
 
 import Chart from "chart.js/auto";
@@ -617,8 +617,8 @@ export default function Report() {
 
   /* ---------------- Render ---------------- */
   return (
-    <div className="report-shell">
-      <Sidebar />
+    <div className="rep">
+      <Sidebarpul />
       <main className="report-main" ref={mainRef}>
         {/* Header */}
         <div className="header">

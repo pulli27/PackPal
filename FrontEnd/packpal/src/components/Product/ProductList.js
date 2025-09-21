@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "./ProductList.css";
+import Sidebarsa from "../Sidebar/Sidebarsa";
 
 /* ===================== ONE PLACE TO EDIT ===================== */
 const URL = "http://localhost:5000/carts";
@@ -167,6 +168,8 @@ function ProductModal({ open, onClose, onSave, product }) {
 
   return (
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <Sidebarsa />
+
       <div className="modal">
         <div className="modal-head">
           <h3>{product ? `Edit Product #${product.id}` : "Add Product"}</h3>
@@ -389,16 +392,19 @@ export default function ProductList() {
     return val;
   };
 
-  return (
-    <div className="content products-page">
+ return (
+  /* === PAGE WRAP START === */
+  <div className="page-wrap products-page">
+    {/* Left: Sidebar */}
+    <Sidebarsa />
+
+    {/* Right: Main */}
+    <main className="content products-page">
       <h1 className="page-title">Products</h1>
       <p className="muted">Admin CRUD (Customer view moved to a separate page)</p>
 
-      {/* Button to open the Customer View page */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button className="btn" onClick={() => navigate("/customer")}>
-          👀 Open Customer View
-        </button>
+        <button className="btn" onClick={() => navigate("/customer")}>👀 Open Customer View</button>
       </div>
 
       {loading && <div className="muted">Loading products…</div>}
@@ -409,9 +415,7 @@ export default function ProductList() {
         <div className="head">
           <h3>Manage Products (CRUD)</h3>
           <div className="actions">
-            <button className="btn primary" onClick={() => setModal({ open: true, product: null })}>
-              ➕ Add Product
-            </button>
+            <button className="btn primary" onClick={() => setModal({ open: true, product: null })}>➕ Add Product</button>
             <button className="btn" onClick={fetchAll}>Reload</button>
           </div>
         </div>
@@ -419,10 +423,7 @@ export default function ProductList() {
           <table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>IMAGE</th>
-                <th>NAME</th>
-                <th>CATEGORY</th>
+                <th>ID</th><th>IMAGE</th><th>NAME</th><th>CATEGORY</th>
                 <th className="right">PRICE (LKR)</th>
                 <th className="center">DISC</th>
                 <th className="center">STOCK</th>
@@ -434,34 +435,21 @@ export default function ProductList() {
               {productsWithSeq.map((p) => (
                 <tr key={p.id}>
                   <td>{p.seq}</td>
-                  <td>
-                    <img
-                      className="pimg"
-                      src={imgSrc(p.img)}
-                      alt=""
-                      onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")}
-                    />
-                  </td>
+                  <td><img className="pimg" src={imgSrc(p.img)} alt="" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")} /></td>
                   <td>{p.name}</td>
                   <td>{p.category || ""}</td>
                   <td className="right">{money(p.price)}</td>
                   <td className="center">
-                    {p.discountType === "percentage"
-                      ? pct(p.discountValue)
-                      : p.discountType === "fixed"
-                      ? "LKR " + Number(p.discountValue).toLocaleString()
+                    {p.discountType === "percentage" ? pct(p.discountValue)
+                      : p.discountType === "fixed" ? "LKR " + Number(p.discountValue).toLocaleString()
                       : "—"}
                   </td>
                   <td className="center">{p.stock || 0}</td>
                   <td className="center">{(p.rating || 0).toFixed(1)}</td>
                   <td>
                     <div className="actions">
-                      <button className="btn" onClick={() => setModal({ open: true, product: p })}>
-                        Edit
-                      </button>
-                      <button className="btn red" onClick={() => onDelete(p.id)}>
-                        Delete
-                      </button>
+                      <button className="btn" onClick={() => setModal({ open: true, product: p })}>Edit</button>
+                      <button className="btn red" onClick={() => onDelete(p.id)}>Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -482,8 +470,7 @@ export default function ProductList() {
             <table>
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>PRODUCT</th>
+                  <th>ID</th><th>PRODUCT</th>
                   <th className="right">BASE PRICE</th>
                   <th>TYPE</th>
                   <th className="right">VALUE</th>
@@ -501,9 +488,7 @@ export default function ProductList() {
                       <td>{p.name}</td>
                       <td className="right">{money(p.price)}</td>
                       <td>{p.discountType === "percentage" ? "Percentage" : "Fixed"}</td>
-                      <td className="right">
-                        {p.discountType === "percentage" ? pct(p.discountValue) : money(p.discountValue)}
-                      </td>
+                      <td className="right">{p.discountType === "percentage" ? pct(p.discountValue) : money(p.discountValue)}</td>
                       <td className="right">{money(ep)}</td>
                       <td className="right">{money(sv)}</td>
                     </tr>
@@ -521,6 +506,9 @@ export default function ProductList() {
         onClose={() => setModal({ open: false, product: null })}
         onSave={onSaveModal}
       />
-    </div>
-  );
+    </main>
+  </div>
+  /* === PAGE WRAP END === */
+);
+
 }

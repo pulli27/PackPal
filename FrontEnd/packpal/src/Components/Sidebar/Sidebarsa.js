@@ -1,38 +1,8 @@
-/*import React from "react"
-import { Link } from "react-router-dom";
-import "./Sidebar.css";
 
-function Sidebar()  {
-  return (
-   <div className="sidebar">
-      <h2 className="logo">  <h2>Smart Bag System</h2></h2>
-      <ul className="nav-list">
-        <li>
-          <Link to="/dashboard">📊 Dashboard</Link>
-        </li>
-        <li>
-          <Link to="/products">🛒 Products List</Link>
-        </li>
-        <li>
-          <Link to="/discounts">💸 Discounts</Link>
-        </li>
-        <li>
-          <Link to="/finance">💰 Finance</Link>
-        </li>
-        <li>
-          <Link to="/reports">📑 Reports</Link>
-        </li>
-      </ul>
-    </div>
-  );
-};
-
-export default Sidebar;
-*/
 // src/Components/Sidebar/Sidebar.jsx
 import React, { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import "./Sidebar.css";
+import "./Sidebarsa.css";
 
 export default function Sidebar({
   initialActive = "reports",
@@ -59,7 +29,7 @@ export default function Sidebar({
       "/discounts": "discounts",
       "/finance": "finance",
       "/reports": "reports",
-      "/settings": "settings", // ✅ added
+      "/settingssa": "settings", // ✅ added
     };
     const key = map[path];
     if (key) setActive(key);
@@ -169,7 +139,7 @@ export default function Sidebar({
         {/* ✅ New: Settings */}
         <li>
           <NavLink
-            to="/settings"
+            to="/settingssa"
             className={({ isActive }) =>
               `nav-item ${isActive || active === "settings" ? "active" : ""}`
             }

@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./Finance.css";
+import Sidebarsa from "../Sidebar/Sidebarsa";
 
 const TX_URL = "http://localhost:5000/transactions";
 
@@ -228,8 +229,14 @@ export default function FinancePage() {
     }
   };
 
-  return (
-    <div className="content finance-page">
+ return (
+  /* === PAGE WRAP START === */
+  <div className="page-wrap finance-page">
+    {/* Left: Sidebar */}
+    <Sidebarsa />
+
+    {/* Right: Main */}
+    <main className="finance-main">
       <h1 className="page-title">Finance</h1>
       <p className="muted">Payments recorded from checkout.</p>
 
@@ -268,7 +275,7 @@ export default function FinancePage() {
                     <th>Product</th>
                     <th className="right">Qty</th>
                     <th className="right">Unit</th>
-                    <th className="right">Discounnts</th>
+                    <th className="right">Discounts</th>{/* ← fixed label */}
                     <th className="right">Total</th>
                     <th>Status</th>
                     <th className="center">Actions</th>
@@ -287,16 +294,10 @@ export default function FinancePage() {
                         {r.discountPerUnit ? money(r.discountPerUnit) : "—"}
                       </td>
                       <td className="right">{money(r.total)}</td>
-                      <td>
-                        <span className={`pill ${r.status}`}>{r.status}</span>
-                      </td>
+                      <td><span className={`pill ${r.status}`}>{r.status}</span></td>
                       <td className="center">
-                        <button className="btn small warning" onClick={() => openEdit(r)}>
-                          ✏️ Edit
-                        </button>
-                        <button className="btn small danger" onClick={() => deleteTx(r.rid)}>
-                          🗑 Delete
-                        </button>
+                        <button className="btn small warning" onClick={() => openEdit(r)}>✏️ Edit</button>
+                        <button className="btn small danger" onClick={() => deleteTx(r.rid)}>🗑 Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -312,7 +313,6 @@ export default function FinancePage() {
         <div className="modal-backdrop" onClick={closeEdit} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Update Status</h3>
-
             <div className="modal-grid one-col">
               <div>
                 <label>Status</label>
@@ -326,7 +326,6 @@ export default function FinancePage() {
                 </select>
               </div>
             </div>
-
             <div className="modal-actions">
               <button className="btn" onClick={closeEdit} disabled={saving}>Cancel</button>
               <button className="btn success" onClick={saveEdit} disabled={saving}>
@@ -336,6 +335,9 @@ export default function FinancePage() {
           </div>
         </div>
       )}
-    </div>
-  );
+    </main>
+  </div>
+  /* === PAGE WRAP END === */
+);
+
 }

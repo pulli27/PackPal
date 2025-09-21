@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebarpul from "../Sidebar/Sidebarpul";
 import "./InventoryDashboard.css";
 import axios from "axios";
 
@@ -9,8 +9,10 @@ const INVENTORY_ITEMS_PATH    = "/api/inventory";  // inventory items/materials
 
 /* ---------- Helpers ---------- */
 function statusOf(stock) {
-  if (Number(stock) === 0) return "out-of-stock";
-  if (Number(stock) <= 20) return "low-stock";
+  const n = Number(stock);
+  if (Number.isNaN(n)) return "in-stock";
+  if (n === 0) return "out-of-stock";
+  if (n <= 20) return "low-stock";
   return "in-stock";
 }
 
@@ -108,9 +110,10 @@ export default function InventoryDashboard() {
         ]);
 
         if (prodRes.status === "fulfilled") {
-          const list = Array.isArray(prodRes.value.data)
-            ? prodRes.value.data
-            : prodRes.value.data.items || prodRes.value.data.data || [];
+          const payload = prodRes.value.data;
+          const list = Array.isArray(payload)
+            ? payload
+            : payload?.items ?? payload?.data ?? [];
           setProducts(list.map(toUiProduct));
         } else {
           setProducts([]);
@@ -119,9 +122,10 @@ export default function InventoryDashboard() {
         }
 
         if (itemRes.status === "fulfilled") {
-          const list = Array.isArray(itemRes.value.data)
-            ? itemRes.value.data
-            : itemRes.value.data.items || itemRes.value.data.data || [];
+          const payload = itemRes.value.data;
+          const list = Array.isArray(payload)
+            ? payload
+            : payload?.items ?? payload?.data ?? [];
           setItems(list.map(toUiItem));
         } else {
           setItems([]); // gracefully treat as 0
@@ -139,12 +143,12 @@ export default function InventoryDashboard() {
   /* ---- Metrics (with discounts applied to products) ---- */
   const metrics = useMemo(() => {
     // Products (finished goods)
-    const totalProductUnits = products.reduce((s, p) => s + p.stock, 0);
-    const totalProductValue = products.reduce((s, p) => s + p.value, 0); // already discounted
+    const totalProductUnits = products.reduce((s, p) => s + (Number(p.stock) || 0), 0);
+    const totalProductValue = products.reduce((s, p) => s + (Number(p.value) || 0), 0); // discounted
 
     // Items (materials/raw)
-    const totalItemUnits = items.reduce((s, i) => s + i.quantity, 0);
-    const totalInventoryValue = items.reduce((s, i) => s + i.value, 0);
+    const totalItemUnits = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+    const totalInventoryValue = items.reduce((s, i) => s + (Number(i.value) || 0), 0);
 
     const lowStockProducts = products.filter((p) => statusOf(p.stock) === "low-stock").length;
     const outOfStockProducts = products.filter((p) => statusOf(p.stock) === "out-of-stock").length;
@@ -185,7 +189,6 @@ export default function InventoryDashboard() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
     const total = donutSegments.reduce((s, d) => s + d.value, 0) || 1;
 
     // ensure crisp canvas
@@ -195,6 +198,11 @@ export default function InventoryDashboard() {
     canvas.height = size * dpr;
     canvas.style.width = `${size}px`;
     canvas.style.height = `${size}px`;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    // reset before scaling so we don't accumulate transforms
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
 
     ctx.clearRect(0, 0, size, size);
@@ -241,27 +249,20 @@ export default function InventoryDashboard() {
   }, [donutSegments, metrics.totalProductUnits]);
 
   return (
-    <div className="page-shell">
-      <Sidebar />
+    <div className="pul page-wrap ppv2">
+      <Sidebarpul />
 
       <main className="main-content">
         <section className="dashboard">
           <header className="header">
-            <h1> 📦 Inventory Management Dashboard</h1>
+            <h1>📦 Inventory Management Dashboard</h1>
             <div className="date">Last Updated: {formattedNow}</div>
           </header>
 
           {error && (
             <div
               role="alert"
-              style={{
-                margin: "12px 0",
-                padding: 12,
-                borderRadius: 10,
-                background: "#fee2e2",
-                color: "#991b1b",
-                border: "1px solid #fecaca",
-              }}
+              className="inline-alert"
             >
               {error}
             </div>

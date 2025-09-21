@@ -1,7 +1,7 @@
-// src/components/CartDashboard/CartDashboard.js
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./CartDashboard.css";
+import Sidebarsa from "../Sidebar/Sidebarsa";
 import TransactionsTable from "../TransactionsTable/TransactionsTable";
 
 const PRODUCTS_URL = "http://localhost:5000/carts";
@@ -47,9 +47,9 @@ const toTx = (row) => ({
   fmc: Boolean(row?.fmc),
   productName: row?.productName ?? row?.product?.name ?? "",
   qty: Number(row?.qty ?? 1),
-  unitPrice: Number(row?.unitPrice ?? 0),         // may be 0 from backend
-  discountPerUnit: Number(row?.discountPerUnit ?? 0), // may be 0 from backend
-  total: Number(row?.total ?? 0),                 // may be 0 from backend
+  unitPrice: Number(row?.unitPrice ?? 0),
+  discountPerUnit: Number(row?.discountPerUnit ?? 0),
+  total: Number(row?.total ?? 0),
   method: row?.method ?? "Card",
   status: row?.status ?? "Paid",
 });
@@ -144,7 +144,7 @@ export default function CartDashboard() {
 
         return {
           ...row,
-          discountPerUnit: perDisc,   // <-- IMPORTANT: TransactionsTable will now see a truthy value
+          discountPerUnit: perDisc,
           unitPrice: finalUnit,
           total: finalTotal,
         };
@@ -182,40 +182,65 @@ export default function CartDashboard() {
         ...t,
         txId: t.id,
         id: String(i + 1),
-        // If your TransactionsTable expects a `discount` field instead, keep both:
         discount: t.discountPerUnit,
       })),
     [recent]
   );
 
   return (
-    <div className="dash">
-      <header className="dash-header">
-        <h1>Dashboard</h1>
-        <p className="muted">Overview of inventory, discounts, and finance.</p>
-      </header>
+  
+    <div className="page-wrap cart-page">
+   
+      <Sidebarsa />
 
-      {loading && <div className="muted">Loading…</div>}
-      {err && <div className="error" style={{ color: "#b91c1c", marginBottom: 12 }}>{err}</div>}
+      {/* Main content (right) */}
+      <main className="cart-main">
+        <header className="dash-header">
+          <h1>Dashboard</h1>
+          <p className="muted">Overview of inventory, discounts, and finance.</p>
+        </header>
 
-      <div className="stats">
-        <div className="card stat"><div className="v">{productsCount}</div><div className="l">Products</div></div>
-        <div className="card stat"><div className="v">{activeDiscounts}</div><div className="l">Active Discounts</div></div>
-        <div className="card stat"><div className="v">{money(totalPaid)}</div><div className="l">Total Sales (Paid)</div></div>
-        <div className="card stat"><div className="v">{money(totalPending)}</div><div className="l">Pending Invoices</div></div>
-      </div>
+        {loading && <div className="muted">Loading…</div>}
+        {err && (
+          <div className="error" style={{ color: "#b91c1c", marginBottom: 12 }}>
+            {err}
+          </div>
+        )}
 
-      <section className="section">
-        <div className="head"><h3>Recent Transactions</h3></div>
-        <TransactionsTable
-          rows={recentWithSeq}
-          limit={10}
-          showActions={false}
-          showFMC={false}
-          showStatus={false}
-          useSequentialIds={true}
-        />
-      </section>
+        <div className="stats">
+          <div className="card stat">
+            <div className="v">{productsCount}</div>
+            <div className="l">Products</div>
+          </div>
+          <div className="card stat">
+            <div className="v">{activeDiscounts}</div>
+            <div className="l">Active Discounts</div>
+          </div>
+          <div className="card stat">
+            <div className="v">{money(totalPaid)}</div>
+            <div className="l">Total Sales (Paid)</div>
+          </div>
+          <div className="card stat">
+            <div className="v">{money(totalPending)}</div>
+            <div className="l">Pending Invoices</div>
+          </div>
+        </div>
+
+        <section className="section">
+          <div className="head">
+            <h3>Recent Transactions</h3>
+          </div>
+          <TransactionsTable
+            rows={recentWithSeq}
+            limit={10}
+            showActions={false}
+            showFMC={false}
+            showStatus={false}
+            useSequentialIds={true}
+          />
+        </section>
+      </main>
     </div>
+    /* === PAGE WRAP END === */
   );
 }

@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import "./Settings.css";
-import Sidebar from "../Sidebar/Sidebar";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import "./Settingssa.css";
+import Sidebarsa from "../Sidebar/Sidebarsa";
 
-// ---------- Translations (outside component) ----------
+/* ---------------- Translations ---------------- */
 const translations = {
   en: {
     settingsTitle: "Settings & Configuration",
@@ -180,7 +180,7 @@ const translations = {
 
 const languageName = { en: "English", si: "Sinhala", ta: "Tamil", es: "Spanish" };
 
-// ---------- Reusable Toggle (no Sidebar here) ----------
+/* ---------------- Reusable Toggle ---------------- */
 function Toggle({ checked, onChange }) {
   return (
     <div className="toggle-container">
@@ -204,7 +204,7 @@ function Toggle({ checked, onChange }) {
 }
 
 export default function Setting() {
-  // App state
+  /* ---------------- State ---------------- */
   const [settings, setSettings] = useState({
     theme: "light",
     language: "en",
@@ -227,9 +227,25 @@ export default function Setting() {
   const t = useMemo(() => translations[settings.language] || translations.en, [settings.language]);
   const fileImportRef = useRef(null);
   const avatarInputRef = useRef(null);
-  const mainRef = useRef(null); // <-- scope target
+  const mainRef = useRef(null);
 
-  // Apply theme and handle 'auto' + system changes (scoped to Settings only)
+  /* ---------------- Toast (stable) ---------------- */
+  const showToast = useCallback((message) => {
+    setToast(message);
+    setTimeout(() => setToast(""), 3000);
+  }, []);
+
+  /* ---------------- Save (stable) ---------------- */
+  const saveAllChanges = useCallback(() => {
+    setSaving(true);
+    showToast(t.saving);
+    setTimeout(() => {
+      setSaving(false);
+      showToast(t.saved);
+    }, 1000);
+  }, [showToast, t]);
+
+  /* ---------------- Theme handling ---------------- */
   useEffect(() => {
     const root = mainRef.current;
     if (!root) return;
@@ -252,7 +268,7 @@ export default function Setting() {
     return cleanup;
   }, [settings.theme]);
 
-  // Keyboard shortcuts
+  /* ---------------- Keyboard shortcuts ---------------- */
   useEffect(() => {
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -270,15 +286,9 @@ export default function Setting() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [saveAllChanges, showToast]);
 
-  // Toast helper
-  function showToast(message) {
-    setToast(message);
-    setTimeout(() => setToast(""), 3000);
-  }
-
-  // Handlers
+  /* ---------------- Handlers ---------------- */
   function changeTheme(theme) {
     setSettings((s) => ({ ...s, theme }));
     showToast("Theme changed to " + theme);
@@ -290,16 +300,8 @@ export default function Setting() {
   function toggle(name, value) {
     setToggles((t) => ({ ...t, [name]: value }));
   }
-  function saveAllChanges() {
-    setSaving(true);
-    showToast(t.saving);
-    setTimeout(() => {
-      setSaving(false);
-      showToast(t.saved);
-    }, 1000);
-  }
 
-  // Profile image
+  /* ---------------- Profile image ---------------- */
   function onAvatarFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -328,7 +330,7 @@ export default function Setting() {
     showToast("Profile image removed");
   }
 
-  // Import / Export
+  /* ---------------- Import / Export ---------------- */
   function exportSettings() {
     const data = JSON.stringify(settings, null, 2);
     const blob = new Blob([data], { type: "application/json" });
@@ -364,7 +366,7 @@ export default function Setting() {
     reader.readAsText(file);
   }
 
-  // UI helper
+  /* ---------------- UI helper ---------------- */
   const tabButton = (id, label) => (
     <button
       key={id}
@@ -376,11 +378,14 @@ export default function Setting() {
     </button>
   );
 
+  /* ---------------- Render ---------------- */
   return (
     <>
       {/* Toast */}
       {toast && (
         <div
+
+        
           role="status"
           aria-live="polite"
           style={{
@@ -398,10 +403,11 @@ export default function Setting() {
           {toast}
         </div>
       )}
+<Sidebarsa />
 
       {/* Shell: Sidebar + Main content */}
       <div className="settings-shell">
-        <Sidebar />
+        
 
         <main className="settings-main" ref={mainRef}>
           <div className="settings-container">
@@ -416,7 +422,7 @@ export default function Setting() {
               </button>
             </div>
 
-            {/* Tabs (Inventory removed) */}
+            {/* Tabs */}
             <div className="tab-navigation">
               {tabButton("general", t.tabs.general)}
               {tabButton("notifications", t.tabs.notifications)}
@@ -440,7 +446,12 @@ export default function Setting() {
                       <p className="form-description">{t.general.companyNameDesc}</p>
                     </div>
                     <div className="form-control-section">
-                      <input type="text" className="form-input" defaultValue="BagCorp Industries" placeholder="Enter company name" />
+                      <input
+                        type="text"
+                        className="form-input"
+                        defaultValue="BagCorp Industries"
+                        placeholder="Enter company name"
+                      />
                     </div>
                   </div>
 
@@ -650,7 +661,12 @@ export default function Setting() {
                             <p className="form-description">{t.profile.fullNameDesc}</p>
                           </div>
                           <div className="form-control-section">
-                            <input type="text" className="form-input" defaultValue="Hiruni Wijesinghe" placeholder="Enter your full name" />
+                            <input
+                              type="text"
+                              className="form-input"
+                              defaultValue="Hiruni Wijesinghe"
+                              placeholder="Enter your full name"
+                            />
                           </div>
                         </div>
                       </div>

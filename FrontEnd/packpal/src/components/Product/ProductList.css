@@ -6,6 +6,32 @@
   --sidebar-w: 220px;
 }
 
+/* === Page wrap for Products (sidebar + main) === */
+.page-wrap.products-page{
+  --border:#e5e7eb;
+  display:flex;
+  min-height:100vh;
+}
+.page-wrap.products-page .sidebar{
+  width:var(--sidebar-w);
+  flex:0 0 var(--sidebar-w);
+  border-right:1px solid var(--border);
+  background:#fff;
+}
+.page-wrap.products-page .content.products-page{
+  flex:1 1 auto;
+  min-width:0;
+}
+@media (max-width:1024px){
+  .page-wrap.products-page{ flex-direction:column; }
+  .page-wrap.products-page .sidebar{
+    width:100%;
+    flex:0 0 auto;
+    border-right:0;
+    border-bottom:1px solid var(--border);
+  }
+}
+
 /* Light Blue Table Theme (scoped to this page) */
 .content.products-page{
   --tbl-bg:     #f0f7ff;   /* table surface */
@@ -18,14 +44,14 @@
   --tbl-chip:   #dbeafe;   /* small badges (optional) */
 }
 
-/* Page layout assumes Sidebar is fixed at --sidebar-w */
+/* Page layout */
 .content.products-page{
   padding: 20px 24px;
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
-  
+   margin-left: 270px;
 }
 
 .page-title{ margin:0 0 8px; font-size:38px; font-weight:900; letter-spacing:.01em; }
@@ -54,30 +80,26 @@
 .btn.red{ background:var(--danger); color:#fff; border-color:var(--danger); }
 .btn:hover{ filter:brightness(.97); }
 
-/* ONLY the row "Edit" button = light green (first button inside ACTIONS cell) */
+/* ONLY the row "Edit" button = light green */
 .content.products-page td .actions .btn:first-child{
-  background: #d1fae5;          /* emerald-100 */
-  color: #065f46;               /* emerald-900 */
-  border-color: #a7f3d0;        /* emerald-200 */
+  background:#d1fae5; color:#065f46; border-color:#a7f3d0;
 }
 .content.products-page td .actions .btn:first-child:hover{
-  background: #bbf7d0;          /* emerald-200 */
-  border-color: #86efac;        /* emerald-300 */
+  background:#bbf7d0; border-color:#86efac;
 }
 .content.products-page td .actions .btn:first-child:focus-visible{
-  outline: 3px solid rgba(5, 150, 105, .35); /* emerald-600 ring */
-  outline-offset: 2px;
+  outline:3px solid rgba(5,150,105,.35); outline-offset:2px;
 }
 
-/* Tables – keep your natural sizing (NO width/table-layout overrides) */
-.table-wrap{ overflow-x: hidden; }  /* keep as you had */
+/* Tables – keep natural sizing */
+.table-wrap{ overflow-x:hidden; }
 
-/* === Light Blue styling applied here (visuals only) === */
 .content.products-page table{
   background: var(--tbl-bg);
   color: var(--tbl-ink);
   border-color: var(--tbl-border);
-  border-collapse: collapse;          /* visual border behavior only */
+  border-collapse: collapse;
+  width: 100%;
 }
 .content.products-page thead th{
   background: var(--tbl-header);
@@ -101,28 +123,10 @@
   background: var(--tbl-hover);
 }
 
-/* (Optional) links and tiny badges inside table cells */
-.content.products-page td a,
-.content.products-page th a{
-  color:#2563eb; text-decoration:none;
-}
-.content.products-page td a:hover,
-.content.products-page th a:hover{
-  color:#1d4ed8; text-decoration:underline;
-}
-.content.products-page .badge{
-  display:inline-flex; align-items:center; gap:6px;
-  padding:3px 8px; font-size:11px;
-  background: var(--tbl-chip);
-  color:#1e3a8a;
-  border:1px solid var(--tbl-border);
-  border-radius:999px;
-}
-
 .right{ text-align:right; }
 .center{ text-align:center; }
 
-/* Images stay contained */
+/* Images */
 .pimg{
   width:56px; height:56px; object-fit:cover;
   border-radius:10px; border:1px solid var(--border); background:#fff;
@@ -157,19 +161,19 @@
 }
 .x{ background:transparent; border:0; font-size:22px; cursor:pointer; }
 
-/* Simple grid */
+/* Form grid */
 .grid{ display:grid; gap:12px; }
 @media(min-width:900px){
   .grid-3{ grid-template-columns: repeat(3, 1fr); }
 }
 
-/* Responsive tighten for smaller screens */
+/* Responsive */
 @media (max-width: 1024px){
   .content.products-page{ margin-left: calc(var(--sidebar-w) - 10px); padding:16px; }
   th, td{ padding:10px 12px; }
 }
 @media (max-width: 768px){
-  .content.products-page{ margin-left: 0; } /* stacked layout if sidebar collapses */
+  .content.products-page{ margin-left: 0; }
   .pimg{ width:48px; height:48px; }
   .page-title{ font-size:30px; }
 }

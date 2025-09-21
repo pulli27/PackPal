@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from "react";
-import Sidebar from "../Sidebar/Sidebar";
+// src/Components/PurchaseItems/PurchaseItems.js
+import React, { useEffect, useRef } from "react"; 
+import Sidebarpul from "../Sidebar/Sidebarpul";
 import "./PurchaseItems.css";
 import { purchases } from "../../lib/purchases";
 
@@ -74,7 +75,7 @@ export default function PurchaseItems() {
           <td>${fmt(o.orderDate)}</td>
           <td>${o.deliveryDate ? fmt(o.deliveryDate) : "-"}</td>
           <td><span class="status ${o.status}">${o.status}</span></td>
-          <td>
+          <td class="actions">
             <button class="btn btn-sec" data-action="view" data-id="${o.id}">View</button>
             ${
               o.status === "pending"
@@ -114,19 +115,16 @@ export default function PurchaseItems() {
 
     // ---------- PDF export (now lazy-loaded) ----------
     const exportPDF = async () => {
-      // lazy-load only when needed
       const { default: jsPDF } = await import("jspdf");
       const { default: autoTable } = await import("jspdf-autotable");
 
       const doc = new jsPDF("p", "pt");
       const orders = purchaseOrdersRef.current;
 
-      // Header title + generated line
       doc.setFontSize(20);
       doc.setTextColor(40);
       doc.text("PackPal — Purchase Orders Summary", 40, 40);
 
-      // thin divider
       doc.setDrawColor(37, 99, 235);
       doc.setLineWidth(2);
       doc.line(40, 48, 555, 48);
@@ -135,7 +133,6 @@ export default function PurchaseItems() {
       doc.setTextColor(80);
       doc.text("Generated on " + new Date().toLocaleString(), 40, 66);
 
-      // Metrics
       const total = orders.length;
       const pending = orders.filter((o) => o.status === "pending").length;
       const approved = orders.filter((o) => o.status === "approved").length;
@@ -148,15 +145,8 @@ export default function PurchaseItems() {
         { label: "Delivered", value: delivered },
       ];
 
-      // Card grid (3 per row)
-      const startX = 40;
-      const startY = 90;
-      const cardW = 160;
-      const cardH = 70;
-      const gap = 15;
-
-      let x = startX;
-      let y = startY;
+      const startX = 40, startY = 90, cardW = 160, cardH = 70, gap = 15;
+      let x = startX, y = startY;
 
       metrics.forEach((m, i) => {
         doc.setDrawColor(225);
@@ -174,20 +164,15 @@ export default function PurchaseItems() {
         doc.text(m.label, x + cardW / 2, y + 48, { align: "center" });
 
         x += cardW + gap;
-        if ((i + 1) % 3 === 0) {
-          x = startX;
-          y += cardH + gap;
-        }
+        if ((i + 1) % 3 === 0) { x = startX; y += cardH + gap; }
       });
 
-      // Section title "Orders"
       let tableStartY = y + cardH + 25;
       doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(33);
       doc.text("Orders", 60, tableStartY);
 
-      // Table
       const tableData = orders.map((o) => [
         o.id,
         o.supplier,
@@ -453,8 +438,9 @@ Delivery: ${o.deliveryDate ? fmt(o.deliveryDate) : "-"}`);
 
   // ---------- UI ----------
   return (
-    <div className="dashboard-layout">
-      <Sidebar />
+    // ▼▼ Namespaced page wrapper
+    <div className="po">
+      <Sidebarpul />
       <main className="main-content">
         <div className="container" id="purchase-items">
           <div className="header">

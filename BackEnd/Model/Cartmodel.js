@@ -1,33 +1,21 @@
-/*const mongoose = require("mongoose");
+// BackEnd/Model/CartModel.js
+const mongoose = require("mongoose");
 
-const userSchema = new mongoose.Schema({
-  ProductId: {
-    type: String, // <-- change from Number to String
-    required: true
-  },
-  product_name: String,
-  quantity: Number,
-  price_per_unit: Number,
-  customer_id: String,
-  selected_variant: String,
-  created_at: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-module.exports = mongoose.model("User", userSchema);
-*/const mongoose = require("mongoose");
-
-const ProductSchema = new mongoose.Schema({
+const ProductSchema = new mongoose.Schema(
+  {
     name: { type: String, required: true },
-    category: { type: String },
-    img: { type: String },
-    price: { type: Number, required: true },
-    stock: { type: Number, default: 0 },
-    rating: { type: Number, default: 4.5 },
+    category: { type: String, default: "" },
+    img: { type: String, default: "" },
+    price: { type: Number, required: true, min: 0 },
+    stock: { type: Number, default: 0, min: 0 },
+    rating: { type: Number, default: 0, min: 0, max: 5 },
     discountType: { type: String, enum: ["none", "percentage", "fixed"], default: "none" },
-    discountValue: { type: Number, default: 0 }
-}, { timestamps: true });
+    discountValue: { type: Number, default: 0, min: 0 },
+  },
+  { timestamps: true, versionKey: false }
+);
 
-module.exports = mongoose.model("Product", ProductSchema);
+// IMPORTANT: use existing model if already compiled
+module.exports =
+  mongoose.models.Product || mongoose.model("Product", ProductSchema, "products"); 
+//                                          ^ model name        ^ collection name (adjust if needed)

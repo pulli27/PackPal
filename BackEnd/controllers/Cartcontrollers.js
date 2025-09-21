@@ -1,11 +1,11 @@
 
-const Product = require("../Model/CartModel");
+const CartProduct = require("../Model/CartModel");
 
 // @desc    Get all products
 // @route   GET /api/products
 exports.getProducts = async (req, res) => {
     try {
-        const products = await Product.find();
+        const products = await CartProduct.find();
         res.status(200).json({ success: true, count: products.length, data: products });
     } catch (err) {
         res.status(500).json({ success: false, message: "Failed to fetch products", error: err.message });
@@ -16,7 +16,7 @@ exports.getProducts = async (req, res) => {
 // @route   GET /api/products/:id
 exports.getProductById = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id);
+        const product = await CartProduct.findById(req.params.id);
         if (!product) return res.status(404).json({ success: false, message: "Product not found" });
 
         res.status(200).json({ success: true, data: product });
@@ -35,7 +35,7 @@ exports.addProduct = async (req, res) => {
             return res.status(400).json({ success: false, message: "Name and price are required" });
         }
 
-        const newProduct = await Product.create({
+        const newProduct = await CartProduct.create({
             name,
             category,
             img,
@@ -56,7 +56,7 @@ exports.addProduct = async (req, res) => {
 // @route   PUT /api/products/:id
 exports.updateProduct = async (req, res) => {
     try {
-        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, {
+        const updatedProduct = await CartProduct.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true
         });
@@ -73,7 +73,7 @@ exports.updateProduct = async (req, res) => {
 // @route   DELETE /api/products/:id
 exports.deleteProduct = async (req, res) => {
     try {
-        const deletedProduct = await Product.findByIdAndDelete(req.params.id);
+        const deletedProduct = await CartProduct.findByIdAndDelete(req.params.id);
         if (!deletedProduct) return res.status(404).json({ success: false, message: "Product not found" });
 
         res.status(200).json({ success: true, message: "Product deleted successfully" });
@@ -92,7 +92,7 @@ exports.applyDiscount = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid discount type" });
         }
 
-        const updatedProduct = await Product.findByIdAndUpdate(
+        const updatedProduct = await CartProduct.findByIdAndUpdate(
             req.params.id,
             { discountType, discountValue },
             { new: true, runValidators: true }

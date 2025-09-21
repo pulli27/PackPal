@@ -1,17 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./Discounts.css";
+import Sidebarsa from "../Sidebar/Sidebarsa";
 
 /* ===== ONE PLACE TO EDIT ===== */
 const URL = "http://localhost:5000/carts";
 
 /* ===== Helpers ===== */
 const money = (n) =>
-  "LKR" +
   Number(n || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
 const pct = (n) => `${Number(n || 0).toFixed(0)}%`;
 
 const effectivePrice = (p) => {
@@ -60,17 +61,13 @@ export default function DiscountsPage() {
     () => products.find((p) => p.id === form.productId) || null,
     [products, form.productId]
   );
-  const valueNum = useMemo(() => Number(form.value), [form.value]);
 
   /* ---------------- Validation ---------------- */
   function validate(nextForm = form) {
     const e = {};
-    // product
     if (!nextForm.productId) e.productId = "Please select a product.";
-    // type
     if (!nextForm.type || nextForm.type === "none")
       e.type = "Choose Percentage or Fixed.";
-    // value
     if (nextForm.type !== "none") {
       if (nextForm.value === "" || nextForm.value === null)
         e.value = "Enter a discount value.";
@@ -78,7 +75,10 @@ export default function DiscountsPage() {
         e.value = "Value must be a number.";
       else if (Number(nextForm.value) < 0)
         e.value = "Value must be 0 or greater.";
-      else if (nextForm.type === "percentage" && (Number(nextForm.value) > 90 || Number(nextForm.value) < 0))
+      else if (
+        nextForm.type === "percentage" &&
+        (Number(nextForm.value) > 90 || Number(nextForm.value) < 0)
+      )
         e.value = "Percentage must be between 0 and 90.";
       else if (
         nextForm.type === "fixed" &&
@@ -91,7 +91,6 @@ export default function DiscountsPage() {
     return e;
   }
 
-  // revalidate when deps change
   useEffect(() => {
     validate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,7 +146,7 @@ export default function DiscountsPage() {
       await axios.put(`${URL}/${prod.id}`, payload, {
         headers: { "Content-Type": "application/json" },
       });
-      await loadProducts(); // refresh dropdown + tables
+      await loadProducts();
       setForm((f) => ({ ...f, value: "" }));
     } catch (e) {
       alert(e?.response?.data?.message || e.message || "Failed to apply discount");
@@ -178,195 +177,185 @@ export default function DiscountsPage() {
 
   /* ---------------- Render ---------------- */
   return (
-    <div className="content discounts-page">
-      <h1 className="page-title">Discounts</h1>
-      <p className="muted">Create and manage product price discounts.</p>
+    /* === PAGE WRAP START === */
+    <div className="page-wrap discounts-page">
+      {/* Left: Sidebar */}
+      <Sidebarsa />
 
-      {loading && <div className="muted">Loading…</div>}
-      {err && (
-        <div className="error" style={{ color: "#b91c1c", marginBottom: 8 }}>
-          {err}
-        </div>
-      )}
+      {/* Right: Main column */}
+      <main className="discounts-main">
+        <div className="container">
+          <h1 className="page-title">Discounts</h1>
+          <p className="muted">Create and manage product price discounts.</p>
 
-      {/* Create / Update */}
-      <section className="section">
-        <div className="head">
-          <h3>Create / Update Product Discounts</h3>
-          <div className="actions">
-            <button className="btn" onClick={loadProducts}>
-              Reload
-            </button>
-          </div>
-        </div>
-        <div className="body">
-          <div className="form-wrapper">
-            <div className="grid grid-3">
-              {/* Select Product */}
-              <div>
-                <label>
-                  Select Product{" "}
-                  {errors.productId && (
-                    <span style={{ color: "#b91c1c", fontWeight: 600 }}>
-                      • {errors.productId}
-                    </span>
-                  )}
-                </label>
-                <select
-                  className={errors.productId ? "invalid" : ""}
-                  value={form.productId}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, productId: e.target.value }))
-                  }
-                >
-                  <option value="">Select a product</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — {money(effectivePrice(p))}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          {loading && <div className="muted">Loading…</div>}
+          {err && (
+            <div className="error" style={{ color: "#b91c1c", marginBottom: 8 }}>
+              {err}
+            </div>
+          )}
 
-              {/* Type */}
-              <div>
-                <label>
-                  Discount Type{" "}
-                  {errors.type && (
-                    <span style={{ color: "#b91c1c", fontWeight: 600 }}>
-                      • {errors.type}
-                    </span>
-                  )}
-                </label>
-                <select
-                  className={errors.type ? "invalid" : ""}
-                  value={form.type}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, type: e.target.value }))
-                  }
-                >
-                  <option value="none">None</option>
-                  <option value="percentage">Percentage (%)</option>
-                  <option value="fixed">Fixed (LKR)</option>
-                </select>
-              </div>
-
-              {/* Value */}
-              <div>
-                <label>
-                  Discount Value{" "}
-                  {errors.value && (
-                    <span style={{ color: "#b91c1c", fontWeight: 600 }}>
-                      • {errors.value}
-                    </span>
-                  )}
-                </label>
-                <input
-                  className={errors.value ? "invalid" : ""}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder={
-                    form.type === "percentage" ? "0–90" : "≤ price in LKR"
-                  }
-                  value={form.value}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, value: e.target.value }))
-                  }
-                  disabled={form.type === "none"}
-                />
-                {/* Helper hint */}
-                {selectedProduct && form.type === "fixed" && (
-                  <small className="muted">
-                    Max: {money(selectedProduct.price)}
-                  </small>
-                )}
-                {form.type === "percentage" && (
-                  <small className="muted">Allowed: 0–90%</small>
-                )}
+          {/* Create / Update */}
+          <section className="section">
+            <div className="head">
+              <h3>Create / Update Product Discounts</h3>
+              <div className="actions">
+                <button className="btn" onClick={loadProducts}>Reload</button>
               </div>
             </div>
-          </div>
+            <div className="body">
+              <div className="form-wrapper">
+                <div className="grid grid-3">
+                  {/* Select Product */}
+                  <div>
+                    <label>
+                      Select Product{" "}
+                      {errors.productId && (
+                        <span style={{ color: "#b91c1c", fontWeight: 600 }}>
+                          • {errors.productId}
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      className={errors.productId ? "invalid" : ""}
+                      value={form.productId}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, productId: e.target.value }))
+                      }
+                    >
+                      <option value="">Select a product</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — {money(effectivePrice(p))}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-          <div
-            className="actions"
-            style={{ marginTop: 12, justifyContent: "center", gap: 8 }}
-          >
-            <button
-              className="btn green"
-              onClick={applyDiscount}
-              disabled={!isValid || loading}
-              title={!isValid ? "Fix validation errors" : ""}
-            >
-              Apply Discount
-            </button>
-            <button
-              className="btn red"
-              onClick={clearDiscount}
-              disabled={!form.productId || loading}
-            >
-              Clear Discount
-            </button>
-          </div>
-        </div>
-      </section>
+                  {/* Type */}
+                  <div>
+                    <label>
+                      Discount Type{" "}
+                      {errors.type && (
+                        <span style={{ color: "#b91c1c", fontWeight: 600 }}>
+                          • {errors.type}
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      className={errors.type ? "invalid" : ""}
+                      value={form.type}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, type: e.target.value }))
+                      }
+                    >
+                      <option value="none">None</option>
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="fixed">Fixed (LKR)</option>
+                    </select>
+                  </div>
 
-      {/* Active Discounts */}
-      <section className="section">
-        <div className="head">
-          <h3>Active Discounts</h3>
-        </div>
-        <div className="body table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>PRODUCT</th>
-                <th className="right">BASE PRICE</th>
-                <th>TYPE</th>
-                <th className="right">VALUE</th>
-                <th className="right">NEW PRICE</th>
-                <th className="right">YOU SAVE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {discounted.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="muted">
-                    No active discounts
-                  </td>
-                </tr>
-              )}
-              {discounted.map((p, i) => {
-                const ep = effectivePrice(p);
-                const sv = saving(p);
-                return (
-                  <tr key={p.id}>
-                    <td>{i + 1}</td>
-                    <td>{p.name}</td>
-                    <td className="right">{money(p.price)}</td>
-                    <td>
-                      {p.discountType === "percentage" ? "Percentage" : "Fixed"}
-                    </td>
-                    <td className="right">
-                      {p.discountType === "percentage"
-                        ? pct(p.discountValue)
-                        : money(p.discountValue)}
-                    </td>
-                    <td className="right">{money(ep)}</td>
-                    <td className="right">{money(sv)}</td>
+                  {/* Value */}
+                  <div>
+                    <label>
+                      Discount Value{" "}
+                      {errors.value && (
+                        <span style={{ color: "#b91c1c", fontWeight: 600 }}>
+                          • {errors.value}
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      className={errors.value ? "invalid" : ""}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={form.type === "percentage" ? "0–90" : "≤ price in LKR"}
+                      value={form.value}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, value: e.target.value }))
+                      }
+                      disabled={form.type === "none"}
+                    />
+                    {selectedProduct && form.type === "fixed" && (
+                      <small className="muted">Max: {money(selectedProduct.price)}</small>
+                    )}
+                    {form.type === "percentage" && (
+                      <small className="muted">Allowed: 0–90%</small>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="actions" style={{ marginTop: 12, justifyContent: "flex-start", gap: 8 }}>
+                <button
+                  className="btn green"
+                  onClick={applyDiscount}
+                  disabled={!isValid || loading}
+                  title={!isValid ? "Fix validation errors" : ""}
+                >
+                  Apply Discount
+                </button>
+                <button
+                  className="btn red"
+                  onClick={clearDiscount}
+                  disabled={!form.productId || loading}
+                >
+                  Clear Discount
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Active Discounts */}
+          <section className="section">
+            <div className="head"><h3>Active Discounts</h3></div>
+            <div className="body table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>PRODUCT</th>
+                    <th className="right">BASE PRICE</th>
+                    <th>TYPE</th>
+                    <th className="right">VALUE</th>
+                    <th className="right">NEW PRICE</th>
+                    <th className="right">YOU SAVE</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                </thead>
+                <tbody>
+                  {discounted.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="muted">No active discounts</td>
+                    </tr>
+                  )}
+                  {discounted.map((p, i) => {
+                    const ep = effectivePrice(p);
+                    const sv = saving(p);
+                    return (
+                      <tr key={p.id}>
+                        <td>{i + 1}</td>
+                        <td>{p.name}</td>
+                        <td className="right">{money(p.price)}</td>
+                        <td>{p.discountType === "percentage" ? "Percentage" : "Fixed"}</td>
+                        <td className="right">
+                          {p.discountType === "percentage" ? pct(p.discountValue) : money(p.discountValue)}
+                        </td>
+                        <td className="right">{money(ep)}</td>
+                        <td className="right">{money(sv)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-      {/* tiny inline style for invalid fields if your CSS doesn't have it */}
-      <style>{`
-        .invalid { border-color: #ef4444 !important; outline: none; }
-      `}</style>
+          {/* tiny inline style for invalid fields if your CSS doesn't have it */}
+          <style>{`.invalid { border-color: #ef4444 !important; outline: none; }`}</style>
+        </div>
+      </main>
     </div>
+    /* === PAGE WRAP END === */
   );
 }

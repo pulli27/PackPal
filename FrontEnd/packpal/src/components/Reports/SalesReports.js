@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./SalesReports.css";
+import Sidebarsa from "../Sidebar/Sidebarsa";
 
 /* ===================== Config ===================== */
 const TX_URL = "http://localhost:5000/transactions";
@@ -343,9 +344,15 @@ export default function SalesReport() {
 
   /* -------- UI -------- */
   return (
-    <div className="content reports-page">
+  /* === PAGE WRAP START === */
+  <div className="page-wrap reports-page">
+    {/* Left: Sidebar */}
+    <Sidebarsa />
+
+    {/* Right: Main */}
+    <main className="content reports-page">
       <h1 className="page-title">Sales Report</h1>
-      <p className="muted">Range-aware analytics with charts & tables.</p>
+      <p className="muted">Range-aware analytics with charts &amp; tables.</p>
 
       {loading && <div className="muted">Loading…</div>}
       {err && <div className="error" style={{ color: "#b91c1c", marginBottom: 8 }}>{err}</div>}
@@ -366,9 +373,7 @@ export default function SalesReport() {
             </div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
               <button className="btn" onClick={fetchTx}>Reload</button>
-              <button className="btn primary" onClick={() => setGeneratedAt(new Date().toLocaleString())}>
-                Generate
-              </button>
+              <button className="btn primary" onClick={() => setGeneratedAt(new Date().toLocaleString())}>Generate</button>
               <button className="btn" onClick={exportPdf}>Export PDF</button>
             </div>
           </div>
@@ -394,8 +399,8 @@ export default function SalesReport() {
         </div>
       </section>
 
-      {/* ANALYSIS charts (orange) */}
-      <section className="section">
+      {/* Analysis charts */}
+      <section className="section analysis">
         <div className="head"><h3>Analysis Charts</h3></div>
         <div className="body">
           <div className="grid" style={{ display: "grid", gap: 12 }}>
@@ -410,9 +415,9 @@ export default function SalesReport() {
               <ChartCard title="Status Breakdown (Amount)" titleColor="#9a3412">
                 <DonutChart
                   series={[
-                    { label: "Paid",    value: analytics.paidRevenue },
+                    { label: "Paid", value: analytics.paidRevenue },
                     { label: "Pending", value: analytics.pendingAmt },
-                    { label: "Refund",  value: analytics.refundAmt },
+                    { label: "Refund", value: analytics.refundAmt },
                   ]}
                   colors={ORANGE_PALETTE}
                 />
@@ -422,7 +427,8 @@ export default function SalesReport() {
         </div>
       </section>
 
-      {/* Sales by Product — light blue table with fixed columns */}
+      {/* Tables */}
+      {/* Sales by Product */}
       <section className="section">
         <div className="head"><h3>Analysis — Sales by Product (Paid)</h3></div>
         <div className="body">
@@ -432,12 +438,12 @@ export default function SalesReport() {
             <div className="table-wrap">
               <table className="report-table">
                 <colgroup>
-                  <col style={{ width: "28%" }} />  {/* product */}
-                  <col style={{ width: "10%" }} />  {/* orders */}
-                  <col style={{ width: "10%" }} />  {/* qty */}
-                  <col style={{ width: "14%" }} />  {/* avg price */}
-                  <col style={{ width: "18%" }} />  {/* discount total */}
-                  <col style={{ width: "20%" }} />  {/* revenue */}
+                  <col style={{ width: "28%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "20%" }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -467,7 +473,7 @@ export default function SalesReport() {
         </div>
       </section>
 
-      {/* Top customers — light blue table with fixed columns */}
+      {/* Top Customers */}
       <section className="section">
         <div className="head"><h3>Top Customers (Paid)</h3></div>
         <div className="body">
@@ -477,9 +483,9 @@ export default function SalesReport() {
             <div className="table-wrap">
               <table className="report-table">
                 <colgroup>
-                  <col style={{ width: "60%" }} />  {/* customer */}
-                  <col style={{ width: "15%" }} />  {/* orders */}
-                  <col style={{ width: "25%" }} />  {/* revenue */}
+                  <col style={{ width: "60%" }} />
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "25%" }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -502,6 +508,9 @@ export default function SalesReport() {
           )}
         </div>
       </section>
-    </div>
-  );
+    </main>
+  </div>
+  /* === PAGE WRAP END === */
+);
+
 }

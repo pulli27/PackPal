@@ -1,96 +1,135 @@
-/* --- Tokens to match the HTML demo --- */
-:root{
-  --bg:#f1f5f9; --card:#fff; --text:#0f172a; --muted:#637087; --border:#e5e7eb;
-  --primary:#2563eb; --danger:#ef4444; --ok:#16a34a;
-  --sidebar-w: 260px;          /* ← must equal Sidebar width */
-  --container-w: 1100px;       /* centered column width like screenshot */
+/* ====== Page wrap (scoped) ======================================= */
+.page-wrap.discounts-page{
+  /* Theme tokens (scoped, not global) */
+  --bg:#f1f5f9;
+  --card:#fff;
+  --text:#0f172a;
+  --muted:#637087;
+  --border:#e5e7eb;
+  --primary:#2563eb;
+  --danger:#ef4444;
+  --ok:#16a34a;
+
+  --sidebar-w: 260px;   /* match your Sidebarsa width */
+  --container-w: 1100px;
+
+  display: flex;               /* sidebar + main */
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
 }
 
+/* Sidebar column (assumes your component outputs .sidebar) */
+.page-wrap.discounts-page .sidebar{
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  background: #fff;
+  border-right: 1px solid var(--border);
+}
 
-/* Center the whole column while keeping the light gutters */
-.content.discounts-page > *{
+/* Main column */
+.discounts-main{
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 20px;
+   margin-left: 270px;
+}
+
+/* Centered content column */
+.discounts-main .container{
   max-width: var(--container-w);
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0 auto;
 }
 
 /* Heading & subtitle */
-.page-title{
+.discounts-main .page-title{
   margin: 0 0 8px;
-  font-size: 48px;             /* big like the second image */
+  font-size: 48px;
   font-weight: 900;
   letter-spacing: .01em;
   line-height: 1.1;
   text-align: left;
 }
-.muted{ color: var(--muted); font-size: 13px; }
+.discounts-main .muted{ color: var(--muted); font-size: 13px; }
 
 /* Card / section */
-.section{
+.discounts-main .section{
   background:#fff; border:1px solid var(--border); border-radius:16px;
   overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.05); margin:18px 0;
 }
-.head{
+.discounts-main .head{
   display:flex; justify-content:space-between; align-items:center;
   padding:16px 18px; border-bottom:1px solid var(--border);
 }
-.body{ padding:18px; }
+.discounts-main .body{ padding:18px; }
 
-/* Form row — left aligned (not centered) */
-.form-wrapper{ display:flex; justify-content:flex-start; padding:4px 0; }
-.grid{ display:grid; gap:14px; }
-.grid.grid-3{
-  grid-template-columns: 1.2fr 1fr 1fr;   /* spacing like the demo */
+/* Form row */
+.discounts-main .form-wrapper{ display:flex; justify-content:flex-start; padding:4px 0; }
+.discounts-main .grid{ display:grid; gap:14px; }
+.discounts-main .grid.grid-3{
+  grid-template-columns: 1.2fr 1fr 1fr;
   width: 100%;
   max-width: 100%;
 }
 
-label{ display:block; font-size:12px; color:#475569; margin-bottom:6px; font-weight:700; }
-select, input{
+.discounts-main label{ display:block; font-size:12px; color:#475569; margin-bottom:6px; font-weight:700; }
+.discounts-main select,
+.discounts-main input{
   width:100%; padding:12px 14px; border:1px solid var(--border);
   border-radius:12px; outline:0; font:inherit; background:#fff;
 }
 
-/* Buttons row — left aligned */
-.actions{
+/* Buttons */
+.discounts-main .actions{
   display:flex; gap:12px; flex-wrap:wrap;
   justify-content:flex-start;
   margin-top: 10px;
 }
-.btn{
+.discounts-main .btn{
   display:inline-flex; align-items:center; gap:8px; padding:10px 14px;
   border-radius:12px; border:1px solid var(--border); background:#fff;
   cursor:pointer; font-weight:700;
 }
-.btn.green{ background:var(--ok); color:#fff; border-color:var(--ok); }
-.btn.red{ background:var(--danger); color:#fff; border-color:var(--danger); }
-.btn:hover{ filter:brightness(.97); }
+.discounts-main .btn.green{ background:var(--ok); color:#fff; border-color:var(--ok); }
+.discounts-main .btn.red{ background:var(--danger); color:#fff; border-color:var(--danger); }
+.discounts-main .btn:hover{ filter:brightness(.97); }
 
 /* Table */
-.table-wrap{ overflow-x:auto; }
-table{ width:100%; border-collapse:collapse; table-layout:fixed; }
-thead th{
+.discounts-main .table-wrap{ overflow-x:auto; }
+.discounts-main table{ width:100%; border-collapse:collapse; table-layout:fixed; }
+.discounts-main thead th{
   background:#f3f4f6; color:#374151; text-transform:uppercase;
   font-size:12px; letter-spacing:.04em;
 }
-th,td{
+.discounts-main th,
+.discounts-main td{
   padding:12px 14px; border-bottom:1px solid var(--border);
   text-align:left; vertical-align:top; font-size:14px;
   white-space:normal; word-break:break-word; overflow-wrap:anywhere;
 }
-tr:hover td{ background:#fafafa; }
-.right{ text-align:right; }
+.discounts-main tr:hover td{ background:#fafafa; }
+.discounts-main .right{ text-align:right; }
+
+/* Errors */
+.discounts-main .error{
+  background:#fee2e2; border:1px solid #fecaca; color:#991b1b;
+  padding:10px 12px; border-radius:10px;
+}
 
 /* Responsive */
 @media (max-width: 1200px){
-  :root{ --container-w: 960px; }
+  .page-wrap.discounts-page{ --container-w: 960px; }
 }
 @media (max-width: 1024px){
-  .content.discounts-page{ margin-left: 0; padding: 20px; }
-  :root{ --container-w: 760px; }
-  .grid.grid-3{ grid-template-columns: 1fr; }
+  .page-wrap.discounts-page{ flex-direction: column; }
+  .page-wrap.discounts-page .sidebar{
+    width: 100%; flex: 0 0 auto; border-right: 0; border-bottom: 1px solid var(--border);
+  }
+  .discounts-main{ padding: 16px; }
+  .page-wrap.discounts-page{ --container-w: 760px; }
+  .discounts-main .grid.grid-3{ grid-template-columns: 1fr; }
 }
 @media (max-width: 640px){
-  :root{ --container-w: 92vw; }
-  .page-title{ font-size: 36px; }
+  .page-wrap.discounts-page{ --container-w: 92vw; }
+  .discounts-main .page-title{ font-size: 36px; }
 }

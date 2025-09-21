@@ -1,7 +1,7 @@
 // src/Components/ItemInventory/ItemInventory.js
 import React, { useEffect, useRef } from "react";
 import "./ItemInventory.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebarpul from "../Sidebar/Sidebarpul";
 import { api } from "../../lib/api";
 
 /* ---------------------------
@@ -200,7 +200,7 @@ export default function ItemInventory() {
           totalValue,
           avgUnitPrice: avgUnit,
           lowStockCount: lowStockItems.length,
-          fixedSafetyStock: SAFETY_STOCK,
+          fixedSafetyStock: 40,
           reportDate: new Date().toLocaleString(),
         },
         inventory: inventoryWithCalcs,
@@ -238,7 +238,7 @@ export default function ItemInventory() {
                 <tr>
                   <td>${i.id}</td><td>${i.name}</td><td>${i.quantity}</td>
                   <td>${i.reorderLevel}</td><td>${Math.max(0, i.reorderLevel - i.quantity)}</td>
-                  <td>LKR ${Number(toNum(i.unitPrice)).toFixed(2)}</td>
+                  <td>LKR ${Number(i.unitPrice).toFixed(2)}</td>
                 </tr>`
                 )
                 .join("")}
@@ -261,7 +261,7 @@ export default function ItemInventory() {
               <tr ${i.isLowStock ? 'class="low-stock-highlight"' : ""}>
                 <td>${i.id}</td><td>${i.name}</td><td>${i.description}</td>
                 <td>${i.quantity}</td><td>${i.reorderLevel}</td>
-                <td>LKR ${Number(toNum(i.unitPrice)).toFixed(2)}</td>
+                <td>LKR ${Number(i.unitPrice).toFixed(2)}</td>
                 <td>LKR ${i.totalPrice.toLocaleString()}</td>
               </tr>`
               )
@@ -306,7 +306,7 @@ export default function ItemInventory() {
       if (m) m.style.display = "none";
     }
 
-    /* ====== ICON HELPERS (vector, avoid emoji fonts in PDF) ====== */
+    /* ===== vector icons + export/print/download (unchanged) ===== */
     function drawReceiptIcon(doc, x, y) {
       doc.setDrawColor(53, 99, 255);
       doc.setLineWidth(0.4);
@@ -334,23 +334,19 @@ export default function ItemInventory() {
       doc.line(x+4, y+2, x+4, y+4);
     }
 
-    /* ===== Export (styled, vector icons) ===== */
     async function exportToPDF() {
       try {
         await ensurePdfTools();
-
         const data = buildInventoryReport();
         const jsPDF = getJsPDFCtor();
         const doc = new jsPDF("p", "mm", "a4");
 
-        // Colors
         const BLUE = [53, 99, 255];
         const BLUE_HEAD = [64, 97, 239];
         const GREY = [110, 119, 129];
         const ORANGE = [244, 143, 64];
         const RED = [231, 76, 60];
 
-        // Header (icon + title)
         drawReceiptIcon(doc, 14, 9);
         doc.setFontSize(16);
         doc.setTextColor(40, 40, 40);
@@ -359,13 +355,12 @@ export default function ItemInventory() {
         doc.setTextColor(...GREY);
         doc.text(`Generated on ${data.summary.reportDate}`, 24, 22);
 
-        // Stat cards (3 x 2 grid)
         const cards = [
           [String(data.summary.totalItems), "TOTAL ITEMS"],
           [data.summary.totalQuantity.toLocaleString(), "TOTAL QUANTITY"],
           [`LKR ${data.summary.totalValue.toLocaleString()}`, "TOTAL VALUE"],
           [String(data.summary.lowStockCount), "LOW STOCK ITEMS", true],
-          [`LKR ${Number(data.summary.avgUnitPrice).toFixed(2)}`, "AVG UNIT PRICE"],
+          [`LKR ${Number(data.summary.avgUnitPrice || 0).toFixed(2)}`, "AVG UNIT PRICE"],
           [String(data.summary.fixedSafetyStock), "SAFETY STOCK"],
         ];
         let cx = 14, cy = 30;
@@ -390,7 +385,6 @@ export default function ItemInventory() {
           }
         });
 
-        // Low Stock section
         let y = cy + 6;
         drawWarningIcon(doc, 14, y - 8);
         doc.setTextColor(40, 40, 40);
@@ -406,12 +400,9 @@ export default function ItemInventory() {
             startY: y,
             head: [["ITEM ID", "ITEM NAME", "CURRENT QTY", "REORDER LEVEL", "SHORTAGE", "UNIT PRICE"]],
             body: data.lowStockItems.map((i) => [
-              i.id,
-              i.name,
-              i.quantity,
-              i.reorderLevel,
+              i.id, i.name, i.quantity, i.reorderLevel,
               Math.max(0, i.reorderLevel - i.quantity),
-              `LKR ${Number(i.unitPrice).toFixed(2)}`,
+              `LKR ${Number(i.unitPrice).toFixed(2)}`
             ]),
             styles: { fontSize: 10, cellPadding: 3 },
             headStyles: { fillColor: RED, textColor: 255, halign: "left" },
@@ -426,7 +417,6 @@ export default function ItemInventory() {
           y += 20;
         }
 
-        // Complete Inventory section
         drawBoxIcon(doc, 14, y - 8);
         doc.setTextColor(40, 40, 40);
         doc.setFontSize(14);
@@ -440,13 +430,9 @@ export default function ItemInventory() {
           startY: y,
           head: [["ITEM ID", "ITEM NAME", "DESCRIPTION", "QUANTITY", "REORDER LEVEL", "UNIT PRICE", "TOTAL VALUE"]],
           body: data.inventory.map((i) => [
-            i.id,
-            i.name,
-            i.description,
-            i.quantity,
-            i.reorderLevel,
+            i.id, i.name, i.description, i.quantity, i.reorderLevel,
             `LKR ${Number(i.unitPrice).toFixed(2)}`,
-            `LKR ${i.totalPrice.toLocaleString()}`,
+            `LKR ${i.totalPrice.toLocaleString()}`
           ]),
           styles: { fontSize: 10, cellPadding: 3 },
           headStyles: { fillColor: BLUE_HEAD, textColor: 255, halign: "left" },
@@ -669,8 +655,9 @@ export default function ItemInventory() {
   }, []);
 
   return (
-    <div className="page-shell">
-      <Sidebar />
+    // ▼▼ added the namespace "ii" so CSS can override safely
+    <div className="page-shell ii">
+      <Sidebarpul />
       <div className="main-content">
         <div className="container">
           {/* Header */}

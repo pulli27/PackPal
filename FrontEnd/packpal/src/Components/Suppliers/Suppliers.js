@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useEffect, useCallback } from "react";
-import Sidebar from "../Sidebar/Sidebar";
+// src/Components/Suppliers/Supplier.js
+import React, { useMemo, useState, useEffect, useCallback } from "react"; 
+import Sidebarpul from "../Sidebar/Sidebarpul";
 import "./Suppliers.css";
 
 /* ------------------- Data ------------------- */
@@ -182,8 +183,7 @@ export default function Suppliers() {
     return () => (document.body.style.overflow = prev);
   }, [selected, reportOpen]);
 
-  /* ---------- Report (same pattern as ItemInventory) ---------- */
-
+  /* ---------- Report ---------- */
   const buildSupplierReportData = useCallback(() => {
     const enriched = suppliers.map((s) => ({
       ...s,
@@ -363,12 +363,11 @@ export default function Suppliers() {
           ""
         );
 
-        // Build a clean A4 canvas to rasterize
         const temp = document.createElement("div");
         temp.style.position = "absolute";
         temp.style.left = "-9999px";
         temp.style.top = "0";
-        temp.style.width = "794px"; // A4 width @ 96dpi ~ 794px
+        temp.style.width = "794px";
         temp.style.padding = "40px";
         temp.style.fontFamily = "Inter, Arial, sans-serif";
         temp.style.fontSize = "14px";
@@ -446,7 +445,6 @@ export default function Suppliers() {
       URL.revokeObjectURL(url);
     }
 
-    // expose for inline HTML buttons
     window.__sup_exportToPDF = exportToPDF;
     window.__sup_printReport = printReport;
     window.__sup_downloadJSON = downloadJSON;
@@ -465,8 +463,9 @@ export default function Suppliers() {
   };
 
   return (
-    <div className="suppliers-page">
-      <Sidebar />
+    // ===== Page wrapper (scopes all styles) =====
+    <div className="sup">
+      <Sidebarpul />
 
       <main className="main" style={{ flex: 1 }}>
         <section className="dashboard">
@@ -695,7 +694,7 @@ export default function Suppliers() {
         </div>
       </div>
 
-      {/* Report Modal (preview like ItemInventory) */}
+      {/* Report Modal (preview) */}
       <div
         id="supReportModal"
         className="modal"
