@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import "./Finance.css";
 import Sidebarsa from "../Sidebar/Sidebarsa";
-
-const TX_URL = "http://localhost:5000/transactions";
+import { api } from "../../lib/api"; // shared axios instance
 
 const money = (n) =>
   "LKR" +
@@ -18,7 +16,7 @@ const unpackList = (payload) =>
     ? payload
     : payload?.transactions ?? payload?.items ?? payload?.data ?? [];
 
-// normalize to view model (method removed, status added)
+
 const toTx = (row) => ({
   id: String(
     row?.id ??
@@ -37,51 +35,34 @@ const toTx = (row) => ({
   status: (row?.status ?? "pending").toLowerCase(), // "pending" | "paid" | "refund"
 });
 
-/* ---------- CSV & Print helpers ---------- */
-const csvEscape = (v) => {
-  if (v == null) return "";
-  const s = String(v).replace(/"/g, '""');
-  return /[",\n]/.test(s) ? `"${s}"` : s;
-};
-const exportCsv = (filename, rows, headers) => {
-  const arr = Array.isArray(rows) ? rows : [];
-  const cols = headers || (arr.length ? Object.keys(arr[0]) : []);
-  const csv =
-    [cols.join(",")]
-      .concat(arr.map((r) => cols.map((c) => csvEscape(r[c])).join(",")))
-      .join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${filename}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-};
 
-const printHtml = (inner) => {
-  const w = window.open("", "_blank");
-  w.document.write(`<!DOCTYPE html><html><head><title>Print</title>
-    <style>
-      body{font-family:Arial,sans-serif;padding:16px}
-      table{width:100%;border-collapse:collapse}
-      th,td{border:1px solid #ddd;padding:8px}
-      thead th{background:#f3f4f6}
-      .right{text-align:right}
-      .center{text-align:center}
-      .pill{padding:4px 8px;border-radius:999px;font-weight:700;text-transform:capitalize;display:inline-block}
-      .pill.pending{background:#fef3c7;color:#b45309}
-      .pill.paid{background:#dcfce7;color:#15803d}
-      .pill.refund{background:#fee2e2;color:#b91c1c}
-    </style>
-  </head><body>${inner}</body></html>`);
-  w.document.close();
-  w.print();
-};
-/* ----------------------------------------- */
+// Try multiple path variants; return { path, data }
+async function getWithFallbacks(paths) {
+  let lastErr;
+  for (const p of paths) {
+    try {
+      const res = await api.get(p);
+      console.log("[Finance] Using transactions path:", p);
+      return { path: p, data: res.data };
+    } catch (e) {
+      lastErr = e;
+      const full = (api.defaults?.baseURL || "") + p;
+      console.warn(
+        "[Finance] Failed:",
+        p,
+        e?.response?.status || e.message,
+        "->",
+        full
+      );
+    }
+  }
+  throw lastErr || new Error("All endpoints failed");
+}
+
 
 export default function FinancePage() {
   const [txs, setTxs] = useState([]);
+  const [txBase, setTxBase] = useState("transactions"); // detected base path used for PUT/DELETE
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
@@ -95,15 +76,29 @@ export default function FinancePage() {
     setLoading(true);
     setErr("");
     try {
-      const res = await axios.get(TX_URL);
-      setTxs(unpackList(res.data).map(toTx));
+      // Try relative first (respects baseURL path), then absolute.
+      const { path, data } = await getWithFallbacks([
+        "transactions",
+        "api/transactions",
+        "/transactions",
+        "/api/transactions",
+      ]);
+      setTxBase(path.replace(/\/+$/, "")); // remember for later PUT/DELETE
+      setTxs(unpackList(data).map(toTx));
     } catch (e) {
-      setErr(e?.response?.data?.message || e.message || "Failed to load transactions");
+      const url = e?.config ? (e.config.baseURL || "") + (e.config.url || "") : "";
+      setErr(
+        (e?.response?.data?.message ||
+          e.message ||
+          "Failed to load transactions") + (url ? `\nURL: ${url}` : "")
+      );
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => { fetchTx(); }, []);
+  useEffect(() => {
+    fetchTx();
+  }, []);
 
   // newest first
   const rawRows = useMemo(() => txs.slice().reverse(), [txs]);
@@ -128,22 +123,48 @@ export default function FinancePage() {
     }));
   }, [rawRows, q]);
 
-  const doExport = () =>
-    exportCsv(
-      "transactions",
-      rows.map((r) => ({
-        txId: r.displayId,
-        date: r.date,
-        customer: r.customer,
-        product: r.productName,
-        qty: r.qty,
-        unitPrice: r.unitPrice,
-        discount: r.discountPerUnit,
-        total: r.total,
-        status: r.status,
-      })),
-      ["txId", "date", "customer", "product", "qty", "unitPrice", "discount", "total", "status"]
-    );
+
+  const doExport = () => {
+    const rowsForCsv = rows.map((r) => ({
+      txId: r.displayId,
+      date: r.date,
+      customer: r.customer,
+      product: r.productName,
+      qty: r.qty,
+      unitPrice: r.unitPrice,
+      discount: r.discountPerUnit,
+      total: r.total,
+      status: r.status,
+    }));
+    const cols = [
+      "txId",
+      "date",
+      "customer",
+      "product",
+      "qty",
+      "unitPrice",
+      "discount",
+      "total",
+      "status",
+    ];
+    const csvEscape = (v) => {
+      if (v == null) return "";
+      const s = String(v).replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    };
+    const csv =
+      [cols.join(",")]
+        .concat(rowsForCsv.map((r) => cols.map((c) => csvEscape(r[c])).join(",")))
+        .join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "transactions.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
 
   const doPrint = () => {
     const body = rows
@@ -161,7 +182,21 @@ export default function FinancePage() {
         </tr>`
       )
       .join("");
-    printHtml(`
+    const w = window.open("", "_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>Print</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:16px}
+        table{width:100%;border-collapse:collapse}
+        th,td{border:1px solid #ddd;padding:8px}
+        thead th{background:#f3f4f6}
+        .right{text-align:right}
+        .center{text-align:center}
+        .pill{padding:4px 8px;border-radius:999px;font-weight:700;text-transform:capitalize;display:inline-block}
+        .pill.pending{background:#fef3c7;color:#b45309}
+        .pill.paid{background:#dcfce7;color:#15803d}
+        .pill.refund{background:#fee2e2;color:#b91c1c}
+      </style>
+    </head><body>
       <h2>Transactions</h2>
       <table>
         <thead>
@@ -172,23 +207,26 @@ export default function FinancePage() {
         </thead>
         <tbody>${body}</tbody>
       </table>
-    `);
+    </body></html>`);
+    w.document.close();
+    w.print();
   };
 
   // ====== ACTIONS: EDIT (status only) ======
   const openEdit = (row) =>
     setEditing({
-      id: row.rid,       // real backend id
-      status: row.status // current status
+      id: row.rid, // real backend id
+      status: row.status,
     });
   const closeEdit = () => setEditing(null);
 
   const saveEdit = async () => {
     if (!editing) return;
     setSaving(true);
-    setErr(""); setOk("");
+    setErr("");
+    setOk("");
     try {
-      // find original row so we PUT full record with updated status only
+
       const orig = txs.find((t) => t.id === editing.id);
       const payload = {
         date: orig?.date,
@@ -197,10 +235,14 @@ export default function FinancePage() {
         qty: Number(orig?.qty || 1),
         unitPrice: Number(orig?.unitPrice || 0),
         discountPerUnit: Number(orig?.discountPerUnit || 0),
-        total: Number(orig?.total || (Number(orig?.unitPrice || 0) * Number(orig?.qty || 1))),
-        status: editing.status,
+
+        total: Number(
+          orig?.total ?? Number(orig?.unitPrice || 0) * Number(orig?.qty || 1)
+        ),
+        status: editing.status, // only change
+
       };
-      await axios.put(`${TX_URL}/${editing.id}`, payload, {
+      await api.put(`${txBase}/${editing.id}`, payload, {
         headers: { "Content-Type": "application/json" },
       });
       setOk("Status updated.");
@@ -208,7 +250,8 @@ export default function FinancePage() {
       await fetchTx();
       setTimeout(() => setOk(""), 1800);
     } catch (e) {
-      setErr(e?.response?.data?.message || e.message || "Update failed");
+      const url = e?.config ? (e.config.baseURL || "") + (e.config.url || "") : "";
+      setErr((e?.response?.data?.message || e.message || "Update failed") + (url ? `\nURL: ${url}` : ""));
     } finally {
       setSaving(false);
     }
@@ -217,30 +260,38 @@ export default function FinancePage() {
   // ====== DELETE BUTTON ======
   const deleteTx = async (rowId) => {
     if (!window.confirm("Delete this transaction?")) return;
-    setErr(""); setOk("");
+    setErr("");
+    setOk("");
     try {
-      await axios.delete(`${TX_URL}/${rowId}`);
+      await api.delete(`${txBase}/${rowId}`);
       await fetchTx();
       setOk("Deleted.");
       setTimeout(() => setOk(""), 1800);
     } catch (e) {
-      setErr(e?.response?.data?.message || e.message || "Delete failed");
+      const url = e?.config ? (e.config.baseURL || "") + (e.config.url || "") : "";
+      setErr((e?.response?.data?.message || e.message || "Delete failed") + (url ? `\nURL: ${url}` : ""));
     }
   };
 
   return (
     /* === PAGE WRAP START === */
     <div className="page-wrap finance-page">
-      {/* Left: Sidebar */}
-      <Sidebarsa />
 
-      {/* Right: Main */}
+      <Sidebarsa />
       <main className="finance-main">
         <h1 className="page-title">Finance</h1>
         <p className="muted">Payments recorded from checkout.</p>
 
-        {err && <div className="error" style={{ marginBottom: 12 }}>{err}</div>}
+        {err && (
+          <pre
+            className="error"
+            style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}
+          >
+            {err}
+          </pre>
+        )}
         {ok && <div className="ok" style={{ marginBottom: 12 }}>{ok}</div>}
+
 
         <section className="section">
           <div className="head">
@@ -293,10 +344,18 @@ export default function FinancePage() {
                           {r.discountPerUnit ? money(r.discountPerUnit) : "—"}
                         </td>
                         <td className="right">{money(r.total)}</td>
-                        <td><span className={`pill ${r.status}`}>{r.status}</span></td>
+
+                        <td>
+                          <span className={`pill ${r.status}`}>{r.status}</span>
+                        </td>
                         <td className="center">
-                          <button className="btn small warning" onClick={() => openEdit(r)}>✏️ Edit</button>
-                          <button className="btn small danger" onClick={() => deleteTx(r.rid)}>🗑 Delete</button>
+                          <button className="btn small warning" onClick={() => openEdit(r)}>
+                            ✏️ Edit
+                          </button>
+                          <button className="btn small danger" onClick={() => deleteTx(r.rid)}>
+                            🗑 Delete
+                          </button>
+
                         </td>
                       </tr>
                     ))}
@@ -307,7 +366,7 @@ export default function FinancePage() {
           </div>
         </section>
 
-        {/* STATUS-ONLY EDIT MODAL */}
+
         {editing && (
           <div className="modal-backdrop" onClick={closeEdit} role="dialog" aria-modal="true">
             <div className="modal" onClick={(e) => e.stopPropagation()}>

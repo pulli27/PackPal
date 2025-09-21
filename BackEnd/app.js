@@ -27,6 +27,10 @@ const salaryRoutes = require("./Route/SalaryRoute");
 const transferRoutes = require("./Route/TransferRoute");
 const contributions = require("./Route/contributions");
 
+//hiruni
+const sewing = require("./Routes/sewingInstructionRoutes");
+const quality = require("./Routes/qualityRoutes");
+
 
 if (!process.env.MONGO_URI) {
   console.error("FATAL: MONGO_URI is missing in BackEnd/.env");
@@ -63,7 +67,7 @@ app.use("/api/purchases",     purchaseRoutes);
 app.use("/api/products",      productRoutes);
 //sasangi
 app.use("/carts",             cartRoutes);
-app.use("/transactions",      transactionRoutes);
+app.use("/api/transactions",      transactionRoutes);
 //isumi
 app.use("/users",             userRouter);
 //sanugi
@@ -73,6 +77,10 @@ app.use("/api/advance", advanceRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/transfers", transferRoutes);
 app.use("/api/contributions", contributions);
+
+//hiruni
+app.use("/api/sewing-instructions", sewing);
+app.use("/api/quality", quality);
 
 // Health
 app.get("/health", (_req, res) => res.json({ ok: true }));

@@ -1,9 +1,9 @@
+// src/App.js
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 
-//pulli
-/* Use the EXACT casing of your folders: "Components" */
+/* pulli */
 import InventoryDashboard from "./Components/Dashboard/InventoryDashboard";
 import ItemInventory from "./Components/ItemInventory/ItemInventory";
 import Suppliers from "./Components/Suppliers/Suppliers";
@@ -12,8 +12,7 @@ import ProductInventory from "./Components/ProductInventory/ProductInventory";
 import Report from "./Components/Report/Report";
 import Settingspul from "./Components/Settings/Settingspul";
 
-//sasangi
-/* Other modules — keep these only if the files actually exist */
+/* sasangi */
 import CartDashboard from "./Components/Dashboard/CartDashboard";
 import ProductList from "./Components/Product/ProductList";
 import Discounts from "./Components/Discounts/Discounts";
@@ -23,15 +22,15 @@ import Settingssa from "./Components/Settings/Settingssa";
 import CustomerView from "./pages/CustomerView";
 import Cart from "./pages/Cart";
 
-//isumi
+/* isumi */
 import Udashboard from "./Components/Dashboard/Udashboard";
 import Login from "./Components/Login/Login";
 import UserManagement from "./Components/UserManagement/UserManagement";
 import Createaccount from "./Components/CreateAccount/Createaccount";
 import Orders from "./Components/Orders/Order";
-import Settingsis from "./Components/Settings/Settingsis"; 
+import Settingsis from "./Components/Settings/Settingsis";
 
-//sanu
+/* sanu */
 import FinanceDashboard from "./Components/Dashboard/FinanceDashboard";
 import SalaryCal from "./Components/SalaryCal/SalaryCal";
 import Attendance from "./Components/Attendance/Attendance";
@@ -53,7 +52,7 @@ function NotFound() {
     <div style={{ padding: 24 }}>
       <h2>404 – Page not found</h2>
       <p>Route didn’t match.</p>
-      <a href="/maindashboard">Go to Dashboard</a>
+      <a href="/home">Go to Home</a>
     </div>
   );
 }
@@ -61,11 +60,28 @@ function NotFound() {
 export default function App() {
   return (
     <Routes>
-      {/* default: go to dashboard */}
-      <Route path="/" element={<Navigate to="/maindashboard" replace />} />
+      {/* default redirect */}
+      <Route path="/" element={<Navigate to="/home" replace />} />
 
+      {/* Auth */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/createaccount" element={<Createaccount />} />
 
-      {/* Core inventory routes */}
+      {/* Storefront (no header/footer here; add inside each page if desired) */}
+      <Route path="/home" element={<Home />} />
+      <Route path="/handbag" element={<HandBag />} />
+      <Route path="/aboutpage" element={<AboutPage />} />
+      <Route path="/accessories" element={<Accessories />} />
+      <Route path="/clutches" element={<Clutches />} />
+      <Route path="/kidsbag" element={<KidsBag />} />
+      <Route path="/sizeguide" element={<SizeGuide />} />
+      <Route path="/sale" element={<Sales />} />
+      <Route path="/faq" element={<Faq />} />
+      <Route path="/customer" element={<CustomerView />} />
+      <Route path="/cart" element={<Cart />} />
+
+      {/* Internal / dashboards */}
+      {/* pulli */}
       <Route path="/maindashboard" element={<InventoryDashboard />} />
       <Route path="/iteminventory" element={<ItemInventory />} />
       <Route path="/supplier" element={<Suppliers />} />
@@ -74,37 +90,32 @@ export default function App() {
       <Route path="/report" element={<Report />} />
       <Route path="/settingspul" element={<Settingspul />} />
 
-      {/* Other modules — make sure these components exist at the paths above */}
+      {/* sasangi */}
       <Route path="/dashboard" element={<CartDashboard />} />
       <Route path="/products" element={<ProductList />} />
       <Route path="/discounts" element={<Discounts />} />
       <Route path="/finance" element={<Finance />} />
       <Route path="/reports" element={<SalesReports />} />
       <Route path="/settingssa" element={<Settingssa />} />
-      <Route path="/customer" element={<CustomerView/>}/>
-      <Route path="/cart" element={<Cart/>}/>
 
-      <Route path="/login" element={<Login />} />
-            <Route path="/isudashboard" element={<Udashboard />} />
-            <Route path="/usermanagement" element={<UserManagement />} />
-            <Route path="/createaccount" element={<Createaccount />} />
-            <Route path="/order" element={<Orders />} />
-            <Route path="/settingsis" element={<Settingsis />} />
+      {/* isumi */}
+      <Route path="/isudashboard" element={<Udashboard />} />
+      <Route path="/usermanagement" element={<UserManagement />} />
+      <Route path="/order" element={<Orders />} />
+      <Route path="/settingsis" element={<Settingsis />} />
 
-      
-            <Route path="/sanudashboard" element={<FinanceDashboard />} />
-            <Route path="/salarycal" element={<SalaryCal />} />
-             <Route path="/epf" element={<EpfManagement />} />
-             <Route path="/financereport" element={<FinancialReport />} />
-             <Route path="/revenue" element={<Revenue />} />
-             <Route path="/settingsanu" element={<Setting />} />
-      
-            {/* Finance tabs */}
-            <Route path="/finance/employees" element={<SalaryCal />} />
-            <Route path="/finance/attendance" element={<Attendance />} />
-            <Route path="/finance/advance" element={<Advance />} />
-            <Route path="/finance/transfers" element={<SalaryTransfer />} />
-            <Route path="/finance/salary" element={<SalaryManagement />} /> 
+      {/* sanu */}
+      <Route path="/sanudashboard" element={<FinanceDashboard />} />
+      <Route path="/salarycal" element={<SalaryCal />} />
+      <Route path="/epf" element={<EpfManagement />} />
+      <Route path="/financereport" element={<FinancialReport />} />
+      <Route path="/revenue" element={<Revenue />} />
+      <Route path="/settingsanu" element={<Setting />} />
+      <Route path="/finance/employees" element={<SalaryCal />} />
+      <Route path="/finance/attendance" element={<Attendance />} />
+      <Route path="/finance/advance" element={<Advance />} />
+      <Route path="/finance/transfers" element={<SalaryTransfer />} />
+      <Route path="/finance/salary" element={<SalaryManagement />} />
 
       
      {/*Totebags*/}

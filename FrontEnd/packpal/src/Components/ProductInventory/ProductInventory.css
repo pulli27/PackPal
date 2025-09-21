@@ -143,25 +143,35 @@
 .pi .filter-badge{ background:#e0e7ff; color:#3730a3; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; display:flex; align-items:center; gap:8px; }
 .pi .filter-badge .remove-filter{ cursor:pointer; background:rgba(55,48,163,.2); border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center; font-size:10px; }
 
-/* ===== Modal overlay (full page, centered) ===== */
+/* ===== Modal overlay (full page, centered, blurred) ===== */
 .pi .modal{
   display:none;
   position:fixed;
-  inset:0;                         /* full screen */
-  z-index:2000;
-  background:rgba(0,0,0,.55);
-  backdrop-filter:blur(3px);
-  display:flex;                    /* center the panel */
-  align-items:center;
-  justify-content:center;
-  overflow:auto;                   /* if panel too tall */
+  inset:0;                      /* cover the entire viewport */
+  width:100vw;
+  height:100vh;
+  box-sizing:border-box;
+ margin-left: 480px;
+  z-index:9999;                 /* above sidebar/cards */
+  background: rgba(17,24,39,.40);   /* semi-transparent dark */
+  backdrop-filter: blur(8px);       /* blur */
+  -webkit-backdrop-filter: blur(8px);/* Safari/Chromium prefix */
+
+  align-items:center;           /* center panel vertically */
+  justify-content:center;       /* center horizontally */
+
+  overflow:auto;                /* scroll if panel taller than viewport */
+  padding:24px;                 /* breathing room on small screens */
+
+  /* important: no margins that shift it */
 }
 
 /* Panel */
 .pi .modal-content{
+  position:relative;
   background:#fff;
-  width:min(900px, 94vw);
-  max-height:90vh;                 /* scroll inside */
+  width:min(680px, 92vw);       /* tighter like your reference */
+  max-height:85vh;              /* inner scroll */
   overflow:auto;
   border-radius:20px;
   box-shadow:0 24px 48px rgba(0,0,0,.25);
@@ -179,9 +189,9 @@
   display:flex; justify-content:space-between; align-items:center;
   z-index:1;
 }
-.pi .modal-title{ font-size:20px; font-weight:800; color:#1f2937; display:flex; align-items:center; gap:10px; }
+.pi .modal-title{ font-size:22px; font-weight:800; color:#1f2937; display:flex; align-items:center; gap:10px; }
 .pi .close-btn{
-  background:none; border:none; font-size:24px; cursor:pointer; color:#6b7280; width:30px; height:30px; border-radius:50%;
+  background:none; border:none; font-size:28px; line-height:1; cursor:pointer; color:#6b7280; width:36px; height:36px; border-radius:50%;
   display:flex; align-items:center; justify-content:center; transition:.2s;
 }
 .pi .close-btn:hover{ background:#f8f9fa; color:#1f2937; }
@@ -205,23 +215,32 @@
 .pi .btn-secondary{ background:#6b7280; }
 .pi .btn-secondary:hover{ background:#4b5563; transform:translateY(-2px); }
 
-/* ===== Details grid: label left, value right ===== */
+/* ===== Details grid: label left, value right (with dividers) ===== */
 .pi .product-details{
   display:grid;
-  grid-template-columns: 240px 1fr;
-  gap:14px 18px;
+  grid-template-columns: 260px 1fr;   /* label column wider for long labels */
+  gap:0 20px;
+  line-height:1.5;
 }
 .pi .product-details .detail-item{
-  display:contents; /* label/value occupy grid columns */
+  display:contents;
 }
 .pi .product-details .detail-label{
   font-weight:800;
   color:#374151;
-  text-align:left;
+  padding:14px 0;
+  border-bottom:1px solid #eef2ff;
 }
 .pi .product-details .detail-value{
   color:#111827;
+  padding:14px 0;
+  border-bottom:1px solid #eef2ff;
   word-break:break-word;
+}
+.pi .detail-image{
+  max-width: 240px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.10);
 }
 
 /* If a row wants to span full width (e.g., image), keep it */
@@ -252,5 +271,9 @@
 @media (max-width:768px){
   .pi th, .pi td{ padding:12px 15px; font-size:13px; }
   .pi .action-buttons{ flex-direction:column; gap:4px; }
-  .pi .product-details{ grid-template-columns: 170px 1fr; }
+  .pi .product-details{ grid-template-columns: 1fr; }
+  .pi .product-details .detail-label{ margin-bottom:4px; }
 }
+
+/* Optional: if you prefer CSS-only body scroll lock when modal is open */
+body.modal-open { overflow: hidden; }

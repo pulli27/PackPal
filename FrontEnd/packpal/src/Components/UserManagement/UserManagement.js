@@ -487,11 +487,13 @@ export default function UserManagement() {
                 </div>
                 <div className="um-field">
                   <label>Email</label>
+                  {/* 🔒 Email is read-only & disabled in edit mode */}
                   <input
                     type="email"
                     value={editing.email}
-                    onChange={(e) => setEditing({ ...editing, email: e.target.value })}
-                    required
+                    readOnly
+                    disabled
+                    title="Email cannot be changed"
                   />
                 </div>
                 <div className="um-field">

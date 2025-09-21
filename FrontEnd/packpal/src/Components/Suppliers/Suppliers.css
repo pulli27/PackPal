@@ -76,20 +76,44 @@
 .sup .eye-btn:hover{ background:#667eea; color:#fff; transform:translateY(-2px); box-shadow:0 8px 20px rgba(102,126,234,.3); }
 .sup .eye-icon{ font-size:16px; }
 
-/* Modal */
+/* ===== Modal (full-viewport, centered, blurred) ===== */
 .sup .modal{
   display:none;
-  position:fixed; inset:0; padding:40px 260px;
-  background:rgba(0,0,0,.5); backdrop-filter:blur(5px); z-index:2000;
-  align-items:flex-start; justify-content:center;
+  position:fixed;
+  inset:0;
+  width:100vw;
+  height:100vh;
+  box-sizing:border-box;
+
+  z-index:9999;
+  background:rgba(17,24,39,.45);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  will-change:backdrop-filter;
+
+  align-items:center;
+  justify-content:center;
+ margin-left: 480px;
+  overflow:auto;
+  padding:24px;       /* small breathing room only */
 }
 .sup .modal.open{ display:flex; }
+
 .sup .modal-content{
-  background:#fff; width:100%; max-width:720px; border-radius:20px; padding:30px;
-  position:relative; box-shadow:0 20px 40px rgba(0,0,0,.2); max-height:calc(100vh - 80px); overflow:auto;
+  background:#fff;
+  width:min(680px, 92vw);
+  max-height:85vh;
+  overflow:auto;
+
+  border-radius:20px;
+  padding:30px;
+  position:relative;
+  box-shadow:0 20px 40px rgba(0,0,0,.25);
 }
+
 .sup .close{ position:absolute; right:20px; top:20px; color:#aaa; font-size:28px; font-weight:bold; cursor:pointer; transition:color .3s ease; background:none; border:none; }
 .sup .close:hover{ color:#667eea; }
+
 .sup .modal-header{ margin-bottom:25px; padding-bottom:15px; border-bottom:2px solid #f0f0f0; }
 .sup .modal h2{ color:#2c3e50; font-size:24px; font-weight:700; }
 
@@ -104,14 +128,13 @@
   .sup .suppliers-grid{ grid-template-columns: 1fr; }
 }
 
-/* Animations (global keyframes OK) */
+/* Animations */
 @keyframes slideInUp{ to{ opacity:1; transform:translateY(0); } }
 @keyframes slideInRight{ from{ transform:translateX(100%); opacity:0; } to{ transform:translateX(0); opacity:1; } }
 @keyframes slideOutRight{ from{ transform:translateX(0); opacity:1; } to{ transform:translateX(100%); opacity:0; } }
 
 /* ===== Report modal (only the #supReportModal instance) ===== */
 #supReportModal { 
-  display: flex; 
   align-items: center;
   justify-content: center; 
 }

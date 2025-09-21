@@ -1,11 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import "./CartDashboard.css";
 import Sidebarsa from "../Sidebar/Sidebarsa";
 import TransactionsTable from "../TransactionsTable/TransactionsTable";
-
-const PRODUCTS_URL = "http://localhost:5000/carts";
-const TX_URL = "http://localhost:5000/transactions";
+import { api } from "../../lib/api"; // <-- use your shared axios instance
 
 const money = (n) =>
   "LKR" +
@@ -54,14 +51,41 @@ const toTx = (row) => ({
   status: row?.status ?? "Paid",
 });
 
+/* ---------- Robust fetchers with fallbacks ---------- */
+async function getWithFallbacks(paths) {
+  let lastErr;
+  for (const p of paths) {
+    try {
+      const res = await api.get(p);
+      // eslint-disable-next-line no-console
+      console.log("[CartDashboard] Fetched:", p);
+      return res.data;
+    } catch (e) {
+      lastErr = e;
+      // eslint-disable-next-line no-console
+      console.warn("[CartDashboard] Failed:", p, e?.response?.status || e.message);
+    }
+  }
+  throw lastErr || new Error("All endpoints failed");
+}
+
 const fetchHandler = {
   getProducts: async () => {
-    const res = await axios.get(PRODUCTS_URL);
-    return unpackList(res.data).map(toProduct);
+    // Try the typical mounts in order
+    const data = await getWithFallbacks([
+      "/carts",
+      "/api/carts",
+      "/api/products",
+      "/products",
+    ]);
+    return unpackList(data).map(toProduct);
   },
   getTransactions: async () => {
-    const res = await axios.get(TX_URL);
-    return unpackList(res.data).map(toTx);
+    const data = await getWithFallbacks([
+      "/transactions",
+      "/api/transactions",
+    ]);
+    return unpackList(data).map(toTx);
   },
 };
 
@@ -83,6 +107,7 @@ export default function CartDashboard() {
 
   useEffect(() => {
     let mounted = true;
+
     const loadAll = async () => {
       setLoading(true);
       setErr("");
@@ -101,7 +126,10 @@ export default function CartDashboard() {
         if (mounted) setLoading(false);
       }
     };
+
     loadAll();
+
+    // optional: reload on focus or custom events
     const onTxChanged = () => loadAll();
     const onProductsChanged = () => loadAll();
     const onFocus = () => loadAll();
@@ -122,7 +150,7 @@ export default function CartDashboard() {
       const p = Array.isArray(products) ? products : [];
       const t = Array.isArray(txs) ? txs : [];
 
-      // quick lookup by product name (adjust if your tx references an id instead)
+      // quick lookup by product name
       const productByName = Object.fromEntries(
         p.map((pr) => [String(pr.name).toLowerCase(), pr])
       );
@@ -152,7 +180,9 @@ export default function CartDashboard() {
 
       const productsCount = p.length;
       const activeDiscounts = p.filter(
-        (x) => (x?.discountType ?? "none") !== "none" && Number(x?.discountValue ?? 0) > 0
+        (x) =>
+          (x?.discountType ?? "none") !== "none" &&
+          Number(x?.discountValue ?? 0) > 0
       ).length;
 
       const paidRows = enriched.filter(
@@ -188,9 +218,7 @@ export default function CartDashboard() {
   );
 
   return (
-  
     <div className="page-wrap cart-page">
-   
       <Sidebarsa />
 
       {/* Main content (right) */}
@@ -241,6 +269,5 @@ export default function CartDashboard() {
         </section>
       </main>
     </div>
-    /* === PAGE WRAP END === */
   );
 }

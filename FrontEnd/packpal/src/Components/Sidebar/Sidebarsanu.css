@@ -1,9 +1,13 @@
-/* ===== Scoped to this page only ===== */
+/* Sidebar.css */
+/* Keep this var in one place so layouts stay in sync */
+:root { --sidebar-w: 280px; }
+
+/* ===== Scoped to the sidebar only ===== */
 .sidebarsanu .sidebar {
   position: fixed;
   left: 0;
   top: 0;
-  width: 280px;
+  width: var(--sidebar-w);
   height: 100vh;
   background: rgba(255,255,255,0.95);
   backdrop-filter: blur(15px);
@@ -16,7 +20,7 @@
 
 /* Header */
 .sidebarsanu .sidebar-header {
-  padding: 30px 25px;
+  padding: 50px 25px;
   border-bottom: 1px solid rgba(0,0,0,0.1);
   text-align: center;
   background: linear-gradient(135deg,#354fc5,#15122f);
@@ -51,7 +55,6 @@
   color: #667eea;
   transform: translateX(5px);
 }
-
 .sidebarsanu .nav-item.active {
   background: rgba(102,126,234,0.15);
   border-left-color: #667eea;
@@ -72,7 +75,6 @@
   right: 0;
   padding: 0 25px;
 }
-
 .sidebarsanu .logout-btn {
   display: flex;
   align-items: center;
@@ -92,7 +94,7 @@
 }
 .sidebarsanu .logout-btn i { margin-right: 10px; }
 
-/* (Optional) simple mobile behavior – sidebar can be hidden with transform */
+/* Mobile toggle (optional) */
 @media (max-width: 768px) {
   .sidebarsanu .sidebar { transform: translateX(-100%); }
   .sidebarsanu .sidebar.active { transform: translateX(0); }
