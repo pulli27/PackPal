@@ -13,7 +13,7 @@
   --sidebar-w: 280px;                    /* ← set this to your actual sidebar width */
   margin-left: var(--sidebar-w);
   width: calc(100vw - var(--sidebar-w));
-  margin-left: 20px;
+  margin-left: 260px;
   font-family: Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
   line-height:1.6; color:var(--text); background:var(--bg);
 }
@@ -33,7 +33,7 @@
   margin: 0;             /* no side margins */
   padding-left: 24px;
   padding-right: 24px;
-   margin-left: 270px;
+   margin-left: 50px;
 }
 .rep .report-main .page-body{ padding:1rem 0 1.5rem; }
 
@@ -74,18 +74,19 @@
 .rep .report-main .btn-primary:hover{ background:var(--brand-600); }
 
 /* Grid + cards */
-.rep .report-main .grid{display:grid;gap:1.25rem}
+.rep .report-main .grid{display:grid;gap:1.25rem; margin-top: 30px;}
 .rep .report-main .md-grid-4{grid-template-columns:repeat(4,1fr)}
 .rep .report-main .lg-grid-2{grid-template-columns:repeat(2,1fr)}
 @media (max-width:1024px){.rep .report-main .md-grid-4,.rep .report-main .lg-grid-2{grid-template-columns:1fr}}
 .rep .report-main .card{
   background:#fff;border-radius:.75rem;
   box-shadow:0 1px 3px rgba(0,0,0,.06);
-  padding:1.25rem;border:1px solid var(--line)
+  padding:0.5rem;border:1px solid var(--line)
+  
 }
 .rep .report-main .card-title{
   font-size:1.05rem;font-weight:650;color:var(--ink);
-  margin-bottom:.75rem;display:flex;gap:.5rem;align-items:center
+  margin-bottom:1.25rem;display:flex;gap:.5rem;align-items:center
 }
 
 .rep .report-main .mb-20{margin-bottom:1.25rem}
@@ -194,3 +195,6 @@
 
 /* Helpers */
 .rep .report-main .muted{color:var(--muted);font-size:.9rem;margin-top:.5rem}
+
+.rep .report-main .btn-primary {  margin-right:50px; background: linear-gradient(145deg,#354fc5 0%, #15122f 100%); }
+

@@ -1,4 +1,3 @@
-// src/Components/ProductInventory/ProductInventory.js
 import React, { useEffect, useRef } from "react"; 
 import "./ProductInventory.css";
 import Sidebarpul from "../Sidebar/Sidebarpul";
@@ -42,7 +41,6 @@ function ProductInventory() {
     const value = Number(valRaw);
     if (!Number.isFinite(value) || value <= 0) return base;
 
-    // percent types
     const isPercent =
       type === "percent" ||
       type === "percentage" ||
@@ -50,7 +48,6 @@ function ProductInventory() {
       type === "pc" ||
       type === "pct";
 
-    // flat/amount types
     const isFlat =
       type === "flat" ||
       type === "amount" ||
@@ -67,7 +64,6 @@ function ProductInventory() {
     if (isFlat) {
       return Math.max(0, base - value);
     }
-    // If discountType unknown but a numeric value exists, treat as flat
     return Math.max(0, base - value);
   }
 
@@ -79,7 +75,7 @@ function ProductInventory() {
     const stock = Number(item.stock ?? item.quantity ?? 0);
     const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
     const createdAt = item.createdAt || "";
-       const updatedAt = item.updatedAt || "";
+    const updatedAt = item.updatedAt || "";
     const createdAtTs = createdAt ? new Date(createdAt).getTime() : 0;
 
     return {
@@ -139,7 +135,7 @@ function ProductInventory() {
     return `
       <tr data-category="${product.category}" data-status="${status}" data-sku="${product.sku}">
         <td><span class="product-name">${product.name}</span></td>
-        <td><span class="category-tag category-${product.category.toLowerCase()}">${product.category}</span></td>
+        <td><span class="category-tag category-${product.category.replace(/\s+/g,'').toLowerCase()}">${product.category}</span></td>
         <td><span class="stock-amount">${product.stock} units</span></td>
         <td><span class="unit-price">${money(unitAfterDiscount)}</span></td>
         <td><span class="value-amount">${money(totalValue)}</span></td>
@@ -262,8 +258,20 @@ function ProductInventory() {
   }
 
   /* ---------------- Modals ---------------- */
-  function openModal(id) { const el = document.getElementById(id); if (el) el.style.display = "block"; document.body.style.overflow = "hidden"; }
-  function closeModal(id) { const el = document.getElementById(id); if (el) el.style.display = "none"; document.body.style.overflow = "auto"; }
+  function openModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = "flex";                 // center using flex
+    el.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";   // lock background scroll
+  }
+  function closeModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = "none";
+    el.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "auto";
+  }
 
   function viewProduct(sku) {
     const p = products.find((x) => x.sku === sku);
@@ -297,6 +305,10 @@ function ProductInventory() {
       : "";
     const created = p.createdAt ? new Date(p.createdAt).toLocaleString() : "";
     const updated = p.updatedAt ? new Date(p.updatedAt).toLocaleString() : "";
+
+    // Put product name into modal header
+    const titleEl = document.querySelector("#viewModal .modal-title");
+    if (titleEl) titleEl.textContent = `📋 ${p.name}`;
 
     $("#productDetails").innerHTML = `
       <div class="detail-item"><div class="detail-label">Product Name</div><div class="detail-value">${p.name}</div></div>
@@ -433,7 +445,7 @@ function ProductInventory() {
       const s = $("#searchInput");
       if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); s?.focus(); }
       if (e.key === "Escape") {
-        document.querySelectorAll(".modal").forEach((m) => { if (m.style.display === "block") closeModal(m.id); });
+        document.querySelectorAll(".modal").forEach((m) => { if (m.style.display === "flex" || m.style.display === "block") closeModal(m.id); });
         if (s) { s.value = ""; currentFilters.search = ""; applyFilters(); }
       }
     };
@@ -443,7 +455,6 @@ function ProductInventory() {
   }, []);
 
   return (
-    // ▼▼ page wrap namespace
     <div className="pi">
       <Sidebarpul />
       <main className="main-content">

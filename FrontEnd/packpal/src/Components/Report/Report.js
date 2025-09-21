@@ -160,10 +160,13 @@ export default function Report() {
       const items = rawItems.map(toUiItem);
 
       // KPIs
-      const totalProductsUnits = products.reduce((s, p) => s + p.stock, 0);
-      const totalItemsUnits = items.reduce((s, i) => s + i.quantity, 0);
-      const totalProductsValue = products.reduce((s, p) => s + p.stock * discountedUnitPrice(p), 0);
-      const totalItemsValue = items.reduce((s, i) => s + i.value, 0);
+      const totalProductsUnits = products.reduce((s, p) => s + (Number(p.stock) || 0), 0);
+      const totalItemsUnits = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+      const totalProductsValue = products.reduce(
+        (s, p) => s + (Number(p.stock) || 0) * (Number(discountedUnitPrice(p)) || 0),
+        0
+      );
+      const totalItemsValue = items.reduce((s, i) => s + (Number(i.value) || 0), 0);
       const totalInventoryValue = totalProductsValue + totalItemsValue;
       const lowStockProducts = products.filter((p) => statusOf(p.stock) === "low-stock").length;
 
@@ -174,30 +177,49 @@ export default function Report() {
       safeText("#kpiInventoryValue", money(totalInventoryValue));
       safeText("#kpiLowStock", String(lowStockProducts));
 
-      // Month range
-      const labels = monthsBetween(start, end);
+      // ---------- Month range ----------
+      const valueMonths = monthsBetween(start, end);
 
-      // Values per month
-      const prodValByMonth = new Map(labels.map((m) => [m, 0]));
-      const itemValByMonth = new Map(labels.map((m) => [m, 0]));
+      // ---------- Values per month (robust, date-safe) ----------
+      const prodValByMonth = new Map(valueMonths.map((m) => [m, 0]));
+      const itemValByMonth = new Map(valueMonths.map((m) => [m, 0]));
 
-      products.forEach((p) => {
-        const stamp = p.updatedAt || p.createdAt || start || new Date();
-        if (!inRange(stamp, start, end)) return;
-        const mk = monthKey(stamp, clampToMonth(start || new Date()));
-        const val = p.stock * discountedUnitPrice(p);
+      function clampMonthKey(dateStr) {
+        const s = start ? new Date(start) : null;
+        const e = end ? new Date(end) : null;
+        const d = new Date(dateStr || (e || s || new Date()));
+        if (isNaN(d)) return e ? ymKey(clampToMonth(e)) : s ? ymKey(clampToMonth(s)) : ymKey(new Date());
+        if (s && d < s) return ymKey(clampToMonth(s));
+        if (e && d > e) return ymKey(clampToMonth(e));
+        return ymKey(clampToMonth(d));
+      }
+
+      // products → stock value per month
+      for (const p of products) {
+        const price = Number(discountedUnitPrice(p)) || 0;
+        const stock = Number(p.stock) || 0;
+        const val = stock * price;
+        if (val <= 0) continue;
+        const stamp = p.updatedAt || p.createdAt || start || end || new Date();
+        const mk = clampMonthKey(stamp);
+        if (!prodValByMonth.has(mk)) prodValByMonth.set(mk, 0);
         prodValByMonth.set(mk, (prodValByMonth.get(mk) || 0) + val);
-      });
-      items.forEach((i) => {
-        const stamp = i.updatedAt || i.createdAt || start || new Date();
-        if (!inRange(stamp, start, end)) return;
-        const mk = monthKey(stamp, clampToMonth(start || new Date()));
-        itemValByMonth.set(mk, (itemValByMonth.get(mk) || 0) + i.value);
-      });
+      }
 
-      const valueMonths = labels;
-      const valueProducts = valueMonths.map((m) => prodValByMonth.get(m) || 0);
-      const valueItems = valueMonths.map((m) => itemValByMonth.get(m) || 0);
+      // items → value per month
+      for (const it of items) {
+        const qty = Number(it.quantity) || 0;
+        const unit = Number(it.unitPrice) || 0;
+        const val = qty * unit;
+        if (val <= 0) continue;
+        const stamp = it.updatedAt || it.createdAt || start || end || new Date();
+        const mk = clampMonthKey(stamp);
+        if (!itemValByMonth.has(mk)) itemValByMonth.set(mk, 0);
+        itemValByMonth.set(mk, (itemValByMonth.get(mk) || 0) + val);
+      }
+
+      const valueProducts = valueMonths.map((m) => Number(prodValByMonth.get(m)) || 0);
+      const valueItems = valueMonths.map((m) => Number(itemValByMonth.get(m)) || 0);
       const valueCombined = valueMonths.map((_, i) => valueProducts[i] + valueItems[i]);
 
       // Inventory by Category
@@ -216,7 +238,7 @@ export default function Report() {
       const catOut = catLabels.map((c) => catMap.get(c).out);
 
       // Purchase order trends within range
-      const trendMap = new Map(labels.map((m) => [m, { pending: 0, completed: 0, cancelled: 0 }]));
+      const trendMap = new Map(valueMonths.map((m) => [m, { pending: 0, completed: 0, cancelled: 0 }]));
       rawOrders.forEach((o) => {
         const stamp = o.orderDate || o.createdAt || start || new Date();
         if (!inRange(stamp, start, end)) return;
@@ -228,7 +250,7 @@ export default function Report() {
           trendMap.get(mk).completed += 1;
         else if (st === "cancelled" || st === "canceled") trendMap.get(mk).cancelled += 1;
       });
-      const trendMonths = labels;
+      const trendMonths = valueMonths;
       const trendPending = trendMonths.map((m) => trendMap.get(m)?.pending || 0);
       const trendCompleted = trendMonths.map((m) => trendMap.get(m)?.completed || 0);
       const trendCancelled = trendMonths.map((m) => trendMap.get(m)?.cancelled || 0);
@@ -256,7 +278,7 @@ export default function Report() {
       console.error("Report load error:", e);
       initializeCharts({
         invByCat: { labels: [], in: [], low: [], out: [] },
-        orderTrends: { labels: [], pending: [], completed: [] , cancelled: [] },
+        orderTrends: { labels: [], pending: [], completed: [], cancelled: [] },
         monthlyValue: { labels: [], combined: [], products: [], items: [] },
         stockPie: { values: [0, 0, 0] },
         itemsPie: { labels: [], values: [] },
@@ -338,7 +360,7 @@ export default function Report() {
       chartsRef.current.push(c);
     }
 
-    // Monthly Inventory Value — 3 lines
+    // Monthly Inventory Value — combined (filled) + products + items
     if (valueRef.current) {
       const c = new Chart(valueRef.current.getContext("2d"), {
         type: "line",
@@ -352,22 +374,28 @@ export default function Report() {
               backgroundColor: "rgba(99,102,241,.20)",
               fill: true,
               tension: 0.18,
+              borderWidth: 2,
+              order: 1, // behind
             },
             {
               label: "Products Value (LKR)",
               data: data.monthlyValue.products,
               borderColor: "#10B981",
-              backgroundColor: "rgba(16,185,129,.18)",
+              backgroundColor: "transparent",
               fill: false,
               tension: 0.18,
+              borderWidth: 3,
+              order: 2,
             },
             {
               label: "Items Value (LKR)",
               data: data.monthlyValue.items,
               borderColor: "#F59E0B",
-              backgroundColor: "rgba(245,158,11,.18)",
+              backgroundColor: "transparent",
               fill: false,
               tension: 0.18,
+              borderWidth: 3,
+              order: 3,
             },
           ],
         },
@@ -522,7 +550,7 @@ export default function Report() {
       kpiGrid.appendChild(k);
     });
 
-    // Figures (NO manual pagebreaks between them)
+    // Figures
     const escapeHtml = (s = "") =>
       s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
     const tocList = toc.querySelector("#tocList");
@@ -570,7 +598,6 @@ export default function Report() {
       margin: [10, 10, 12, 10],
       filename: `inventory-report-${new Date().toISOString().split("T")[0]}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
-      // IMPORTANT: rely on CSS only — no legacy auto pagebreaks that can double-break
       pagebreak: { mode: ["css"], avoid: [".avoid-break"] },
       html2canvas: { scale: 3, useCORS: true, backgroundColor: "#ffffff", logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },

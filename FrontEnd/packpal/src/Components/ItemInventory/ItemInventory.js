@@ -80,6 +80,7 @@ export default function ItemInventory() {
       if ($("safetyStock")) $("safetyStock").value = SAFETY_STOCK;
       editingIndexRef.current = -1;
       updateRopPreview();
+      $("itemName")?.setCustomValidity("");
     }
 
     function updateStats() {
@@ -144,6 +145,7 @@ export default function ItemInventory() {
       updateRopPreview();
       editingIndexRef.current = index;
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
+      validateNameField();
     }
 
     async function deleteItem(index) {
@@ -501,15 +503,66 @@ export default function ItemInventory() {
     const lead = $("leadTimeDays");
     const form = $("itemForm");
 
+    // --- NEW: inputs we validate ---
+    const nameInput  = $("itemName");
+    const qtyInput   = $("quantity");
+    const priceInput = $("unitPrice");
+    const avgInput   = avg;   // avgDailyUsage
+    const leadInput  = lead;  // leadTimeDays
+
+    // --- NEW: helpers for validation ---
+    function validateNameField() {
+      if (!nameInput) return true;
+      const clean = (nameInput.value || "").trim();
+      const ok = /^[A-Za-z ]+$/.test(clean) && clean.length > 0;
+      if (!ok) {
+        nameInput.setCustomValidity("Item Name must contain only letters and spaces.");
+      } else {
+        nameInput.setCustomValidity("");
+      }
+      return ok;
+    }
+
+    function sanitizeNameOnInput() {
+      if (!nameInput) return;
+      const v = nameInput.value;
+      const fixed = v.replace(/[^A-Za-z ]+/g, " ").replace(/\s{2,}/g, " ").trimStart();
+      if (fixed !== v) nameInput.value = fixed;
+      validateNameField();
+    }
+
+    function preventInvalidNumberKeys(e, { allowDot }) {
+      const bad = new Set(["e", "E", "+", "-"]);
+      if (!allowDot) bad.add(".");
+      if (bad.has(e.key)) e.preventDefault();
+    }
+    function sanitizePasteToDigits(e) {
+      const txt = (e.clipboardData?.getData("text") ?? "").replace(/[^\d]/g, "");
+      if (txt !== "") {
+        e.preventDefault();
+        e.target.value = txt;
+      }
+    }
+    function sanitizePasteToDecimal(e) {
+      let txt = (e.clipboardData?.getData("text") ?? "");
+      txt = txt.replace(/[^\d.]/g, "");
+      const parts = txt.split(".");
+      if (parts.length > 2) txt = parts[0] + "." + parts.slice(1).join("");
+      if (txt !== "") {
+        e.preventDefault();
+        e.target.value = txt;
+      }
+    }
+
     function onAdd() {
       resetForm();
       showInlineForm(true);
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
     }
     function onCancel() { showInlineForm(false); resetForm(); }
-    function onClear() { resetForm(); }
-    function onAvg() { updateRopPreview(); }
-    function onLead() { updateRopPreview(); }
+    function onClear()  { resetForm(); }
+    function onAvg()    { updateRopPreview(); }
+    function onLead()   { updateRopPreview(); }
 
     function onSearch(e) {
       const term = (e.target.value || "").toLowerCase();
@@ -549,6 +602,9 @@ export default function ItemInventory() {
 
     async function onSubmit(e) {
       e.preventDefault();
+
+      if (!validateNameField()) { nameInput?.reportValidity(); return; }
+
       const data = {
         id: $("itemId").value.trim(),
         name: $("itemName").value.trim(),
@@ -558,6 +614,28 @@ export default function ItemInventory() {
         avgDailyUsage: parseInt($("avgDailyUsage").value, 10) || 0,
         leadTimeDays: parseInt($("leadTimeDays").value, 10) || 0,
       };
+
+      // guards: ensure integers for qty/avg/lead; non-negative; and price is non-negative number
+      if (!Number.isInteger(data.quantity) || data.quantity < 0) {
+        alert("Quantity must be a non-negative whole number.");
+        $("quantity")?.focus();
+        return;
+      }
+      if (!Number.isInteger(data.avgDailyUsage) || data.avgDailyUsage < 0) {
+        alert("Avg Daily Usage must be a non-negative whole number.");
+        $("avgDailyUsage")?.focus();
+        return;
+      }
+      if (!Number.isInteger(data.leadTimeDays) || data.leadTimeDays < 0) {
+        alert("Lead Time must be a non-negative whole number.");
+        $("leadTimeDays")?.focus();
+        return;
+      }
+      if (!Number.isFinite(data.unitPrice) || data.unitPrice < 0) {
+        alert("Unit Price must be a non-negative number.");
+        $("unitPrice")?.focus();
+        return;
+      }
 
       const list = inventoryRef.current;
       const dupIndex = list.findIndex((i) => i.id === data.id && editingIndexRef.current !== list.indexOf(i));
@@ -602,6 +680,34 @@ export default function ItemInventory() {
     searchInput?.addEventListener("input", onSearch);
     form?.addEventListener("submit", onSubmit);
 
+    // --- NEW: attach validation listeners ---
+    nameInput?.addEventListener("input", sanitizeNameOnInput);
+
+    // Quantity (integers only)
+    qtyInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
+    qtyInput?.addEventListener("paste", sanitizePasteToDigits);
+    qtyInput?.addEventListener("blur", () => { if (qtyInput) qtyInput.value = (qtyInput.value || "").replace(/[^\d]/g, ""); });
+
+    // Unit Price (decimal allowed, but no e/E/+/−)
+    priceInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: true }));
+    priceInput?.addEventListener("paste", sanitizePasteToDecimal);
+    priceInput?.addEventListener("blur", () => {
+      if (!priceInput) return;
+      const v = priceInput.value.trim();
+      const ok = /^(\d+(\.\d*)?|\.\d+)$/.test(v);
+      if (!ok) priceInput.value = v.replace(/[^\d.]/g, "");
+    });
+
+    // NEW: Avg Daily Usage (integers only)
+    avgInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
+    avgInput?.addEventListener("paste", sanitizePasteToDigits);
+    avgInput?.addEventListener("blur", () => { if (avgInput) avgInput.value = (avgInput.value || "").replace(/[^\d]/g, ""); });
+
+    // NEW: Lead Time (integers only)
+    leadInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
+    leadInput?.addEventListener("paste", sanitizePasteToDigits);
+    leadInput?.addEventListener("blur", () => { if (leadInput) leadInput.value = (leadInput.value || "").replace(/[^\d]/g, ""); });
+
     // modal close by outside click
     function clickHandler(e) {
       const m = $("reportModal");
@@ -643,6 +749,21 @@ export default function ItemInventory() {
       lead?.removeEventListener("input", onLead);
       searchInput?.removeEventListener("input", onSearch);
       form?.removeEventListener("submit", onSubmit);
+
+      nameInput?.removeEventListener("input", sanitizeNameOnInput);
+
+      qtyInput?.removeEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
+      qtyInput?.removeEventListener("paste", sanitizePasteToDigits);
+
+      priceInput?.removeEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: true }));
+      priceInput?.removeEventListener("paste", sanitizePasteToDecimal);
+
+      avgInput?.removeEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
+      avgInput?.removeEventListener("paste", sanitizePasteToDigits);
+
+      leadInput?.removeEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
+      leadInput?.removeEventListener("paste", sanitizePasteToDigits);
+
       window.removeEventListener("click", clickHandler);
 
       delete window.__inv_editItem;
@@ -655,7 +776,6 @@ export default function ItemInventory() {
   }, []);
 
   return (
-    // ▼▼ added the namespace "ii" so CSS can override safely
     <div className="page-shell ii">
       <Sidebarpul />
       <div className="main-content">
@@ -691,7 +811,12 @@ export default function ItemInventory() {
                 </div>
                 <div className="form-group">
                   <label htmlFor="itemName">Item Name</label>
-                  <input id="itemName" required />
+                  <input
+                    id="itemName"
+                    required
+                    pattern="[A-Za-z ]+"
+                    title="Only letters and spaces are allowed"
+                  />
                 </div>
                 <div className="form-group">
                   <label htmlFor="description">Description</label>
@@ -699,16 +824,39 @@ export default function ItemInventory() {
                 </div>
                 <div className="form-group">
                   <label htmlFor="quantity">Quantity</label>
-                  <input id="quantity" type="number" min="0" required />
+                  <input
+                    id="quantity"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    required
+                  />
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="avgDailyUsage">Avg Daily Usage</label>
-                  <input id="avgDailyUsage" type="number" min="0" step="1" defaultValue="0" required />
+                  <input
+                    id="avgDailyUsage"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    defaultValue="0"
+                    required
+                  />
                 </div>
                 <div className="form-group">
                   <label htmlFor="leadTimeDays">Lead Time (days)</label>
-                  <input id="leadTimeDays" type="number" min="0" step="1" defaultValue="0" required />
+                  <input
+                    id="leadTimeDays"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    defaultValue="0"
+                    required
+                  />
                 </div>
 
                 <div className="form-group">
@@ -723,7 +871,14 @@ export default function ItemInventory() {
 
                 <div className="form-group">
                   <label htmlFor="unitPrice">Unit Price</label>
-                  <input id="unitPrice" type="number" step="0.01" min="0" required />
+                  <input
+                    id="unitPrice"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    inputMode="decimal"
+                    required
+                  />
                 </div>
               </div>
               <div className="form-actions">
