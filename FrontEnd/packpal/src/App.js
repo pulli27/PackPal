@@ -56,7 +56,7 @@ import SizeGuide from './Components/SizeGuide/SizeGuide';
 import Sales from './Components/Sales/Sales';
 import Faq from './Components/Faq/Faq';
 import Totebags from "./Components/Totebags/Totebags";
-
+import Feedback from "./Components/Feedback/Feedback";
 
 /* 404 fallback */
 function NotFound() {
@@ -90,7 +90,7 @@ export default function App() {
       <Route path="/sizeguide" element={<SizeGuide />} />
       <Route path="/sale" element={<Sales />} />
       <Route path="/faq" element={<Faq />} />
-      
+      <Route path="/feedback" element={<Feedback />} />
       <Route path="/customer" element={<CustomerView />} />
       <Route path="/cart" element={<Cart />} />
       <Route path="/header" element={<Header />} />
