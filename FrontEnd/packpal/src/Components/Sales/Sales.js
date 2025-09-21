@@ -1,6 +1,8 @@
 // src/Components/Sales/Sales.js
 import React, { useEffect, useRef } from "react";
 import "./Sales.css";
+import Header from "../Header/Header";
+import Footer from "../Footer/Footer";
 
 function Sales() {
   const rootRef = useRef(null);
@@ -265,33 +267,10 @@ function Sales() {
 
   return (
     <div className="page-wrap">
+      <Header/>
       <div className="sales-page" ref={rootRef}>
         {/* Nav */}
-        <nav className="nav" aria-label="Primary">
-          <div className="nav-inner">
-            <div className="logo" aria-label="PackPal Home">PackPal</div>
-            <div className="links" role="menubar">
-              <a role="menuitem" href="#flash-sale">Flash Sale</a>
-              <a role="menuitem" href="#bundles">Bundles</a>
-              <a role="menuitem" href="#limited">Limited Offers</a>
-              <a role="menuitem" href="#newsletter">Newsletter</a>
-              <a role="menuitem" href="#contact">Contact</a>
-            </div>
-            <div className="nav-actions">
-              <button className="btn-icon burger" aria-label="Toggle menu" id="menuBtn">☰</button>
-              <button className="btn-icon cart-badge" aria-label="Open cart" id="cartBtn">
-                🛒 <span className="cart-count" id="cartCount" hidden>0</span>
-              </button>
-            </div>
-          </div>
-          <div className="mobile-menu" id="mobileMenu">
-            <a href="#flash-sale">Flash Sale</a>
-            <a href="#bundles">Bundles</a>
-            <a href="#limited">Limited Offers</a>
-            <a href="#newsletter">Newsletter</a>
-            <a href="#contact">Contact</a>
-          </div>
-        </nav>
+      
 
         {/* Hero */}
         <header className="hero" data-end="">
@@ -325,8 +304,8 @@ function Sales() {
               </div>
               <h3>Adventure Pro Backpack</h3>
               <div className="price">
-                <span className="was" data-was="159.99">LKR 159.99</span>
-                <span className="now" data-now="63.99">LKR 63.99</span>
+                <span className="was" data-was="1590.99">LKR 1590.99</span>
+                <span className="now" data-now="636.99">LKR 636.99</span>
                 <span className="off">60% OFF</span>
               </div>
               <p className="desc">Pro-grade 40L capacity, weather-resistant, lifetime warranty. Perfect for hiking and travel.</p>
@@ -348,8 +327,8 @@ function Sales() {
               </div>
               <h3>Executive Briefcase</h3>
               <div className="price">
-                <span className="was" data-was="249.99">LKR 249.99</span>
-                <span className="now" data-now="99.99">LKR 99.99</span>
+                <span className="was" data-was="249.99">LKR 2490.99</span>
+                <span className="now" data-now="99.99">LKR 996.99</span>
                 <span className="off">60% OFF</span>
               </div>
               <p className="desc">Premium leather with padded laptop bay and document organizers — sharp, durable, professional.</p>
@@ -371,8 +350,8 @@ function Sales() {
               </div>
               <h3>Designer Handbag Set</h3>
               <div className="price">
-                <span className="was" data-was="199.99">LKR 199.99</span>
-                <span className="now" data-now="79.99">LKR 79.99</span>
+                <span className="was" data-was="199.99">LKR 19990.99</span>
+                <span className="now" data-now="79.99">LKR 7996.99</span>
                 <span className="off">60% OFF</span>
               </div>
               <p className="desc">Elegant 3-piece: tote, crossbody, clutch. Premium materials. Modern design.</p>
@@ -500,34 +479,10 @@ function Sales() {
           </div>
         </section>
 
-        {/* Newsletter */}
-        <section id="newsletter" className="section newsletter">
-          <div className="nl-inner sr">
-            <h2>Don't Miss Out!</h2>
-            <p>Subscribe for flash sales, exclusive offers, and new arrivals.</p>
-            <form className="nl-form" id="nlForm" noValidate>
-              <label className="sr-only" htmlFor="nlEmail">Email</label>
-              <input id="nlEmail" type="email" className="nl-input" placeholder="Enter your email" required />
-              <button className="nl-btn" type="submit">Get Deals</button>
-            </form>
-          </div>
-        </section>
-
-        {/* Footer */}
-        <footer id="contact" aria-label="Footer">
-          <div className="container">
-            <nav className="f-links" aria-label="Footer links">
-              <a href="#about">About PackPal</a>
-              <a href="#shipping">Shipping Info</a>
-              <a href="#returns">Returns & Exchanges</a>
-              <a href="#support">Customer Support</a>
-              <a href="#privacy">Privacy Policy</a>
-              <a href="#terms">Terms of Service</a>
-            </nav>
-            <p>&copy; 2024 PackPal. Sale prices valid while supplies last. Customer Service: 1-800-PACKPAL</p>
-          </div>
-        </footer>
+        
+      
       </div>
+      <Footer/>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import "./AboutPage.css";
 // Header is rendered globally by your app (not here) to avoid duplicates.
 import Footer from "../Footer/Footer";
+import Header from "../Header/Header";
 
 function Aboutpage() {
   useEffect(() => {
@@ -47,7 +48,7 @@ function Aboutpage() {
             );
           })}
         </div>
-
+<Header/>
         <div className="about-hero-content">
           <h1>ABOUT US</h1>
           <p>Trusted companions for life on the go—smarter details, fewer worries.</p>

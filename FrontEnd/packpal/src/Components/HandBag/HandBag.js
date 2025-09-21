@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./HandBag.css"; // keep this exact casing
 import Header from "../Header/Header";
-
+import Footer from "../Footer/Footer";
 /* ---------- helpers ---------- */
 const money = (n) => `$${Number(n || 0).toFixed(2)}`;
 const imgFallback = (e) => {
@@ -550,6 +550,7 @@ export default function Handbags() {
         {/* Toast */}
         <div id="toast" className={`toast ${toast ? "show" : ""}`}>{toast}</div>
       </div>
+      <Footer/>
     </div>
   );
 }

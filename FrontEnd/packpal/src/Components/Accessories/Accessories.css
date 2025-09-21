@@ -35,7 +35,7 @@
 .acc-page .hero{
   background:
     radial-gradient(420px 260px at 16% 10%, rgba(212, 217, 226, 0.18), transparent 5%),
-    linear-gradient(180deg, #6c6855 0%, #cbc047 40%, #505bf1 100%);
+    linear-gradient(180deg, #6c6855 0%, #778ab7 40%, #dfcb48 100%);
   color:var(--hero-text);
   text-align:center;
   padding:8.5rem 2rem;

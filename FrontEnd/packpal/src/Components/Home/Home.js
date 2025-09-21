@@ -1,13 +1,14 @@
+// src/Components/Home/Home.js
 import React, { useEffect, useRef, useState } from "react";
 import "./Home.css";
-import Footer from "../Footer/Footer";              // ← keep
+import Footer from "../Footer/Footer";
+import Header from "../Header/Header";
 
 import {
   FaShoppingBag, FaSearch, FaUser, FaUserPlus, FaShoppingCart, FaHome, FaLayerGroup,
-  FaPuzzlePiece, FaTags, FaGift, FaPlay, FaLaptop, FaChild, FaWallet,
-  FaBriefcase, FaSuitcase, FaChevronDown
+  FaPuzzlePiece, FaTags, FaGift, FaPlay, FaBriefcase, FaSuitcase, FaChevronDown
 } from "react-icons/fa";
-import { FaBagShopping, FaVolumeHigh, FaVolumeXmark, FaFacebookF, FaInstagram, FaTwitter, FaPlus, FaMinus } from "react-icons/fa6"; /* CHANGED: moved FB/IG/Twitter to fa6 import to avoid dupe */
+import { FaBagShopping, FaVolumeHigh, FaVolumeXmark, FaFacebookF, FaInstagram, FaTwitter, FaPlus, FaMinus } from "react-icons/fa6";
 
 export default function Home() {
   const headerRef = useRef(null);
@@ -16,9 +17,8 @@ export default function Home() {
   const [cartItems, setCartItems] = useState([]);
   const [notice, setNotice]       = useState(null);
 
-  // hero video sound
-  const [muted, setMuted]     = useState(true);
-  const [volume, setVolume]   = useState(0.4);
+  const [muted, setMuted]   = useState(true);
+  const [volume, setVolume] = useState(0.4);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -26,7 +26,6 @@ export default function Home() {
     videoRef.current.volume = volume;
   }, [muted, volume]);
 
-  // ratings numbers
   const [happy, setHappy]         = useState(0);
   const [designs, setDesigns]     = useState(0);
   const [satisfaction, setSat]    = useState(0);
@@ -80,75 +79,9 @@ export default function Home() {
   const onDropdownClick = (title) => () => showNotification(`Browsing ${title}`);
 
   return (
-    <div className="page-wrap">
+    <div className="pph">
       <div className="home-page">
-        {/* HEADER */}
-        <header className="header" id="header" ref={headerRef}>
-          <div className="header-content">
-            <div className="header-top">
-              <a href="/" className="logo" onClick={(e) => e.preventDefault()}>
-                <div className="logo-icon"><FaShoppingBag /></div>
-                <div className="logo-text">PackPal</div>
-              </a>
-
-              <div className="header-actions">
-                <a href="/" className="btn" onClick={handleAuth("login")}><FaUser /><span>Login</span></a>
-                <a href="/" className="btn btn-primary" onClick={handleAuth("register")}><FaUserPlus /><span>Register</span></a>
-                <button className="cart-btn" onClick={cartClick} style={{ position: "relative" }}>
-                  <FaShoppingCart />
-                  <div className="cart-badge" id="cartBadge">{cartItems.length}</div>
-                </button>
-              </div>
-            </div>
-
-            {/* NAVIGATION */}
-            <nav className="nav">
-              <ul className="nav-list">
-                <li className="nav-item">
-                  <a href="#home" className="nav-link" onClick={(e) => smoothTo(e, "#home")}><FaHome /> Home</a>
-                </li>
-
-                <li className="nav-item" style={{ position: "relative" }}>
-                  <a href="#collection" className="nav-link" onClick={(e) => e.preventDefault()}>
-                    <FaLayerGroup /> Collection <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
-                  </a>
-                  <div className="dropdown">
-                    <div className="dropdown-item" onClick={onDropdownClick("Kids Bag")}>
-                      <div className="dropdown-title">Kids Bag</div>
-                      <div className="dropdown-desc">Fun and colorful bags for children</div>
-                    </div>
-                    <div className="dropdown-item" onClick={onDropdownClick("School Bag/Laptop Bag")}>
-                      <div className="dropdown-title">School Bag/Laptop Bag</div>
-                      <div className="dropdown-desc">Durable bags for students and professionals</div>
-                    </div>
-                    <div className="dropdown-item" onClick={onDropdownClick("Tote Bag")}>
-                      <div className="dropdown-title">Tote Bag</div>
-                      <div className="dropdown-desc">Spacious and versatile everyday bags</div>
-                    </div>
-                    <div className="dropdown-item" onClick={onDropdownClick("Handbag")}>
-                      <div className="dropdown-title">Handbag</div>
-                      <div className="dropdown-desc">Elegant bags for special occasions</div>
-                    </div>
-                    <div className="dropdown-item" onClick={onDropdownClick("Clutch")}>
-                      <div className="dropdown-title">Clutch</div>
-                      <div className="dropdown-desc">Compact and stylish evening bags</div>
-                    </div>
-                  </div>
-                </li>
-
-                <li className="nav-item">
-                  <a href="#accessories" className="nav-link" onClick={(e) => smoothTo(e, "#accessories")}><FaPuzzlePiece /> Accessories</a>
-                </li>
-                <li className="nav-item">
-                  <a href="#sales" className="nav-link" onClick={(e) => smoothTo(e, "#sales")}><FaTags /> Sales</a>
-                </li>
-                <li className="nav-item">
-                  <a href="#offers" className="nav-link" onClick={(e) => smoothTo(e, "#offers")}><FaGift /> Offers</a>
-                </li>
-              </ul>
-            </nav>
-          </div>
-        </header>
+        <Header/>
 
         {/* MAIN */}
         <main className="main">
@@ -416,12 +349,12 @@ export default function Home() {
           </section>
         </main>
 
-        {/* FOOTER (component, at the very end) */}
-        <Footer />
+        
 
         {/* Toast */}
         {notice && <div className="notification">{notice}</div>}
       </div>
+      <Footer/>
     </div>
   );
 }

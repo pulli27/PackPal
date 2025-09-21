@@ -1,5 +1,7 @@
 import React, { useEffect } from "react";
 import "./Faq.css";
+import Header from "../Header/Header";
+import Footer from "../Footer/Footer";
 
 export default function Faq() {
   useEffect(() => {
@@ -245,6 +247,7 @@ export default function Faq() {
 
   return (
     <main className="faq-wrap">
+      <Header/>
       {/* Animated BG */}
       <div className="bg-animation" aria-hidden="true">
         <div className="floating-icon">🎒</div>
@@ -615,6 +618,7 @@ export default function Faq() {
             </div>
           </div>
         </section>
+        <Footer/>
       </div>
     </main>
   );
