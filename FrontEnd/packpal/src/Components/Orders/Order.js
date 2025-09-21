@@ -76,110 +76,113 @@ export default function Orders() {
   const completedCount = 1;
 
   return (
-    <div className="orders-page">
+    <div className="orders">{/* page wrapper to scope styles */}
       <Sidebar />
-      <h1 className="page-title">Orders</h1>
 
-      {/* Stats */}
-      <section className="stats">
-        <article className="stat-card">
-          <p className="stat-label">New Orders</p>
-          <p className="stat-value" id="newCount">{newOrdersCount}</p>
-        </article>
-        <article className="stat-card">
-          <p className="stat-label">Processing</p>
-          <p className="stat-value" id="processingCount">{processingCount}</p>
-        </article>
-        <article className="stat-card">
-          <p className="stat-label">Completed</p>
-          <p className="stat-value" id="completedCount">{completedCount}</p>
-        </article>
-      </section>
+      <div className="orders-page">
+        <h1 className="page-title">Orders</h1>
 
-      {/* Lightweight customer panel */}
-      <section className="table-card" aria-labelledby="recentOrdersHeading">
-        <div className="table-head">
-          <h2 id="recentOrdersHeading">Recent Orders</h2>
+        {/* Stats */}
+        <section className="stats">
+          <article className="stat-card">
+            <p className="stat-label">New Orders</p>
+            <p className="stat-value" id="newCount">{newOrdersCount}</p>
+          </article>
+          <article className="stat-card">
+            <p className="stat-label">Processing</p>
+            <p className="stat-value" id="processingCount">{processingCount}</p>
+          </article>
+          <article className="stat-card">
+            <p className="stat-label">Completed</p>
+            <p className="stat-value" id="completedCount">{completedCount}</p>
+          </article>
+        </section>
 
-          <div className="table-tools" style={{ display: "flex", gap: 10 }}>
-            <label className="search">
-              <input
-                type="search"
-                placeholder="Search order # or customer"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-            </label>
+        {/* Lightweight customer panel */}
+        <section className="table-card" aria-labelledby="recentOrdersHeading">
+          <div className="table-head">
+            <h2 id="recentOrdersHeading">Recent Orders</h2>
 
-            {/* Customer filter fed from UserManagement's saved customers */}
-            <select
-              className="customer-filter"
-              value={customerFilter}
-              onChange={(e) => setCustomerFilter(e.target.value)}
-              aria-label="Filter by customer"
-            >
-              <option value="All">All Customers</option>
-              {customers.map((c) => (
-                <option key={c._id || c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <div className="table-tools" style={{ display: "flex", gap: 10 }}>
+              <label className="search">
+                <input
+                  type="search"
+                  placeholder="Search order # or customer"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </label>
+
+              {/* Customer filter fed from UserManagement's saved customers */}
+              <select
+                className="customer-filter"
+                value={customerFilter}
+                onChange={(e) => setCustomerFilter(e.target.value)}
+                aria-label="Filter by customer"
+              >
+                <option value="All">All Customers</option>
+                {customers.map((c) => (
+                  <option key={c._id || c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div className="table-wrap">
-          <table className="orders-table">
-            <thead>
-              <tr>
-                <th>Order ID</th>
-                <th>Customer</th>
-                <th>Status</th>
-                <th>Total</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
+          <div className="table-wrap">
+            <table className="orders-table">
+              <thead>
                 <tr>
-                  <td className="empty" colSpan={5}>No orders found</td>
+                  <th>Order ID</th>
+                  <th>Customer</th>
+                  <th>Status</th>
+                  <th>Total</th>
+                  <th>Date</th>
                 </tr>
-              ) : (
-                filtered.map((o) => (
-                  <tr key={o.id}>
-                    <td className="order-id">#{o.id}</td>
-                    <td>
-                      {/* Click the name to filter by that customer quickly */}
-                      <button
-                        className="linklike"
-                        onClick={() => setCustomerFilter(o.customer || "All")}
-                        title="Filter by this customer"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          color: "inherit",
-                          cursor: "pointer",
-                          textDecoration: "underline",
-                        }}
-                      >
-                        {o.customer}
-                      </button>
-                    </td>
-                    <td>
-                      <span className={`status ${statusClass(o.status)}`}>
-                        {o.status}
-                      </span>
-                    </td>
-                    <td>{money(o.total)}</td>
-                    <td>{o.date}</td>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td className="empty" colSpan={5}>No orders found</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                ) : (
+                  filtered.map((o) => (
+                    <tr key={o.id}>
+                      <td className="order-id">#{o.id}</td>
+                      <td>
+                        {/* Click the name to filter by that customer quickly */}
+                        <button
+                          className="linklike"
+                          onClick={() => setCustomerFilter(o.customer || "All")}
+                          title="Filter by this customer"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            color: "inherit",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          {o.customer}
+                        </button>
+                      </td>
+                      <td>
+                        <span className={`status ${statusClass(o.status)}`}>
+                          {o.status}
+                        </span>
+                      </td>
+                      <td>{money(o.total)}</td>
+                      <td>{o.date}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

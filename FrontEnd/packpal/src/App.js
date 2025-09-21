@@ -5,11 +5,10 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Udashboard from "./Components/Dashboard/Udashboard";
 import Login from "./Components/Login/Login";
 import UserManagement from "./Components/UserManagement/UserManagement";
-import Analytics from "./Components/Analytics/Analytics";
-import Payment from "./Components/Payment/Payment";
+
 import Createaccount from "./Components/CreateAccount/Createaccount";
 import Orders from "./Components/Orders/Order";
-import Settings from "./Components/Settings/Settings"; 
+import Settingsis from "./Components/Settings/Settingsis"; 
 
 
 
@@ -19,13 +18,12 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/dashboard" element={<Udashboard />} />
+      <Route path="/isudashboard" element={<Udashboard />} />
       <Route path="/usermanagement" element={<UserManagement />} />
-      <Route path="/payment" element={<Payment />} />
-      <Route path="/analytics" element={<Analytics />} />
+      
       <Route path="/createaccount" element={<Createaccount />} />
       <Route path="/order" element={<Orders />} />
-      <Route path="/settings" element={<Settings />} />
+      <Route path="/settingsis" element={<Settingsis />} />
       
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

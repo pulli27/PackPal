@@ -1,5 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import "./Settings.css";
+// src/Components/Settings/Settingsis.js
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
+import "./Settingsis.css";
 import Sidebar from "../Sidebar/Sidebaris";
 
 /* ---------- Translations ---------- */
@@ -223,7 +230,10 @@ export default function Settings() {
     dataBackup: true,
   });
 
-  const t = useMemo(() => translations[settings.language] || translations.en, [settings.language]);
+  const t = useMemo(
+    () => translations[settings.language] || translations.en,
+    [settings.language]
+  );
 
   const fileImportRef = useRef(null);
   const avatarInputRef = useRef(null);
@@ -251,6 +261,22 @@ export default function Settings() {
     return () => cleanup();
   }, [settings.theme]);
 
+  // Toast helper (stable)
+  const showToast = useCallback((message) => {
+    setToast(message);
+    setTimeout(() => setToast(""), 2200);
+  }, []);
+
+  // Save All Changes (stable)
+  const saveAllChanges = useCallback(() => {
+    setSaving(true);
+    showToast(t.saving);
+    setTimeout(() => {
+      setSaving(false);
+      showToast(t.saved);
+    }, 800);
+  }, [showToast, t.saving, t.saved]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
@@ -269,15 +295,9 @@ export default function Settings() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [saveAllChanges, showToast]);
 
-  // Toast helper
-  function showToast(message) {
-    setToast(message);
-    setTimeout(() => setToast(""), 2200);
-  }
-
-  // Handlers
+  // ----- Handlers that ARE used in JSX below -----
   function changeTheme(theme) {
     setSettings((s) => ({ ...s, theme }));
     showToast("Theme changed to " + theme);
@@ -290,15 +310,6 @@ export default function Settings() {
     setToggles((t) => ({ ...t, [name]: value }));
   }
 
-  function saveAllChanges() {
-    setSaving(true);
-    showToast(t.saving);
-    setTimeout(() => {
-      setSaving(false);
-      showToast(t.saved);
-    }, 800);
-  }
-
   // Optional: Auto-save (debounced) when toggle is ON
   useEffect(() => {
     if (!toggles.autoSave) return;
@@ -307,14 +318,16 @@ export default function Settings() {
       showToast(t.saved);
     }, 600);
     return () => clearTimeout(id);
-  }, [settings, toggles, t.saved, toggles.autoSave]);
+  }, [settings, toggles, t.saved, toggles.autoSave, showToast]);
 
   // Profile image
   function onAvatarFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) return alert("Please select a valid image file.");
-    if (file.size > 5 * 1024 * 1024) return alert("Please select an image smaller than 5MB.");
+    if (!file.type.startsWith("image/"))
+      return alert("Please select a valid image file.");
+    if (file.size > 5 * 1024 * 1024)
+      return alert("Please select an image smaller than 5MB.");
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -423,7 +436,9 @@ export default function Settings() {
 
             <div className="tab-content">
               {/* General */}
-              <div className={`tab-panel ${activeTab === "general" ? "active" : ""}`}>
+              <div
+                className={`tab-panel ${activeTab === "general" ? "active" : ""}`}
+              >
                 <div className="section-header">
                   <span className="section-icon">🏢</span>
                   <h2 className="section-title">{t.general.companyInfo}</h2>
@@ -436,7 +451,12 @@ export default function Settings() {
                       <p className="form-description">{t.general.companyNameDesc}</p>
                     </div>
                     <div className="form-control-section">
-                      <input type="text" className="form-input" defaultValue="BagCorp Industries" placeholder="Enter company name" />
+                      <input
+                        type="text"
+                        className="form-input"
+                        defaultValue="BagCorp Industries"
+                        placeholder="Enter company name"
+                      />
                     </div>
                   </div>
 
@@ -478,7 +498,10 @@ export default function Settings() {
                       <p className="form-description">{t.general.autoSaveDesc}</p>
                     </div>
                     <div className="form-control-section">
-                      <Toggle checked={toggles.autoSave} onChange={(v) => toggle("autoSave", v)} />
+                      <Toggle
+                        checked={toggles.autoSave}
+                        onChange={(v) => toggle("autoSave", v)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -488,21 +511,29 @@ export default function Settings() {
                 <div className="settings-grid">
                   <div className="settings-card">
                     <h3 className="card-title">Business Hours</h3>
-                    <p className="card-description">Configure your operational hours and availability</p>
+                    <p className="card-description">
+                      Configure your operational hours and availability
+                    </p>
                   </div>
                   <div className="settings-card">
                     <h3 className="card-title">Tax Configuration</h3>
-                    <p className="card-description">Set up tax rates and regional tax settings</p>
+                    <p className="card-description">
+                      Set up tax rates and regional tax settings
+                    </p>
                   </div>
                   <div className="settings-card">
                     <h3 className="card-title">Shipping Zones</h3>
-                    <p className="card-description">Define shipping areas and delivery options</p>
+                    <p className="card-description">
+                      Define shipping areas and delivery options
+                    </p>
                   </div>
                 </div>
               </div>
 
               {/* Notifications */}
-              <div className={`tab-panel ${activeTab === "notifications" ? "active" : ""}`}>
+              <div
+                className={`tab-panel ${activeTab === "notifications" ? "active" : ""}`}
+              >
                 <div className="section-header">
                   <span className="section-icon">🔔</span>
                   <h2 className="section-title">{t.tabs.notifications}</h2>
@@ -515,7 +546,10 @@ export default function Settings() {
                       <p className="form-description">Receive notifications via email</p>
                     </div>
                     <div className="form-control-section">
-                      <Toggle checked={toggles.email} onChange={(v) => toggle("email", v)} />
+                      <Toggle
+                        checked={toggles.email}
+                        onChange={(v) => toggle("email", v)}
+                      />
                     </div>
                   </div>
 
@@ -535,14 +569,19 @@ export default function Settings() {
                       <p className="form-description">Get notified about order status changes</p>
                     </div>
                     <div className="form-control-section">
-                      <Toggle checked={toggles.orderUpdates} onChange={(v) => toggle("orderUpdates", v)} />
+                      <Toggle
+                        checked={toggles.orderUpdates}
+                        onChange={(v) => toggle("orderUpdates", v)}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Appearance */}
-              <div className={`tab-panel ${activeTab === "appearance" ? "active" : ""}`}>
+              <div
+                className={`tab-panel ${activeTab === "appearance" ? "active" : ""}`}
+              >
                 <div className="section-header">
                   <span className="section-icon">🎨</span>
                   <h2 className="section-title">{t.appearance.appearanceSettings}</h2>
@@ -591,7 +630,9 @@ export default function Settings() {
               </div>
 
               {/* Profile */}
-              <div className={`tab-panel ${activeTab === "profile" ? "active" : ""}`}>
+              <div
+                className={`tab-panel ${activeTab === "profile" ? "active" : ""}`}
+              >
                 <div className="section-header">
                   <span className="section-icon">👤</span>
                   <h2 className="section-title">{t.profile.userProfile}</h2>
@@ -607,7 +648,8 @@ export default function Settings() {
                           if (settings.profileImage) {
                             e.preventDefault();
                             // eslint-disable-next-line no-restricted-globals
-                            if (confirm("Do you want to remove your profile picture?")) removeProfileImage();
+                            if (confirm("Do you want to remove your profile picture?"))
+                              removeProfileImage();
                           }
                         }}
                         onClick={() => avatarInputRef.current?.click()}
@@ -646,7 +688,12 @@ export default function Settings() {
                             <p className="form-description">{t.profile.fullNameDesc}</p>
                           </div>
                           <div className="form-control-section">
-                            <input type="text" className="form-input" defaultValue="Hiruni Wijesinghe" placeholder="Enter your full name" />
+                            <input
+                              type="text"
+                              className="form-input"
+                              defaultValue="Hiruni Wijesinghe"
+                              placeholder="Enter your full name"
+                            />
                           </div>
                         </div>
                       </div>
@@ -726,7 +773,9 @@ export default function Settings() {
                   <div className="security-item">
                     <div className="security-content">
                       <h3 className="security-title">Session Timeout</h3>
-                      <p className="security-description">Auto-logout after inactivity (minutes)</p>
+                      <p className="security-description">
+                        Auto-logout after inactivity (minutes)
+                      </p>
                     </div>
                     <div className="security-control">
                       <select className="form-select timeout-select" defaultValue="30">
@@ -755,7 +804,10 @@ export default function Settings() {
                       <p className="form-description">Automatically backup your data</p>
                     </div>
                     <div className="form-control-section">
-                      <Toggle checked={toggles.dataBackup} onChange={(v) => toggle("dataBackup", v)} />
+                      <Toggle
+                        checked={toggles.dataBackup}
+                        onChange={(v) => toggle("dataBackup", v)}
+                      />
                     </div>
                   </div>
 
@@ -794,14 +846,21 @@ export default function Settings() {
                 <div className="settings-grid">
                   <div className="settings-card">
                     <h3 className="card-title">Export Settings</h3>
-                    <p className="card-description">Download your current configuration as JSON.</p>
-                    <button className="security-action-btn change-btn" onClick={exportSettings}>
+                    <p className="card-description">
+                      Download your current configuration as JSON.
+                    </p>
+                    <button
+                      className="security-action-btn change-btn"
+                      onClick={exportSettings}
+                    >
                       Export
                     </button>
                   </div>
                   <div className="settings-card">
                     <h3 className="card-title">Import Settings</h3>
-                    <p className="card-description">Load a previously saved configuration.</p>
+                    <p className="card-description">
+                      Load a previously saved configuration.
+                    </p>
                     <input
                       ref={fileImportRef}
                       type="file"
@@ -818,8 +877,19 @@ export default function Settings() {
                       onClick={() => {
                         // eslint-disable-next-line no-restricted-globals
                         if (confirm("Are you sure you want to reset all settings to defaults?")) {
-                          setSettings({ theme: "light", language: "en", profileImage: null, preferences: {} });
-                          setToggles({ autoSave: true, email: true, sms: false, orderUpdates: true, dataBackup: true });
+                          setSettings({
+                            theme: "light",
+                            language: "en",
+                            profileImage: null,
+                            preferences: {},
+                          });
+                          setToggles({
+                            autoSave: true,
+                            email: true,
+                            sms: false,
+                            orderUpdates: true,
+                            dataBackup: true,
+                          });
                           showToast("Settings reset to defaults");
                         }
                       }}

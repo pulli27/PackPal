@@ -1,3 +1,4 @@
+// src/Components/Udashboard/Udashboard.js
 import React, { useEffect, useRef, useState } from "react";
 import "./Udashboard.css";
 import Sidebar from "../Sidebar/Sidebaris";
@@ -43,8 +44,8 @@ export default function Udashboard() {
         const today = new Date().toISOString().slice(0, 10);
 
         const statTotal = users.length;
-        const statNew = users.filter(u => (u.createdAt || "").slice(0,10) === today).length;
-        const statPending = users.filter(u => String(u.status || "").toLowerCase() === "pending").length;
+        const statNew = users.filter((u) => (u.createdAt || "").slice(0, 10) === today).length;
+        const statPending = users.filter((u) => String(u.status || "").toLowerCase() === "pending").length;
 
         if (!cancelled) {
           animateTo(totalRef.current, statTotal);
@@ -63,11 +64,13 @@ export default function Udashboard() {
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
-    <>
+    <div className="udb">
       <Sidebar />
 
       <div className="wrap">
@@ -77,17 +80,23 @@ export default function Udashboard() {
           <section className="cards">
             <article className="stat">
               <p className="stat__label">Total Users</p>
-              <div className="stat__value" ref={totalRef} data-val="0">0</div>
+              <div className="stat__value" ref={totalRef} data-val="0">
+                0
+              </div>
             </article>
 
             <article className="stat">
               <p className="stat__label">New Today</p>
-              <div className="stat__value" ref={newRef} data-val="0">0</div>
+              <div className="stat__value" ref={newRef} data-val="0">
+                0
+              </div>
             </article>
 
             <article className="stat">
               <p className="stat__label">Pending Approval</p>
-              <div className="stat__value" ref={pendingRef} data-val="0">0</div>
+              <div className="stat__value" ref={pendingRef} data-val="0">
+                0
+              </div>
             </article>
 
             <article className="banner">
@@ -97,6 +106,6 @@ export default function Udashboard() {
           </section>
         </main>
       </div>
-    </>
+    </div>
   );
 }

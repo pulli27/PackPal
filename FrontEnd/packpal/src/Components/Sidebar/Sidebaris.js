@@ -1,7 +1,7 @@
 // src/Components/Sidebar/Sidebar.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import "./Sidebar.css";
+import "./Sidebaris.css";
 
 export default function Sidebar({
   initialActive = "report",
@@ -21,21 +21,15 @@ export default function Sidebar({
     } catch {}
   }, []);
 
-  // Keep active state in sync with route changes
+  // Keep active state in sync with route changes (match your current routes)
   useEffect(() => {
     const path = location.pathname.toLowerCase();
     const map = {
-      "/maindashboard": "dashboard",
-      "/iteminventory": "itemInventory",
-      "/productinventory": "productInventory",
-      "/purchase": "purchase",
-      "/supplier": "suppliers",
-    
-      "/settings": "settings",
-      
-      "/orders": "orders",
-      "/login": "login",
+      "/isudashboard": "dashboard",
       "/usermanagement": "usermanagement",
+      "/order": "order",
+      "/settingsis": "settings",
+      "/login": "login",
     };
     const key = map[path];
     if (key) setActive(key);
@@ -45,7 +39,7 @@ export default function Sidebar({
   useEffect(() => {
     const handleDocClick = (e) => {
       if (window.innerWidth <= 768) {
-        const btn = document.querySelector(".mobile-menu");
+        const btn = document.querySelector(".sidebar-shell .mobile-menu");
         if (
           sidebarRef.current &&
           !sidebarRef.current.contains(e.target) &&
@@ -74,9 +68,8 @@ export default function Sidebar({
     productInventory: "Product Inventory",
     purchase: "Purchase Items",
     suppliers: "Suppliers",
-    
     settings: "Settings",
-    orders: "Orders",
+    order: "Orders",
     login: "Login",
     usermanagement: "User Management",
   };
@@ -105,7 +98,7 @@ export default function Sidebar({
   };
 
   return (
-    <>
+    <div className="sidebar-shell">{/* page wrapper for scoping */}
       {/* Mobile toggle */}
       <button
         className="mobile-menu"
@@ -129,7 +122,7 @@ export default function Sidebar({
 
         <nav className="sidebar-nav" role="navigation">
           <NavLink
-            to="/dashboard"
+            to="/isudashboard"
             className={({ isActive }) =>
               `nav-item ${isActive || active === "dashboard" ? "active" : ""}`
             }
@@ -168,12 +161,8 @@ export default function Sidebar({
             <i className="fa-solid fa-right-to-bracket" /> <span>Login</span>
           </NavLink>
 
-         
-       
-
-         
           <NavLink
-            to="/settings"
+            to="/settingsis"
             className={({ isActive }) =>
               `nav-item ${isActive || active === "settings" ? "active" : ""}`
             }
@@ -191,6 +180,6 @@ export default function Sidebar({
           </button>
         </div>
       </aside>
-    </>
+    </div>
   );
 }
