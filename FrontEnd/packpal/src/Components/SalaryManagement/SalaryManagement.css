@@ -98,6 +98,7 @@
   font-size: 14px;
   transition: .3s;
   background: #fff;
+  padding-top: 5px;
 }
 .salarycal input:focus,
 .salarycal select:focus {
