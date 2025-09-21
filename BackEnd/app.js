@@ -12,6 +12,7 @@ const purchaseRoutes  = require("./Route/PurchaseRoute");
 const productRoutes  = require("./Route/ProductRoute");
 const cartRoutes  = require("./Routes/CartRoutes");
 const transactionRoutes  = require("./Routes/TransactionsRoutes");
+const userRouter = require("./Routes/userRouter");
 
 if (!process.env.MONGO_URI) {
   console.error("FATAL: MONGO_URI is missing in BackEnd/.env");
@@ -48,6 +49,7 @@ app.use("/api/purchases", purchaseRoutes);
 app.use("/api/products", productRoutes);
 app.use("/carts", cartRoutes);          
 app.use("/transactions", transactionRoutes); 
+app.use("/users", userRouter);
 
 // health
 app.get("/health", (_req, res) => res.json({ ok: true }));

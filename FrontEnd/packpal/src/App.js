@@ -21,6 +21,13 @@ import Settingssa from "./Components/Settings/Settingssa";
 import CustomerView from "./pages/CustomerView";
 import Cart from "./pages/Cart";
 
+import Udashboard from "./Components/Dashboard/Udashboard";
+import Login from "./Components/Login/Login";
+import UserManagement from "./Components/UserManagement/UserManagement";
+import Createaccount from "./Components/CreateAccount/Createaccount";
+import Orders from "./Components/Orders/Order";
+import Settingsis from "./Components/Settings/Settingsis"; 
+
 /* 404 fallback */
 function NotFound() {
   return (
@@ -56,6 +63,13 @@ export default function App() {
       <Route path="/settingssa" element={<Settingssa />} />
       <Route path="/customer" element={<CustomerView/>}/>
       <Route path="/cart" element={<Cart/>}/>
+
+      <Route path="/login" element={<Login />} />
+            <Route path="/isudashboard" element={<Udashboard />} />
+            <Route path="/usermanagement" element={<UserManagement />} />
+            <Route path="/createaccount" element={<Createaccount />} />
+            <Route path="/order" element={<Orders />} />
+            <Route path="/settingsis" element={<Settingsis />} />
 
       {/* catch-all */}
       <Route path="*" element={<NotFound />} />
