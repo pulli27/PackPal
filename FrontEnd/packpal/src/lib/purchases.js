@@ -1,5 +1,5 @@
 // src/lib/purchases.js
-import { api } from "./api";
+import { api } from "./api1";
 
 export const purchases = {
   // GET /api/purchases

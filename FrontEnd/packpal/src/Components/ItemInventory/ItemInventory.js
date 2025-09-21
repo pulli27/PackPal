@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from "react";
 import "./ItemInventory.css";
 import Sidebarpul from "../Sidebar/Sidebarpul";
-import { api } from "../../lib/api";
+import { api } from "../../lib/api1";
 
 /* ---------------------------
    Runtime PDF tools loader (jsPDF + AutoTable)
