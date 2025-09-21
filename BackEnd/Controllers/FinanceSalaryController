@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Finance = require("../models/FinanceSalaryModel"); // <-- declare ONCE
+const Finance = require("../Model/FinanceSalaryModel"); // <-- declare ONCE
 
 // GET /finances
 async function getAllFinances(_req, res) {

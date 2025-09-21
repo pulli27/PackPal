@@ -1,6 +1,6 @@
 const express = require("express");
-const Inventory = require("../models/InventoryItem");
-const Product = require("../models/Product"); // <-- add this
+const Inventory = require("../Model/InventoryItem");
+const Product = require("../Model/Product"); // <-- add this
 const router = express.Router();
 
 /** Helper: effective unit price after discount */

@@ -1,12 +1,35 @@
 import React, { useEffect, useState } from "react";
 import "./SalaryCal.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebar/Sidebarsanu";
 import { NavLink } from "react-router-dom";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { api } from "../../lib/api";
 
 const rs = (n) => `Rs. ${Math.round(Number(n || 0)).toLocaleString()}`;
 const toast = (msg, type = "info") => alert(`${type.toUpperCase()}: ${msg}`);
+
+// === Validation helpers ===
+// Only letters (allow spaces). No digits/symbols.
+const sanitizeLettersOnly = (v) =>
+  String(v || "")
+    .replace(/[^A-Za-z\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const isLettersOnly = (v) => {
+  const s = String(v || "").trim();
+  if (!s) return false;
+  return /^[A-Za-z]+(?:\s[A-Za-z]+)*$/.test(s);
+};
+
+// Digits only for account no
+const sanitizeDigitsOnly = (v) => String(v || "").replace(/\D/g, "");
+const isDigitsOnly = (v) => /^[0-9]+$/.test(String(v || ""));
+
+// Block scientific notation chars in numeric fields
+const blockExpKeys = (e) => {
+  if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+};
 
 export default function SalaryCal() {
   const [rows, setRows] = useState([]);
@@ -28,7 +51,6 @@ export default function SalaryCal() {
     try {
       setLoading(true);
       const { data } = await api.get("/finances");
-      // Oldest → newest so newly created items appear at the bottom
       const list = (data.finances || []).slice().sort((a, b) => {
         const ta = a.createdAt
           ? new Date(a.createdAt).getTime()
@@ -50,14 +72,34 @@ export default function SalaryCal() {
     load();
   }, []);
 
+  // ---------- CREATE ----------
   async function create() {
     if (!form.EmpId || !form.Emp_Name || !form.Base_Sal)
       return toast("EmpId, Name, Salary required", "warning");
 
+    if (!isLettersOnly(form.Emp_Name))
+      return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
+    if (form.Designation && !isLettersOnly(form.Designation))
+      return toast("Designation: letters only (A–Z), no numbers/symbols.", "warning");
+    if (form.Bank_Name && !isLettersOnly(form.Bank_Name))
+      return toast("Bank Name: letters only (A–Z), no numbers/symbols.", "warning");
+    if (form.branch && !isLettersOnly(form.branch))
+      return toast("Branch: letters only (A–Z), no numbers/symbols.", "warning");
+
+    if (form.Acc_No && !isDigitsOnly(form.Acc_No))
+      return toast("Account No: digits only.", "warning");
+
     try {
-      const payload = { ...form, Base_Sal: Number(form.Base_Sal || 0) };
+      const payload = {
+        ...form,
+        Emp_Name: sanitizeLettersOnly(form.Emp_Name),
+        Designation: sanitizeLettersOnly(form.Designation),
+        Bank_Name: sanitizeLettersOnly(form.Bank_Name),
+        branch: sanitizeLettersOnly(form.branch),
+        Acc_No: sanitizeDigitsOnly(form.Acc_No),
+        Base_Sal: Number(String(form.Base_Sal).replace(/[^\d.]/g, "")) || 0,
+      };
       const { data } = await api.post("/finances", payload);
-      // Append to end (keeps newest at bottom)
       setRows((p) => [...p, data]);
       setForm({
         EmpId: "",
@@ -71,25 +113,43 @@ export default function SalaryCal() {
       });
       setAddOpen(false);
       toast("Employee added", "success");
-      // If you prefer canonical order from server, call: await load();
     } catch (e) {
       toast(e?.response?.data?.message || "Add failed", "error");
     }
   }
 
+  // ---------- EDIT SAVE ----------
   async function saveEdit() {
     const id = editing?._id;
     if (!id) return toast("Update failed: missing _id", "error");
 
+    if (!editing.EmpId || !editing.Emp_Name || editing.Base_Sal === "")
+      return toast("EmpId, Name, Salary required", "warning");
+
+    if (!isLettersOnly(editing.Emp_Name))
+      return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
+    if (editing.Designation && !isLettersOnly(editing.Designation))
+      return toast("Designation: letters only (A–Z), no numbers/symbols.", "warning");
+    if (editing.Bank_Name && !isLettersOnly(editing.Bank_Name))
+      return toast("Bank Name: letters only (A–Z), no numbers/symbols.", "warning");
+    if (editing.branch && !isLettersOnly(editing.branch))
+      return toast("Branch: letters only (A–Z), no numbers/symbols.", "warning");
+
+    if (editing.Acc_No && !isDigitsOnly(editing.Acc_No))
+      return toast("Account No: digits only.", "warning");
+
     const payload = {
       EmpId: editing.EmpId,
-      Emp_Name: editing.Emp_Name,
-      Designation: editing.Designation,
+      Emp_Name: sanitizeLettersOnly(editing.Emp_Name),
+      Designation: sanitizeLettersOnly(editing.Designation),
       Epf_No: editing.Epf_No,
-      Base_Sal: editing.Base_Sal === "" ? "" : Number(editing.Base_Sal || 0),
-      Bank_Name: editing.Bank_Name,
-      branch: editing.branch,
-      Acc_No: editing.Acc_No,
+      Base_Sal:
+        editing.Base_Sal === ""
+          ? ""
+          : Number(String(editing.Base_Sal).replace(/[^\d.]/g, "")) || 0,
+      Bank_Name: sanitizeLettersOnly(editing.Bank_Name),
+      branch: sanitizeLettersOnly(editing.branch),
+      Acc_No: sanitizeDigitsOnly(editing.Acc_No),
     };
 
     try {
@@ -97,13 +157,14 @@ export default function SalaryCal() {
       setRows((prev) => prev.map((r) => (r._id === id ? data : r)));
       setEditing(null);
       toast("Updated", "success");
-      await load(); // keep sorted order after edits
+      await load();
     } catch (e) {
       const msg = e?.response?.data?.message || e.message || "Update failed";
       toast(`Update failed: ${msg}`, "error");
     }
   }
 
+  // Delete
   async function remove(id) {
     if (!window.confirm("Delete this record?")) return;
     try {
@@ -114,6 +175,28 @@ export default function SalaryCal() {
       toast(e?.response?.data?.message || "Delete failed", "error");
     }
   }
+
+  // Sanitizing on type for Add form fields
+  const handleAddChange = (k, val) => {
+    let v = val;
+    if (k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch") {
+      v = sanitizeLettersOnly(v);
+    }
+    if (k === "Acc_No") v = sanitizeDigitsOnly(v);
+    if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, ""); // strips e/E/+/- and any symbols
+    setForm((s) => ({ ...s, [k]: v }));
+  };
+
+  // Sanitizing on type for Edit form fields
+  const handleEditChange = (k, val) => {
+    let v = val;
+    if (k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch") {
+      v = sanitizeLettersOnly(v);
+    }
+    if (k === "Acc_No") v = sanitizeDigitsOnly(v);
+    if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, "");
+    setEditing((s) => ({ ...s, [k]: v }));
+  };
 
   return (
     <div className="salarycal page-wrap">
@@ -179,8 +262,16 @@ export default function SalaryCal() {
                     <input
                       type={k === "Base_Sal" ? "number" : "text"}
                       value={form[k]}
-                      onChange={(e) =>
-                        setForm((s) => ({ ...s, [k]: e.target.value }))
+                      onChange={(e) => handleAddChange(k, e.target.value)}
+                      inputMode={k === "Base_Sal" || k === "Acc_No" ? "decimal" : "text"}
+                      step={k === "Base_Sal" ? "0.01" : undefined}
+                      onKeyDown={
+                        k === "Base_Sal" || k === "Acc_No" ? blockExpKeys : undefined
+                      } // blocks e/E/+/- while typing
+                      pattern={
+                        k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch"
+                          ? "[A-Za-z ]+"
+                          : undefined
                       }
                     />
                   </div>
@@ -228,9 +319,7 @@ export default function SalaryCal() {
                     <td>{r.Epf_No || ""}</td>
                     <td>{rs(r.Base_Sal)}</td>
                     <td>
-                      {[r.Bank_Name, r.branch, r.Acc_No]
-                        .filter(Boolean)
-                        .join(" - ")}
+                      {[r.Bank_Name, r.branch, r.Acc_No].filter(Boolean).join(" - ")}
                     </td>
                     <td className="actions">
                       <button
@@ -291,8 +380,16 @@ export default function SalaryCal() {
                   <input
                     type={k === "Base_Sal" ? "number" : "text"}
                     value={editing?.[k] ?? ""}
-                    onChange={(e) =>
-                      setEditing((s) => ({ ...s, [k]: e.target.value }))
+                    onChange={(e) => handleEditChange(k, e.target.value)}
+                    inputMode={k === "Base_Sal" || k === "Acc_No" ? "decimal" : "text"}
+                    step={k === "Base_Sal" ? "0.01" : undefined}
+                    onKeyDown={
+                      k === "Base_Sal" || k === "Acc_No" ? blockExpKeys : undefined
+                    } // blocks e/E/+/- while typing
+                    pattern={
+                      k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch"
+                        ? "[A-Za-z ]+"
+                        : undefined
                     }
                   />
                 </div>

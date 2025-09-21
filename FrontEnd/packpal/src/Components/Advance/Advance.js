@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./Advance.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebar/Sidebarsanu";
 import { NavLink } from "react-router-dom";
 import { api } from "../../lib/api";
 

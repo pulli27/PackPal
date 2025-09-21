@@ -1,7 +1,7 @@
 // controllers/AttendanceController.js
 const mongoose = require("mongoose");
-const Attendance = require("../models/AttendanceModel");
-const Finance = require("../models/FinanceSalaryModel");
+const Attendance = require("../Model/AttendanceModel");
+const Finance = require("../Model/FinanceSalaryModel");
 
 // GET /attendance  (use ?includeEmployee=1 to join Finance for names/designations)
 // GET /attendance

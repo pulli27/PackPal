@@ -10,7 +10,7 @@ const {
 } = require("../Controllers/FinanceSalaryController");
 
 // Used for fallback & to reach the same DB connection
-const FinanceSalary = require("../models/FinanceSalaryModel");
+const FinanceSalary = require("../Model/FinanceSalaryModel");
 
 const router = express.Router();
 

@@ -13,7 +13,7 @@ const router = express.Router();
 // Optional seed
 router.post("/test-create", async (_req, res, next) => {
   try {
-    const Attendance = require("../models/AttendanceModel");
+    const Attendance = require("../Model/AttendanceModel");
     const r = await Attendance.create({
       empId: "EMP001",
       period: "2025-08",

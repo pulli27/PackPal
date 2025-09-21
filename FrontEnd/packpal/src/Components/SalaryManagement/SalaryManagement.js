@@ -1,7 +1,7 @@
 // FrontEnd/src/components/SalaryManagement/SalaryManagement.jsx
 import React, { useEffect, useState } from "react";
 import "./SalaryManagement.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebar/Sidebarsanu";
 import { NavLink } from "react-router-dom";
 import { api } from "../../lib/api";
 

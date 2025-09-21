@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./EpfManagement.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebar/Sidebarsanu";
 import { useNavigate } from "react-router-dom";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { api } from "../../lib/api"; // <-- axios instance

@@ -1,10 +1,23 @@
 import React, { useEffect, useState } from "react";
 import "./Attendance.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebar/Sidebarsanu";
 import { NavLink } from "react-router-dom";
 import { api } from "../../lib/api";
 
 const toast = (m, t = "info") => alert(`${t.toUpperCase()}: ${m}`);
+
+// helpers for 0–31 validation
+const clamp0to31 = (v) => {
+  const n = Number(v ?? 0);
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 31) return 31;
+  return n;
+};
+const anyOver31 = (obj) =>
+  ["workingDays", "leaveAllowed", "noPayLeave", "leaveTaken"].some(
+    (k) => Number(obj?.[k] ?? 0) > 31
+  );
 
 export default function Attendance() {
   const [employees, setEmployees] = useState([]);   // [{ EmpId, Emp_Name }]
@@ -52,6 +65,12 @@ export default function Attendance() {
   async function create() {
     if (!form.empId || !form.period)
       return toast("Employee and period are required", "warning");
+
+    // enforce <= 31 for specific fields
+    if (anyOver31(form)) {
+      return toast("Working Days, Leave Allowed, No Pay Leave, and Leave Taken cannot exceed 31.", "warning");
+    }
+
     try {
       const payload = {
         ...form,
@@ -78,6 +97,12 @@ export default function Attendance() {
   async function saveEdit() {
     const id = editing?._id;
     if (!id) return toast("Missing _id", "error");
+
+    // enforce <= 31 for specific fields on edit
+    if (anyOver31(editing)) {
+      return toast("Working Days, Leave Allowed, No Pay Leave, and Leave Taken cannot exceed 31.", "warning");
+    }
+
     try {
       const payload = {
         empId: editing.empId,
@@ -110,6 +135,12 @@ export default function Attendance() {
       toast(e?.response?.data?.message || "Delete failed", "error");
     }
   }
+
+  // onChange helpers for add/edit numeric fields to clamp 0–31 live
+  const onAddNum = (key) => (e) =>
+    setForm((s) => ({ ...s, [key]: clamp0to31(e.target.value) }));
+  const onEditNum = (key) => (e) =>
+    setEditing((s) => ({ ...s, [key]: clamp0to31(e.target.value) }));
 
   return (
     <div className="Attendance page-wrap">
@@ -167,8 +198,10 @@ export default function Attendance() {
                 <div className="form-group"><label>Working Days</label>
                   <input
                     type="number"
+                    min={0}
+                    max={31}
                     value={form.workingDays}
-                    onChange={(e) => setForm((s) => ({ ...s, workingDays: e.target.value }))}
+                    onChange={onAddNum("workingDays")}
                   />
                 </div>
                 <div className="form-group"><label>Overtime Hours</label>
@@ -181,22 +214,28 @@ export default function Attendance() {
                 <div className="form-group"><label>Leave Allowed</label>
                   <input
                     type="number"
+                    min={0}
+                    max={31}
                     value={form.leaveAllowed}
-                    onChange={(e) => setForm((s) => ({ ...s, leaveAllowed: e.target.value }))}
+                    onChange={onAddNum("leaveAllowed")}
                   />
                 </div>
                 <div className="form-group"><label>No Pay Leave</label>
                   <input
                     type="number"
+                    min={0}
+                    max={31}
                     value={form.noPayLeave}
-                    onChange={(e) => setForm((s) => ({ ...s, noPayLeave: e.target.value }))}
+                    onChange={onAddNum("noPayLeave")}
                   />
                 </div>
                 <div className="form-group"><label>Leave Taken</label>
                   <input
                     type="number"
+                    min={0}
+                    max={31}
                     value={form.leaveTaken}
-                    onChange={(e) => setForm((s) => ({ ...s, leaveTaken: e.target.value }))}
+                    onChange={onAddNum("leaveTaken")}
                   />
                 </div>
                 <div className="form-group"><label>Other</label>
@@ -295,8 +334,10 @@ export default function Attendance() {
               <div className="form-group"><label>Working Days</label>
                 <input
                   type="number"
+                  min={0}
+                  max={31}
                   value={editing.workingDays ?? 0}
-                onChange={(e) => setEditing((s) => ({ ...s, workingDays: e.target.value }))}
+                  onChange={onEditNum("workingDays")}
                 />
               </div>
               <div className="form-group"><label>Overtime Hours</label>
@@ -309,22 +350,28 @@ export default function Attendance() {
               <div className="form-group"><label>Leave Allowed</label>
                 <input
                   type="number"
+                  min={0}
+                  max={31}
                   value={editing.leaveAllowed ?? 0}
-                  onChange={(e) => setEditing((s) => ({ ...s, leaveAllowed: e.target.value }))}
+                  onChange={onEditNum("leaveAllowed")}
                 />
               </div>
               <div className="form-group"><label>No Pay Leave</label>
                 <input
                   type="number"
+                  min={0}
+                  max={31}
                   value={editing.noPayLeave ?? 0}
-                  onChange={(e) => setEditing((s) => ({ ...s, noPayLeave: e.target.value }))}
+                  onChange={onEditNum("noPayLeave")}
                 />
               </div>
               <div className="form-group"><label>Leave Taken</label>
                 <input
                   type="number"
+                  min={0}
+                  max={31}
                   value={editing.leaveTaken ?? 0}
-                  onChange={(e) => setEditing((s) => ({ ...s, leaveTaken: e.target.value }))}
+                  onChange={onEditNum("leaveTaken")}
                 />
               </div>
               <div className="form-group"><label>Other</label>

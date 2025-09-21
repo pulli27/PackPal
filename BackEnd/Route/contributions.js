@@ -1,7 +1,7 @@
 // routes/contributions.js
 const express = require("express");
-const Contribution = require("../models/Contribution");
-const Finance = require("../models/FinanceSalaryModel"); // your existing model
+const Contribution = require("../Model/Contribution");
+const Finance = require("../Model/FinanceSalaryModel"); // your existing model
 const { monthLabel, dueDateNextMonth15, round } = require("../lib/contrib");
 
 const router = express.Router();

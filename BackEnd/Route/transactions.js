@@ -1,6 +1,6 @@
 // routes/transactions.js
 const express = require("express");
-const Transaction = require("../models/Transaction");
+const Transaction = require("../Model/Transaction");
 const router = express.Router();
 
 /**

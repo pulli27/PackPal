@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import "./Revenue.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebar/Sidebarsanu";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { api } from "../../lib/api";
 

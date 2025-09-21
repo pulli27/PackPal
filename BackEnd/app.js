@@ -4,15 +4,15 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 
-const financeRoutes = require("./Routes/FinanceSalaryRoute");
-const attendanceRoutes = require("./Routes/AttendanceRoute");
-const advanceRoutes = require("./Routes/AdvanceRoute");
-const salaryRoutes = require("./Routes/SalaryRoute");
-const transferRoutes = require("./Routes/TransferRoute");
-const contributions = require("./Routes/contributions");
-const inventoryRoutes = require("./Routes/Inventory");
-const transactionRoutes = require("./Routes/transactions");
-const purchaseRoutes = require("./Routes/Purchases");
+const financeRoutes = require("./Route/FinanceSalaryRoute");
+const attendanceRoutes = require("./Route/AttendanceRoute");
+const advanceRoutes = require("./Route/AdvanceRoute");
+const salaryRoutes = require("./Route/SalaryRoute");
+const transferRoutes = require("./Route/TransferRoute");
+const contributions = require("./Route/contributions");
+const inventoryRoutes = require("./Route/Inventory");
+const transactionRoutes = require("./Route/transactions");
+const purchaseRoutes = require("./Route/Purchases");
 
 const app = express();
 

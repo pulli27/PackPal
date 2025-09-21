@@ -1,7 +1,7 @@
 // Controllers/AdvanceController.js
 const mongoose = require("mongoose");
-const Advance = require("../models/AdvanceModel");
-const Finance = require("../models/FinanceSalaryModel");
+const Advance = require("../Model/AdvanceModel");
+const Finance = require("../Model/FinanceSalaryModel");
 
 /* ----------------------------- helpers ----------------------------- */
 

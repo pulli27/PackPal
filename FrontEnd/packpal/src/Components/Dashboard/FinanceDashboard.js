@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useMemo, useState } from "react";
 import Chart from "chart.js/auto";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./FinanceDashboard.css";
-import Sidebar from "../Sidebar/Sidebar";
+import Sidebar from "../Sidebar/Sidebarsanu";
 import { api } from "../../lib/api";
 
 /* ===== helpers ===== */

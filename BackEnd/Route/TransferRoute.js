@@ -1,6 +1,6 @@
 // BackEnd/Routes/TransferRoute.js
 const express = require("express");
-const Transfer = require("../models/TransferModel");
+const Transfer = require("../Model/TransferModel");
 
 const router = express.Router();
 

@@ -1,8 +1,8 @@
 // Controllers/SalaryController.js
 const mongoose   = require("mongoose");
-const Finance    = require("../models/FinanceSalaryModel");
-const Advance    = require("../models/AdvanceModel");
-const Attendance = require("../models/AttendanceModel");
+const Finance    = require("../Model/FinanceSalaryModel");
+const Advance    = require("../Model/AdvanceModel");
+const Attendance = require("../Model/AttendanceModel");
 
 function toNumberSafe(v) {
   if (v === null || v === undefined) return 0;
