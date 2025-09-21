@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react"; 
+import React, { useEffect, useRef } from "react";
 import "./ProductInventory.css";
 import Sidebarpul from "../Sidebar/Sidebarpul";
 import axios from "axios";
@@ -300,15 +300,15 @@ function ProductInventory() {
     const imgLine = p.img
       ? `<div class="detail-item" style="grid-column:1/-1">
            <div class="detail-label">Image</div>
-           <div class="detail-value"><img alt="${p.name}" src="${p.img}" style="max-width:240px;border-radius:10px"/></div>
+           <div class="detail-value"><img alt="${p.name}" src="${p.img}" class="detail-image"/></div>
          </div>`
       : "";
     const created = p.createdAt ? new Date(p.createdAt).toLocaleString() : "";
     const updated = p.updatedAt ? new Date(p.updatedAt).toLocaleString() : "";
 
-    // Put product name into modal header
+    // Keep title exactly like screenshot
     const titleEl = document.querySelector("#viewModal .modal-title");
-    if (titleEl) titleEl.textContent = `📋 ${p.name}`;
+    if (titleEl) titleEl.textContent = "📋 Product Details";
 
     $("#productDetails").innerHTML = `
       <div class="detail-item"><div class="detail-label">Product Name</div><div class="detail-value">${p.name}</div></div>
@@ -546,11 +546,18 @@ function ProductInventory() {
       </main>
 
       {/* View Modal */}
-      <div id="viewModal" className="modal" aria-hidden="true">
+      <div
+        id="viewModal"
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+        aria-labelledby="viewModalTitle"
+      >
         <div className="modal-content">
           <div className="modal-header">
-            <h2 className="modal-title">📋 Product Details</h2>
-            <button className="close-btn" onClick={() => closeModal("viewModal")}>&times;</button>
+            <h2 id="viewModalTitle" className="modal-title">📋 Product Details</h2>
+            <button className="close-btn" onClick={() => closeModal("viewModal")} aria-label="Close">&times;</button>
           </div>
           <div className="modal-body">
             <div className="product-details" id="productDetails"></div>

@@ -256,7 +256,7 @@ export default function InventoryDashboard() {
         <section className="dashboard">
           <header className="header">
             <h1>📦 Inventory Management Dashboard</h1>
-            <div className="date">Last Updated: {formattedNow}</div>
+            
           </header>
 
           {error && (

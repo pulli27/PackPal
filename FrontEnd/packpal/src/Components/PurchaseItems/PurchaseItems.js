@@ -76,7 +76,7 @@ export default function PurchaseItems() {
           <td>${o.deliveryDate ? fmt(o.deliveryDate) : "-"}</td>
           <td><span class="status ${o.status}">${o.status}</span></td>
           <td class="actions">
-            <button class="btn btn-sec" data-action="view" data-id="${o.id}">View</button>
+            <button class="btn btn-ed" data-action="view" data-id="${o.id}">View</button>
             ${
               o.status === "pending"
                 ? `<button class="btn btn-suc" data-action="approve" data-id="${o.id}">Approve</button>`

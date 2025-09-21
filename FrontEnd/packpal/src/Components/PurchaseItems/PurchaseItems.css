@@ -88,8 +88,8 @@
 
 /* Pill buttons (variants) */
 .po .btn-view{ background: linear-gradient(135deg,#93c5fd,#3b82f6); color:#fff; }
-.po .btn-sec{ background:#3b82f6; color:#fff; }
-.po .btn-secon{ background: linear-gradient(135deg,#6a5af9,#15122f); color:#fff; }
+.po .btn-ed{ background:#3b82f6; color:#fff; }
+.po .btn-sec{ background: linear-gradient(135deg,#6a5af9,#231b5a); color:#fff; }
 .po .btn-suc{ background: linear-gradient(135deg,#34d399,#059669); color:#fff; }
 .po .btn-danger{ background:#e74c3c; color:#fff; }
 
