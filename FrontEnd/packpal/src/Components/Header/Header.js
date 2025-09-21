@@ -1,27 +1,12 @@
+// src/components/Header/Header.js
 import React from "react";
 import {
-  FaShoppingBag,
-  FaHome,
-  FaLayerGroup,
-  FaPuzzlePiece,
-  FaTags,
-  FaGift,
-  FaChevronDown,
-  FaUser,
-  FaUserPlus,
-  FaShoppingCart,
+  FaShoppingBag, FaHome, FaLayerGroup, FaPuzzlePiece, FaTags, FaGift,
+  FaChevronDown, FaUser, FaUserPlus, FaShoppingCart,
 } from "react-icons/fa";
-import "./Header.css"
-/**
- * Header (extracted from Home)
- *
- * Props:
- * - cartCount: number
- * - onCartClick: () => void
- * - onLogin: () => void
- * - onRegister: () => void
- * - onDropdown: (title: string) => void   // optional
- */
+import { NavLink, Link, useNavigate } from "react-router-dom";
+import "./Header.css";
+
 export default function Header({
   cartCount = 0,
   onCartClick = () => {},
@@ -29,47 +14,32 @@ export default function Header({
   onRegister = () => {},
   onDropdown = () => {},
 }) {
-  const smoothTo = (e, selector) => {
-    e.preventDefault();
-    const el = document.querySelector(selector);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  const navigate = useNavigate();
+  const goCategory = (slug, title) => () => {
+    onDropdown(title);
+    navigate(`/collection/${slug}`);
   };
-
-  const dropdownClick = (title) => () => onDropdown(title);
 
   return (
     <header className="header" id="header">
       <div className="header-content">
-        {/* Top bar */}
+        {/* Top */}
         <div className="header-top">
-          <a href="/" className="logo" onClick={(e) => e.preventDefault()}>
-            <div className="logo-icon">
-              <FaShoppingBag />
-            </div>
+          <Link to="/" className="logo">
+            <div className="logo-icon"><FaShoppingBag /></div>
             <div className="logo-text">PackPal</div>
-          </a>
+          </Link>
 
           <div className="header-actions">
-            <a href="/" className="btn" onClick={(e) => { e.preventDefault(); onLogin(); }}>
-              <FaUser />
-              <span>Login</span>
-            </a>
-            <a
-              href="/"
-              className="btn btn-primary"
-              onClick={(e) => {
-                e.preventDefault();
-                onRegister();
-              }}
-            >
-              <FaUserPlus />
-              <span>Register</span>
-            </a>
+            <button className="btn" onClick={onLogin}>
+              <FaUser /><span>Login</span>
+            </button>
+            <button className="btn btn-primary" onClick={onRegister}>
+              <FaUserPlus /><span>Register</span>
+            </button>
             <button className="cart-btn" onClick={onCartClick} style={{ position: "relative" }}>
               <FaShoppingCart />
-              <div className="cart-badge" id="cartBadge">
-                {cartCount}
-              </div>
+              <div className="cart-badge" id="cartBadge">{cartCount}</div>
             </button>
           </div>
         </div>
@@ -78,33 +48,33 @@ export default function Header({
         <nav className="nav">
           <ul className="nav-list">
             <li className="nav-item">
-              <a href="#home" className="nav-link" onClick={(e) => smoothTo(e, "#home")}>
+              <NavLink to="/" className="nav-link">
                 <FaHome /> Home
-              </a>
+              </NavLink>
             </li>
 
             <li className="nav-item" style={{ position: "relative" }}>
-              <a href="#collection" className="nav-link" onClick={(e) => e.preventDefault()}>
+              <NavLink to="/collection" className="nav-link">
                 <FaLayerGroup /> Collection <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
-              </a>
+              </NavLink>
               <div className="dropdown">
-                <div className="dropdown-item" onClick={dropdownClick("Kids Bag")}>
+                <div className="dropdown-item" onClick={goCategory("kids", "Kids Bag")}>
                   <div className="dropdown-title">Kids Bag</div>
                   <div className="dropdown-desc">Fun and colorful bags for children</div>
                 </div>
-                <div className="dropdown-item" onClick={dropdownClick("School Bag/Laptop Bag")}>
+                <div className="dropdown-item" onClick={goCategory("school-laptop", "School Bag/Laptop Bag")}>
                   <div className="dropdown-title">School Bag/Laptop Bag</div>
                   <div className="dropdown-desc">Durable bags for students and professionals</div>
                 </div>
-                <div className="dropdown-item" onClick={dropdownClick("Tote Bag")}>
+                <div className="dropdown-item" onClick={goCategory("tote", "Tote Bag")}>
                   <div className="dropdown-title">Tote Bag</div>
                   <div className="dropdown-desc">Spacious and versatile everyday bags</div>
                 </div>
-                <div className="dropdown-item" onClick={dropdownClick("Handbag")}>
+                <div className="dropdown-item" onClick={goCategory("handbag", "Handbag")}>
                   <div className="dropdown-title">Handbag</div>
                   <div className="dropdown-desc">Elegant bags for special occasions</div>
                 </div>
-                <div className="dropdown-item" onClick={dropdownClick("Clutch")}>
+                <div className="dropdown-item" onClick={goCategory("clutch", "Clutch")}>
                   <div className="dropdown-title">Clutch</div>
                   <div className="dropdown-desc">Compact and stylish evening bags</div>
                 </div>
@@ -112,19 +82,19 @@ export default function Header({
             </li>
 
             <li className="nav-item">
-              <a href="#accessories" className="nav-link" onClick={(e) => smoothTo(e, "#accessories")}>
+              <NavLink to="/accessories" className="nav-link">
                 <FaPuzzlePiece /> Accessories
-              </a>
+              </NavLink>
             </li>
             <li className="nav-item">
-              <a href="#sales" className="nav-link" onClick={(e) => smoothTo(e, "#sales")}>
+              <NavLink to="/sales" className="nav-link">
                 <FaTags /> Sales
-              </a>
+              </NavLink>
             </li>
             <li className="nav-item">
-              <a href="#offers" className="nav-link" onClick={(e) => smoothTo(e, "#offers")}>
+              <NavLink to="/offers" className="nav-link">
                 <FaGift /> Offers
-              </a>
+              </NavLink>
             </li>
           </ul>
         </nav>

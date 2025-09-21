@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from "react";
 import "./Accessories.css";
 import Header from "../Header/Header";
 
+import Footer from "../Footer/Footer";
+
 export default function Accessories() {
   const rootRef = useRef(null);
 
@@ -586,6 +588,7 @@ export default function Accessories() {
 
         <div id="toast" className="toast" role="status" aria-live="polite" />
       </div>
+      <Footer/>
     </div>
   );
 }

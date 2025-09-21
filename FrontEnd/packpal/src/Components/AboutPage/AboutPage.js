@@ -1,9 +1,10 @@
 import React, { useEffect } from "react";
 import "./AboutPage.css";
+// Header is rendered globally by your app (not here) to avoid duplicates.
+import Footer from "../Footer/Footer";
 
 function Aboutpage() {
   useEffect(() => {
-    // ===== Reveal on scroll (respect reduced motion) =====
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const revealNodes = Array.from(document.querySelectorAll(".about-page .reveal"));
 
@@ -23,33 +24,37 @@ function Aboutpage() {
       );
       revealNodes.forEach((n) => io.observe(n));
     }
-
-    // ===== Gentle header shadow on scroll =====
-    const header = document.querySelector(".about-page .header");
-    const applyShadow = () => {
-      if (!header) return;
-      header.style.boxShadow = window.scrollY > 4 ? "0 6px 24px rgba(0,0,0,.12)" : "none";
-    };
-    window.addEventListener("scroll", applyShadow, { passive: true });
-    applyShadow();
-
-    // cleanup
-    return () => {
-      window.removeEventListener("scroll", applyShadow);
-    };
   }, []);
 
   return (
     <div className="about-page">
-      {/* Header / Hero */}
-      <header className="header">
-        <div className="container">
-          <h1>About Pack Pal</h1>
-          <p>Your trusted companion for every journey.</p>
+      {/* ===== About Page Banner (single global Header sits above) ===== */}
+      <section className="about-hero" aria-label="About Pack Pal banner">
+        <div className="about-dots" aria-hidden="true">
+          {Array.from({ length: 36 }).map((_, i) => {
+            const left = `${Math.random() * 100}%`;
+            const delay = `${-Math.random() * 12}s`;
+            const dur = `${10 + Math.random() * 10}s`;
+            const drift = `${(Math.random() * 160 - 80).toFixed(0)}px`;
+            const scale = (0.7 + Math.random() * 0.8).toFixed(2);
+            const sizeCls = Math.random() < 0.18 ? "lg" : Math.random() < 0.5 ? "sm" : "";
+            return (
+              <span
+                key={i}
+                className={`dot ${sizeCls}`}
+                style={{ left, "--delay": delay, "--dur": dur, "--dx": drift, "--scale": scale }}
+              />
+            );
+          })}
         </div>
-      </header>
 
-      {/* Main content card */}
+        <div className="about-hero-content">
+          <h1>ABOUT US</h1>
+          <p>Trusted companions for life on the go—smarter details, fewer worries.</p>
+        </div>
+      </section>
+
+      {/* ===== Main content card ===== */}
       <main className="container">
         <div className="content reveal">
           {/* Intro */}
@@ -237,12 +242,14 @@ function Aboutpage() {
 
           {/* CTA */}
           <section className="cta-section reveal" aria-label="Get in touch">
-            <h3>Ready to Find Yo ur Perfect Pack Pal?</h3>
-            <p> Discover our collection of thoughtfully designed bags that are ready to accompany you on life's adventures </p>
+            <h3>Ready to Find Your Perfect Pack&nbsp;Pal?</h3>
+            <p>Discover our collection of thoughtfully designed bags that are ready to accompany you on life's adventures.</p>
             <a className="cta-button" href="#contact">Shop Our Collection</a>
           </section>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./KidsBag.css";
+import Header from "../Header/Header";
+import Footer from "../Footer/Footer";
 
 const CART_PAGE = "/checkout"; // go to the React route
 
@@ -101,6 +103,7 @@ export default function KidsBags() {
 
   return (
     <div className="kidsbags-root">
+      <Header/>
       <div className="kb-wrap">
         {/* HERO (Accessories-style) */}
         <section className="hero" id="home" role="region" aria-label="Kids bags hero">
@@ -251,6 +254,7 @@ export default function KidsBags() {
 
       {/* TOAST */}
       <div className={`toast ${toast ? "show" : ""}`}>{toast}</div>
+      <Footer/>
     </div>
   );
 }

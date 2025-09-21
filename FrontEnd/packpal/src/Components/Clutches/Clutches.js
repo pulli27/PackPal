@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Clutches.css";
+import Header from "../Header/Header";
+import Footer from "../Footer/Footer";
 
 function Clutches() {
   const navigate = useNavigate();
@@ -98,6 +100,7 @@ function Clutches() {
 
   return (
     <div className="clutches-page">
+      <Header/>
       {/* HERO */}
       <section className="hero" role="region" aria-label="Clutches hero">
         <div className="dots" aria-hidden="true">{dots}</div>
@@ -239,6 +242,7 @@ function Clutches() {
           </div>
         </div>
       )}
+      <Footer/>
     </div>
   );
 }

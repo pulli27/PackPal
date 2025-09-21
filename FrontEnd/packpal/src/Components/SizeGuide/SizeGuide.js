@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import './SizeGuide.css';
+import Header from "../Header/Header";
+import Footer from "../Footer/Footer";
 
 function SizeGuide() {
   // Tab switching functionality
@@ -148,18 +150,43 @@ function SizeGuide() {
 
   return (
     <div className="sizeguide-root">
+      <Header/>
+      {/* ===== Handbags Banner (hero) – search removed, taller hero kept ===== */}
+      <section className="hb-hero">
+        <div className="hb-dots" aria-hidden="true">
+          {Array.from({ length: 40 }).map((_, i) => {
+            const left = `${Math.random() * 100}%`;
+            const delay = `${-Math.random() * 12}s`;
+            const dur = `${10 + Math.random() * 10}s`;
+            const drift = `${(Math.random() * 160 - 80).toFixed(0)}px`;
+            const scale = (0.7 + Math.random() * 0.8).toFixed(2);
+            const sizeCls = Math.random() < 0.18 ? "lg" : Math.random() < 0.5 ? "sm" : "";
+            return (
+              <span
+                key={i}
+                className={`hb-dot ${sizeCls}`}
+                style={{
+                  left,
+                  "--delay": delay,
+                  "--dur": dur,
+                  "--dx": drift,
+                  "--scale": scale,
+                }}
+              />
+            );
+          })}
+        </div>
+
+        <div className="hb-hero-inner">
+          <h1>Size Guide</h1>
+          <p>Find your perfect bag with our comprehensive sizing system. Choose the right size for every adventure.</p>
+        </div>
+      </section>
+      {/* =================== end hero =================== */}
+
       <div className="sg-wrap">
         <div className="sg-card">
           <div className="container">
-            {/* Header Section */}
-            <div className="sg-header">
-              <h1>PackPal Size Guide</h1>
-              <p>
-                Find your perfect bag with our comprehensive sizing system.
-                Choose the right size for every adventure.
-              </p>
-            </div>
-
             {/* Size Guide Section */}
             <div className="size-guide-section">
               <h2 className="section-title">Bag Categories</h2>
@@ -548,6 +575,7 @@ function SizeGuide() {
           </div>{/* .container */}
         </div>{/* .sg-card */}
       </div>{/* .sg-wrap */}
+      <Footer/>
     </div>
   );
 }
