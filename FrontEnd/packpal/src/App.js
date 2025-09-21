@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 
+//pulli
 /* Use the EXACT casing of your folders: "Components" */
 import InventoryDashboard from "./Components/Dashboard/InventoryDashboard";
 import ItemInventory from "./Components/ItemInventory/ItemInventory";
@@ -11,6 +12,7 @@ import ProductInventory from "./Components/ProductInventory/ProductInventory";
 import Report from "./Components/Report/Report";
 import Settingspul from "./Components/Settings/Settingspul";
 
+//sasangi
 /* Other modules — keep these only if the files actually exist */
 import CartDashboard from "./Components/Dashboard/CartDashboard";
 import ProductList from "./Components/Product/ProductList";
@@ -20,6 +22,26 @@ import SalesReports from "./Components/Reports/SalesReports";
 import Settingssa from "./Components/Settings/Settingssa";
 import CustomerView from "./pages/CustomerView";
 import Cart from "./pages/Cart";
+
+//isumi
+import Udashboard from "./Components/Dashboard/Udashboard";
+import Login from "./Components/Login/Login";
+import UserManagement from "./Components/UserManagement/UserManagement";
+import Createaccount from "./Components/CreateAccount/Createaccount";
+import Orders from "./Components/Orders/Order";
+import Settingsis from "./Components/Settings/Settingsis"; 
+
+//sanu
+import FinanceDashboard from "./Components/Dashboard/FinanceDashboard";
+import SalaryCal from "./Components/SalaryCal/SalaryCal";
+import Attendance from "./Components/Attendance/Attendance";
+import Advance from "./Components/Advance/Advance";
+import SalaryTransfer from "./Components/SalaryTransfer/SalaryTransfer";
+import SalaryManagement from "./Components/SalaryManagement/SalaryManagement";
+import EpfManagement from "./Components/EpfManagement/EpfManagement";
+import FinancialReport from "./Components/FinancialReport/FinancialReport";
+import Revenue from "./Components/Revenue/Revenue";
+import Setting from "./Components/Settings/Settingsanu";
 
 /* 404 fallback */
 function NotFound() {
@@ -37,6 +59,7 @@ export default function App() {
     <Routes>
       {/* default: go to dashboard */}
       <Route path="/" element={<Navigate to="/maindashboard" replace />} />
+
 
       {/* Core inventory routes */}
       <Route path="/maindashboard" element={<InventoryDashboard />} />
@@ -56,6 +79,28 @@ export default function App() {
       <Route path="/settingssa" element={<Settingssa />} />
       <Route path="/customer" element={<CustomerView/>}/>
       <Route path="/cart" element={<Cart/>}/>
+
+      <Route path="/login" element={<Login />} />
+            <Route path="/isudashboard" element={<Udashboard />} />
+            <Route path="/usermanagement" element={<UserManagement />} />
+            <Route path="/createaccount" element={<Createaccount />} />
+            <Route path="/order" element={<Orders />} />
+            <Route path="/settingsis" element={<Settingsis />} />
+
+      
+            <Route path="/sanudashboard" element={<FinanceDashboard />} />
+            <Route path="/salarycal" element={<SalaryCal />} />
+             <Route path="/epf" element={<EpfManagement />} />
+             <Route path="/financereport" element={<FinancialReport />} />
+             <Route path="/revenue" element={<Revenue />} />
+             <Route path="/settingsanu" element={<Setting />} />
+      
+            {/* Finance tabs */}
+            <Route path="/finance/employees" element={<SalaryCal />} />
+            <Route path="/finance/attendance" element={<Attendance />} />
+            <Route path="/finance/advance" element={<Advance />} />
+            <Route path="/finance/transfers" element={<SalaryTransfer />} />
+            <Route path="/finance/salary" element={<SalaryManagement />} /> 
 
       {/* catch-all */}
       <Route path="*" element={<NotFound />} />
