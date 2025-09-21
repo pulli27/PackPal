@@ -73,7 +73,7 @@ export default function KidsBags() {
       img: p.img,
     });
     localStorage.setItem("packPalCart", JSON.stringify(stored));
-    navigate(CART_PAGE); // SPA routing
+    navigate(CART_PAGE);
   };
 
   const toggleWish = (p) => {
@@ -88,27 +88,24 @@ export default function KidsBags() {
     setWishlist(next);
   };
 
+  // Build floating dots like Accessories
+  const dots = Array.from({ length: 36 }).map((_, i) => {
+    const left = `${Math.random() * 100}%`;
+    const delay = `${-Math.random() * 12}s`;
+    const dur = `${10 + Math.random() * 10}s`;
+    const drift = `${(Math.random() * 160 - 80).toFixed(0)}px`;
+    const scale = (0.7 + Math.random() * 0.8).toFixed(2);
+    const cls = Math.random() < 0.18 ? "lg" : Math.random() < 0.6 ? "sm" : "";
+    return <span key={i} className={`dot ${cls}`} style={{ left, ["--delay"]: delay, ["--dur"]: dur, ["--dx"]: drift, ["--scale"]: scale }} aria-hidden="true" />;
+  });
+
   return (
     <div className="kidsbags-root">
-      {/* Page wrap START */}
       <div className="kb-wrap">
-        {/* Header */}
-        <header className="kb-header">
-          <div className="kb-nav">
-            <div className="kb-logo">PackPal</div>
-            <nav>
-              <ul className="kb-nav-menu">
-                <li><a href="#home">Home</a></li>
-                <li><a href="#bags" className="active">Kids Bags</a></li>
-                <li><a href="#about">About</a></li>
-                <li><a href="#contact">Contact</a></li>
-              </ul>
-            </nav>
-          </div>
-        </header>
+        {/* HERO (Accessories-style) */}
+        <section className="hero" id="home" role="region" aria-label="Kids bags hero">
+          <div className="dots" aria-hidden="true">{dots}</div>
 
-        {/* Hero */}
-        <section className="hero" id="home">
           <div className="hero-content">
             <h1>Bright &amp; Tough Kids Bags</h1>
             <p>Fun designs, durable materials, comfy straps – built for school, play and everything in between.</p>
@@ -120,6 +117,7 @@ export default function KidsBags() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e)=> e.key==='Enter' && e.preventDefault()}
+                aria-label="Search kids bags"
               />
               <button type="button" className="search-btn" aria-label="Search">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -130,9 +128,8 @@ export default function KidsBags() {
           </div>
         </section>
 
-        {/* Main */}
+        {/* FILTERS (chips like Accessories) */}
         <main className="main-content" id="bags">
-          {/* Filters */}
           <section className="filter-wrap">
             <div className="filter-row" id="categoryFilters">
               {[
@@ -173,7 +170,7 @@ export default function KidsBags() {
             </div>
           </section>
 
-          {/* Products */}
+          {/* GRID */}
           <section className="products-grid">
             {filtered.map((p) => (
               <article key={p.id} className={`product-card ${p.category}`} data-age={p.age}>
@@ -186,7 +183,7 @@ export default function KidsBags() {
                   <div className="product-category">{p.category === "trolley" ? "Trolley Bag" : "Backpacks"}</div>
                   <h3 className="product-title">{p.title}</h3>
                   <div className="rating">
-                    {p.ratingText} <span style={{ color: "#64748b", fontSize: ".9rem" }}>({p.reviews})</span>
+                    {p.ratingText} <span className="rating-num">({p.reviews})</span>
                   </div>
                   <div className="price-row"><span className="price">{p.priceText}</span></div>
                   <p className="desc">{p.desc}</p>
@@ -204,9 +201,8 @@ export default function KidsBags() {
           </section>
         </main>
       </div>
-      {/* Page wrap END */}
 
-      {/* Details Modal (kept outside the wrap to center over viewport) */}
+      {/* MODAL */}
       {details && (
         <div className="modal" onClick={(e) => e.target === e.currentTarget && setDetails(null)}>
           <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="dTitle">
@@ -223,13 +219,13 @@ export default function KidsBags() {
                   {(details.category === "trolley" ? "Trolley Bag" : "Backpacks") + " • Age " + details.age}
                 </div>
                 <div className="rating" id="dRating">
-                  {details.ratingText} <span style={{ color: "#64748b", fontSize: ".9rem" }}>({details.reviews})</span>
+                  {details.ratingText} <span className="rating-num">({details.reviews})</span>
                 </div>
                 <div className="price" id="dPrice">{details.priceText}</div>
               </div>
             </div>
 
-            <p id="dDesc" style={{ marginTop: ".8rem", color: "var(--muted)" }}>
+            <p id="dDesc" className="detail-desc">
               {details.desc || "Durable, lightweight, and school-ready."}
             </p>
 
@@ -253,7 +249,7 @@ export default function KidsBags() {
         </div>
       )}
 
-      {/* Toast (outside wrap so it hugs the viewport edge) */}
+      {/* TOAST */}
       <div className={`toast ${toast ? "show" : ""}`}>{toast}</div>
     </div>
   );

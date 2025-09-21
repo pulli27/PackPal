@@ -1,19 +1,54 @@
-// D:\Git_project2\PackPal\FrontEnd\packpal\src\Components\Home\Home.js
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./Home.css";
+import Footer from "../Footer/Footer";              // ← ADD THIS LINE
 
 import {
   FaShoppingBag, FaSearch, FaUser, FaUserPlus, FaShoppingCart, FaHome, FaLayerGroup,
   FaPuzzlePiece, FaTags, FaGift, FaPlay, FaLaptop, FaChild, FaWallet,
-  FaBriefcase, FaSuitcase, FaChevronDown, FaFacebookF, FaInstagram, FaTwitter
+  FaBriefcase, FaSuitcase, FaChevronDown
 } from "react-icons/fa";
-import { FaBagShopping } from "react-icons/fa6"; // modern bag icon
+import { FaBagShopping, FaVolumeHigh, FaVolumeXmark, FaFacebookF, FaInstagram, FaTwitter, FaPlus, FaMinus } from "react-icons/fa6"; /* CHANGED: moved FB/IG/Twitter to fa6 import to avoid dupe */
 
 export default function Home() {
   const headerRef = useRef(null);
+  const videoRef   = useRef(null);
+
   const [cartItems, setCartItems] = useState([]);
-  const [notice, setNotice] = useState(null);
-  const [inlinePlaying, setInlinePlaying] = useState(false);
+  const [notice, setNotice]       = useState(null);
+
+  // hero video sound
+  const [muted, setMuted]     = useState(true);
+  const [volume, setVolume]   = useState(0.4);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    videoRef.current.muted  = muted;
+    videoRef.current.volume = volume;
+  }, [muted, volume]);
+
+  // ratings numbers
+  const [happy, setHappy]         = useState(0);
+  const [designs, setDesigns]     = useState(0);
+  const [satisfaction, setSat]    = useState(0);
+
+  useEffect(() => {
+    const animate = (target, setter, isPercent = false, duration = 2000) => {
+      const start = performance.now();
+      const tick = (now) => {
+        const p = Math.min(1, (now - start) / duration);
+        const val = target * p;
+        setter(isPercent ? +val.toFixed(1) : Math.floor(val));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
+    animate(25855, setHappy);
+    animate(1892, setDesigns);
+    animate(98.7,  setSat, true);
+
+    const bump = setInterval(() => setHappy((v) => v + Math.floor(Math.random() * 3)), 10000);
+    return () => clearInterval(bump);
+  }, []);
 
   const showNotification = (msg) => {
     setNotice(msg);
@@ -46,7 +81,7 @@ export default function Home() {
 
   return (
     <>
-      {/* Transparent header overlays hero and scrolls away */}
+      {/* HEADER */}
       <header className="header" id="header" ref={headerRef}>
         <div className="header-content">
           <div className="header-top">
@@ -65,7 +100,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Straight, centered nav row */}
+          {/* NAVIGATION */}
           <nav className="nav">
             <ul className="nav-list">
               <li className="nav-item">
@@ -74,9 +109,7 @@ export default function Home() {
 
               <li className="nav-item" style={{ position: "relative" }}>
                 <a href="#collection" className="nav-link" onClick={(e) => e.preventDefault()}>
-                  <FaLayerGroup />
-                  Collection
-                  <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
+                  <FaLayerGroup /> Collection <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
                 </a>
                 <div className="dropdown">
                   <div className="dropdown-item" onClick={onDropdownClick("Kids Bag")}>
@@ -103,34 +136,57 @@ export default function Home() {
               </li>
 
               <li className="nav-item">
-                <a href="#accessories" className="nav-link" onClick={(e) => smoothTo(e, "#accessories")}>
-                  <FaPuzzlePiece /> Accessories
-                </a>
+                <a href="#accessories" className="nav-link" onClick={(e) => smoothTo(e, "#accessories")}><FaPuzzlePiece /> Accessories</a>
               </li>
               <li className="nav-item">
-                <a href="#sales" className="nav-link" onClick={(e) => smoothTo(e, "#sales")}>
-                  <FaTags /> Sales
-                </a>
+                <a href="#sales" className="nav-link" onClick={(e) => smoothTo(e, "#sales")}><FaTags /> Sales</a>
               </li>
               <li className="nav-item">
-                <a href="#offers" className="nav-link" onClick={(e) => smoothTo(e, "#offers")}>
-                  <FaGift /> Offers
-                </a>
+                <a href="#offers" className="nav-link" onClick={(e) => smoothTo(e, "#offers")}><FaGift /> Offers</a>
               </li>
             </ul>
           </nav>
         </div>
       </header>
 
-      {/* Main */}
+      {/* MAIN */}
       <main className="main">
-        {/* HERO with BACKGROUND VIDEO */}
+        {/* HERO with background video */}
         <section className="hero" id="home">
-          {/* Place file at public/Videos/packpal-intro.mp4 */}
-          <video className="hero-video" autoPlay muted loop playsInline>
-            <source src="/Videos/packpal-intro.mp4" type="video/mp4" />
+          <video
+            ref={videoRef}
+            className="hero-video"
+            autoPlay
+            muted={muted}
+            loop
+            playsInline
+          >
+            <source src="/images/homepage_videoooo.mp4" type="video/mp4" />
             Your browser does not support the video tag.
           </video>
+
+          {/* Sound control */}
+          <div className="volume-widget" role="group" aria-label="Video sound">
+            <button
+              className="vol-toggle"
+              onClick={() => setMuted((m) => !m)}
+              aria-label={muted ? "Unmute video" : "Mute video"}
+              title={muted ? "Unmute" : "Mute"}
+            >
+              {muted || volume === 0 ? <FaVolumeXmark /> : <FaVolumeHigh />}
+              <span className="vol-label">Sound</span>
+            </button>
+
+            <div className="vol-steps">
+              <button className="vol-btn" onClick={() => { setMuted(false); setVolume(v => Math.max(0, +(v - 0.1).toFixed(2))); }} aria-label="Decrease volume" title="Volume -">
+                <FaMinus />
+              </button>
+              <div className="vol-meter"><div className="vol-fill" style={{ width: `${Math.round(volume * 100)}%` }} /></div>
+              <button className="vol-btn" onClick={() => { setMuted(false); setVolume(v => Math.min(1, +(v + 0.1).toFixed(2))); }} aria-label="Increase volume" title="Volume +">
+                <FaPlus />
+              </button>
+            </div>
+          </div>
 
           <div className="hero-content">
             <h1 className="hero-title">Smart Bags for Smart People</h1>
@@ -142,12 +198,12 @@ export default function Home() {
               <a href="#collection" className="btn btn-primary" onClick={(e) => smoothTo(e, "#collection")}>
                 <FaBagShopping /> Explore Collection
               </a>
-              <a href="#offers" className="btn" onClick={(e) => smoothTo(e, "#offers")}>
-                <FaPlay /> Watch Our Story
+              <a href="#our-journey" className="btn" onClick={(e) => smoothTo(e, "#our-journey")}>
+                <FaPlay /> Our Journey
               </a>
             </div>
 
-            {/* Search below buttons */}
+            {/* Search */}
             <div className="hero-search">
               <form
                 id="searchFormHero"
@@ -171,37 +227,33 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Video Section */}
-        <section className="section video-section" id="video">
-          <div className="section-container">
-            <div className="section-header">
-              <h2 className="section-title">Video</h2>
-              <p className="section-subtitle">
-                See how PackPal revolutionizes the way you carry your essentials
+        {/* ===== OUR JOURNEY ===== */}
+        <section className="section our-journey" id="our-journey">
+          <div className="journey-container">
+            <div className="journey-text">
+              <h2 className="journey-title">Our Journey</h2>
+              <p>
+                What began as a passion project in a small studio has evolved into a global movement.
+                PackPal was born from the belief that exceptional craftsmanship should meet
+                cutting-edge design.
+              </p>
+              <p>
+                Every bag tells a story of meticulous attention to detail, premium materials
+                sourced from the finest suppliers worldwide, and an unwavering commitment to sustainability.
+              </p>
+              <p>
+                Today, we're not just creating bags – we're crafting experiences that empower
+                individuals to carry their dreams with confidence and style.
               </p>
             </div>
-
-            <div className="video-wrapper">
-              {!inlinePlaying ? (
-                <div
-                  className="video-player"
-                  onClick={() => setInlinePlaying(true)}
-                  role="button"
-                  aria-label="Play showcase video"
-                >
-                  <div className="play-button"><FaPlay /></div>
-                </div>
-              ) : (
-                <video width="100%" height="100%" controls autoPlay style={{ display: "block" }}>
-                  <source src="https://samplelib.com/lib/preview/mp4/sample-960x540.mp4" type="video/mp4" />
-                </video>
-              )}
+            <div className="journey-image">
+              <img src="/images/journey-bag.jpg" alt="PackPal bag on pedestal" />
             </div>
           </div>
         </section>
 
-        {/* New Arrivals */}
-        <section className="section" id="new-arrivals">
+        {/* ===== New Arrivals (3) ===== */}
+        <section className="section soft-bg" id="new-arrivals">
           <div className="section-container">
             <div className="section-header">
               <h2 className="section-title">New Arrivals</h2>
@@ -214,7 +266,7 @@ export default function Home() {
                 data-product="smart-backpack"
                 onClick={() => showNotification("Viewing Smart Tech Backpack details...")}
               >
-                <div className="product-image"><FaLaptop /></div>
+                <div className="product-image"><img src="/images/smart_bag.png" alt="Smart Tech Backpack" /></div>
                 <h3 className="product-title">Smart Tech Backpack</h3>
                 <div className="product-price">$199.99</div>
                 <p className="product-description">
@@ -233,7 +285,7 @@ export default function Home() {
                 data-product="kids-adventure"
                 onClick={() => showNotification("Viewing Kids Adventure Pack details...")}
               >
-                <div className="product-image"><FaChild /></div>
+                <div className="product-image"><img src="/images/kids.png" alt="Kids Adventure Pack" /></div>
                 <h3 className="product-title">Kids Adventure Pack</h3>
                 <div className="product-price">$79.99</div>
                 <p className="product-description">Colorful and durable backpack designed for young explorers.</p>
@@ -250,7 +302,7 @@ export default function Home() {
                 data-product="designer-tote"
                 onClick={() => showNotification("Viewing Designer Tote Bag details...")}
               >
-                <div className="product-image"><FaBagShopping /></div>
+                <div className="product-image"><img src="/images/tote.png" alt="Designer Tote Bag" /></div>
                 <h3 className="product-title">Designer Tote Bag</h3>
                 <div className="product-price">$149.99</div>
                 <p className="product-description">Spacious tote bag crafted from premium materials.</p>
@@ -261,31 +313,12 @@ export default function Home() {
                   <FaBagShopping /> Add to Cart
                 </button>
               </div>
-
-              <div
-                className="product-card loading"
-                data-product="evening-clutch"
-                onClick={() => showNotification("Viewing Premium Evening Clutch details...")}
-              >
-                <div className="product-image"><FaWallet /></div>
-                <h3 className="product-title">Premium Evening Clutch</h3>
-                <div className="product-price">$129.99</div>
-                <p className="product-description">
-                  Sophisticated clutch with metallic finish and detachable chain.
-                </p>
-                <button
-                  className="product-btn"
-                  onClick={(e) => { e.stopPropagation(); addToCart("Premium Evening Clutch", 129.99); }}
-                >
-                  <FaBagShopping /> Add to Cart
-                </button>
-              </div>
             </div>
           </div>
         </section>
 
-        {/* Best Selling */}
-        <section className="section" id="best-selling" style={{ background: "rgba(0,0,0,.2)" }}>
+        {/* ===== Best Selling (3) ===== */}
+        <section className="section soft-bg" id="best-selling">
           <div className="section-container">
             <div className="section-header">
               <h2 className="section-title">Best Selling Products</h2>
@@ -343,53 +376,49 @@ export default function Home() {
                   <FaBagShopping /> Add to Cart
                 </button>
               </div>
+            </div>
+          </div>
+        </section>
 
-              <div
-                className="product-card loading"
-                data-product="crossbody-bag"
-                onClick={() => showNotification("Viewing Urban Crossbody details...")}
-              >
-                <div className="product-image"><FaBagShopping /></div>
-                <h3 className="product-title">Urban Crossbody</h3>
-                <div className="product-price">$119.99</div>
-                <p className="product-description">Versatile crossbody with secure pockets.</p>
-                <button
-                  className="product-btn"
-                  onClick={(e) => { e.stopPropagation(); addToCart("Urban Crossbody", 119.99); }}
-                >
-                  <FaBagShopping /> Add to Cart
-                </button>
+        {/* ===== Ratings Banner (ABOVE FOOTER) ===== */}
+        <section className="rating-banner" id="ratings">
+          <div className="rating-container">
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-icon happy-icon" />
+                <div className="stat-number">{happy.toLocaleString()}</div>
+                <div className="stat-label">Happy Customers</div>
+                <div className="stat-description">
+                  Satisfied clients worldwide who trust our exceptional service and continue to choose us
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon design-icon" />
+                <div className="stat-number">{designs.toLocaleString()}</div>
+                <div className="stat-label">Unique Designs</div>
+                <div className="stat-description">
+                  Original, creative solutions crafted with precision and tailored to each client's vision
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon satisfaction-icon" />
+                <div className="stat-number">{satisfaction.toFixed(1)}%</div>
+                <div className="stat-label">Satisfaction Rate</div>
+                <div className="stat-description">
+                  Outstanding customer satisfaction score reflecting our dedication to excellence
+                </div>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      {/* FOOTER */}
-      <footer className="ultra-footer">
-        <div className="footer-container">
-          <div className="footer-brand">
-            <h3>PackPal</h3>
-            <p>Smart Bags for Smart People.</p>
-            <p className="footer-copy">© 2025 PackPal. All rights reserved.</p>
-          </div>
+      {/* FOOTER (component, at the very end) */}
+      <Footer />                                   {/* ← ADD THIS LINE */}
 
-          <div className="footer-links">
-            <a href="#collection" onClick={(e)=>smoothTo(e,"#collection")}>Collections</a>
-            <a href="#sales" onClick={(e)=>smoothTo(e,"#sales")}>Sales</a>
-            <a href="#offers" onClick={(e)=>smoothTo(e,"#offers")}>Offers</a>
-            <a href="#accessories" onClick={(e)=>smoothTo(e,"#accessories")}>Accessories</a>
-          </div>
-
-          <div className="footer-socials">
-            <a href="#" aria-label="Facebook"><FaFacebookF /></a>
-            <a href="#" aria-label="Instagram"><FaInstagram /></a>
-            <a href="#" aria-label="Twitter"><FaTwitter /></a>
-          </div>
-        </div>
-      </footer>
-
-      {/* Notification toast */}
+      {/* Toast */}
       {notice && <div className="notification">{notice}</div>}
     </>
   );
