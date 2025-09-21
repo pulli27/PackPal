@@ -12,6 +12,8 @@
 
 /* Unique wrapper */
 .finance-page-wrap {
+  --gap: 18px;                 /* single source of truth for chart gaps */
+  --card-radius: 14px;
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 12px;
@@ -56,43 +58,70 @@
 .finance-page-wrap .positive { color: #10b981; }
 .finance-page-wrap .negative { color: #ef4444; }
 
-/* Charts */
-.finance-page-wrap .top-charts, 
+/* ===== Charts ===== */
+.finance-page-wrap .top-charts,
 .finance-page-wrap .bottom-charts {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin-bottom: 18px;
+  gap: var(--gap);
+  margin-bottom: var(--gap);
 }
 
-.finance-page-wrap .chart-card {
+/* Top row: two equal cards */
+.finance-page-wrap .top-charts {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Bottom row: center one card with the SAME width as one of the top cards */
+.finance-page-wrap .bottom-charts {
+  grid-template-columns: 1fr;            /* single “slot” */
+  justify-items: center;                 /* center its content */
+}
+
+/* Generic chart card */
+.finance-page-wrap .chart-card,
+.finance-page-wrap .chart-card-monthly {
   background: #fff;
   padding: 16px;
-  border-radius: 14px;
+  border-radius: var(--card-radius);
   box-shadow: 0 8px 22px rgba(0,0,0,0.06);
 }
 
-.finance-page-wrap .chart-card-monthly{ background: #fff;
-  
-  padding: 16px;
-  border-radius: 14px;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.06);
-  margin-left: 300px;}
-.finance-page-wrap .chart-title { font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-bottom: 10px; text-align: center; }
+/* Make Monthly card match the width of a single top card */
+.finance-page-wrap .chart-card-monthly {
+  width: calc((100% - var(--gap)) / 2);  /* exactly one column width */
+  max-width: calc((1280px - 24px - var(--gap)) / 2); /* maintain same width at max container */
+}
+
+/* Titles & canvas height */
+.finance-page-wrap .chart-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 10px;
+  text-align: center;
+}
 .finance-page-wrap .chart-container { position: relative; height: 240px; }
-.finance-page-wrap .chart-container.medium { height: 280px; }
+.finance-page-wrap .chart-container.medium { height: 240px; } /* keep all equal */
 
 /* Footer */
 .finance-page-wrap .footer { text-align: center; color: #4b5563; font-size: .9rem; margin-top: 12px; }
 
-/* Responsive */
+/* ===== Responsive ===== */
 @media (max-width: 1400px){
   .finance-page-wrap .kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+@media (max-width: 1024px){
+  /* Stack the top charts; monthly stays centered and becomes full width */
+  .finance-page-wrap .top-charts { grid-template-columns: 1fr; }
+  .finance-page-wrap .chart-card-monthly { width: 100%; max-width: none; }
+}
+
 @media (max-width: 768px){
   .main-content { margin-left: 0; padding: 16px; }
   .finance-page-wrap .content-header h1 { font-size: 1.8rem; }
   .finance-page-wrap .kpi-grid { grid-template-columns: 1fr; }
+  .finance-page-wrap .chart-container,
   .finance-page-wrap .chart-container.medium { height: 300px; }
   .finance-page-wrap { padding: 0 10px; }
 }

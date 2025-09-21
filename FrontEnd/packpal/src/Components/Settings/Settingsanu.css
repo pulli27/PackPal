@@ -19,7 +19,7 @@
   max-width: clamp(1200px, 95vw, 1700px);
   margin: 0 auto;
   padding: 2rem 2.5rem;
-  margin-left: 270px; /* offset for your sidebar */
+  margin-left: 0px; /* offset for your sidebar */
 }
 
 /* Header */
