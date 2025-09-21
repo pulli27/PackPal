@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./Sidebarpul.css";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 
 export default function Sidebar({ initialActive = "reports", onNavigate, onLogout }) {
   const [active, setActive] = useState(initialActive);
   const [open, setOpen] = useState(false);
   const sidebarRef = useRef(null);
+  const navigate = useNavigate();
 
   // Restore last page
   useEffect(() => {
@@ -53,14 +54,18 @@ export default function Sidebar({ initialActive = "reports", onNavigate, onLogou
   };
 
   const logout = () => {
-    // eslint-disable-next-line no-restricted-globals
     const ok = window.confirm("Are you sure you want to logout?");
     if (!ok) return;
+
+    // optional: clear auth
+    try { localStorage.removeItem("token"); sessionStorage.removeItem("token"); } catch {}
+
     if (window.showNotification) window.showNotification("Logging out...", "info");
     setTimeout(() => {
       alert("You have been logged out successfully!");
       onLogout?.();
-    }, 800);
+      navigate("/login", { replace: true }); // ✅ redirect to /login
+    }, 400);
   };
 
   return (
@@ -145,7 +150,6 @@ export default function Sidebar({ initialActive = "reports", onNavigate, onLogou
       </nav>
 
       <div className="logout-section">
-        {/* Don't nest a <button> inside a <Link>. Just use a button. */}
         <button className="logout-btn" type="button" onClick={logout}>
           <i className="fa-solid fa-right-from-bracket" /> <span>Logout</span>
         </button>

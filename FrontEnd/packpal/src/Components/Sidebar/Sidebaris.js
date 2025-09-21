@@ -1,6 +1,5 @@
-// src/Components/Sidebar/Sidebar.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import "./Sidebaris.css";
 
 export default function Sidebar({
@@ -12,6 +11,7 @@ export default function Sidebar({
   const [open, setOpen] = useState(false);
   const sidebarRef = useRef(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Restore last page once
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function Sidebar({
     } catch {}
   }, []);
 
-  // Keep active state in sync with route changes (match your current routes)
+  // Keep active state in sync with route changes
   useEffect(() => {
     const path = location.pathname.toLowerCase();
     const map = {
@@ -87,19 +87,20 @@ export default function Sidebar({
   };
 
   const logout = () => {
-    // eslint-disable-next-line no-restricted-globals
     const ok = window.confirm("Are you sure you want to logout?");
     if (!ok) return;
     if (window.showNotification) window.showNotification("Logging out...", "info");
+    try { localStorage.removeItem("token"); sessionStorage.removeItem("token"); } catch {}
+
     setTimeout(() => {
       alert("You have been logged out successfully!");
       onLogout?.();
-    }, 800);
+      navigate("/login", { replace: true }); // ✅ redirect to /login
+    }, 400);
   };
 
   return (
-    <div className="sidebar-shell">{/* page wrapper for scoping */}
-      {/* Mobile toggle */}
+    <div className="sidebar-shell">
       <button
         className="mobile-menu"
         aria-label="Toggle menu"

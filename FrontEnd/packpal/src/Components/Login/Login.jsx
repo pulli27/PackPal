@@ -7,7 +7,8 @@ export default function Login() {
   // ------- login state -------
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [status, setStatus] = useState("idle"); // idle | loading | success
+  const [status, setStatus] = useState("idle"); // idle | loading | success | error
+  const [errMsg, setErrMsg] = useState("");
 
   // ------- forgot password state -------
   // 0 = login screen, 1 = enter email, 2 = enter code, 3 = set new password
@@ -16,13 +17,37 @@ export default function Login() {
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [fpLoading, setFpLoading] = useState(false);
-  const [fpMsg, setFpMsg] = useState(""); // helper text (success/error/info)
+  const [fpMsg, setFpMsg] = useState("");
 
   const containerRef = useRef(null);
   const navigate = useNavigate();
 
-  // 👉 change this if your route is different (e.g., "/user-management")
-  const USER_MGMT_ROUTE = "/usermanagement";
+  // 👉 routes
+  const DEFAULT_ROUTE = "/usermanagement";
+
+  // ✅ Hardcoded credential → route map
+  const USER_ROUTES = {
+    "pulmi.vihansa@packpal.com": {
+      password: "Pulmi@1234",
+      route: "/maindashboard",
+    },
+    "sanugi.silva@packpal.com": {
+      password: "Sanugi@1234",
+      route: "/sanudashboard",
+    },
+    "hiruni.wijesinghe@packpal.com": {
+      password: "Hiruni@1234",
+      route: "/hirudashboard",
+    },
+    "sasangi.ranasingha@packpal.com": {
+      password: "Sasangi@1234",
+      route: "/dashboard",
+    },
+    "isumi.kumarasinghe@packpal.com": {
+      password: "Isumi@1234",
+      route: "/isudashboard",
+    },
+  };
 
   useEffect(() => {
     containerRef.current?.classList.add("mounted");
@@ -32,14 +57,30 @@ export default function Login() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (status === "loading") return;
+    setErrMsg("");
     setStatus("loading");
 
-    // TODO: replace with real auth call
     setTimeout(() => {
-      setStatus("success");
-      // ✅ redirect straight to User Management
-      setTimeout(() => navigate(USER_MGMT_ROUTE), 1200);
-    }, 1500);
+      const inputEmail = email.trim().toLowerCase();
+
+      // if email matches a hardcoded user and password matches -> redirect to their route
+      const userCfg = USER_ROUTES[inputEmail];
+      if (userCfg && password === userCfg.password) {
+        setStatus("success");
+        setTimeout(() => navigate(userCfg.route), 600);
+        return;
+      }
+
+      // otherwise: simple mock rule — any non-empty creds succeed to DEFAULT_ROUTE
+      if (inputEmail && password) {
+        setStatus("success");
+        setTimeout(() => navigate(DEFAULT_ROUTE), 600);
+      } else {
+        setStatus("error");
+        setErrMsg("Invalid email or password.");
+        setTimeout(() => setStatus("idle"), 1200);
+      }
+    }, 600);
   };
 
   /* --------------- Forgot Password: Step 1 (send code) --------------- */
@@ -53,11 +94,7 @@ export default function Login() {
     setFpLoading(true);
 
     try {
-      // 🔗 Hook to backend (replace with your API)
-      // const res = await fetch(`${API_ROOT}/api/auth/forgot-password`, { ... });
-
-      // Mock sending email code:
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 900)); // mock
       setFpMsg(`We emailed a verification code to ${resetEmail}.`);
       setForgotStep(2);
     } catch (err) {
@@ -78,10 +115,7 @@ export default function Login() {
     setFpLoading(true);
 
     try {
-      // 🔗 Backend verify (replace)
-
-      // Mock verify:
-      await new Promise((r) => setTimeout(r, 700));
+      await new Promise((r) => setTimeout(r, 700)); // mock
       setFpMsg("Code verified. Please set a new password.");
       setForgotStep(3);
     } catch (err) {
@@ -102,12 +136,8 @@ export default function Login() {
     setFpLoading(true);
 
     try {
-      // 🔗 Backend update (replace)
-
-      // Mock update:
-      await new Promise((r) => setTimeout(r, 900));
+      await new Promise((r) => setTimeout(r, 900)); // mock
       setFpMsg("Password updated. Redirecting to login…");
-      // clear flow state & go back to login after a beat
       setTimeout(() => {
         setForgotStep(0);
         setResetEmail("");
@@ -124,16 +154,20 @@ export default function Login() {
   };
 
   const btnText =
-    status === "loading" ? "Signing In..." :
-    status === "success" ? "Success ✓" : "Sign In";
+    status === "loading"
+      ? "Signing In..."
+      : status === "success"
+      ? "Success ✓"
+      : "Sign In";
 
   const btnClass =
     "login-btn" +
     (status === "loading" ? " loading" : "") +
-    (status === "success" ? " success" : "");
+    (status === "success" ? " success" : "") +
+    (status === "error" ? " error" : "");
 
   return (
-    <div className="login"> {/* <-- page wrapper to scope styles */}
+    <div className="login">
       <div className="login-page">
         {/* background anim */}
         <div className="bg-animation">
@@ -158,166 +192,168 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Right panel */}
-          <div className="login-side">
-            {/* ---------- LOGIN SCREEN ---------- */}
-            {forgotStep === 0 && (
-              <>
-                <div className="login-header">
-                  <h2>Welcome Back</h2>
-                  <p>Sign in to your PackPal account</p>
-                </div>
+        {/* Right panel */}
+        <div className="login-side">
+          {/* ---------- LOGIN SCREEN ---------- */}
+          {forgotStep === 0 && (
+            <>
+              <div className="login-header">
+                <h2>Welcome Back</h2>
+                <p>Sign in to your PackPal account</p>
+              </div>
 
-                <form onSubmit={handleSubmit} noValidate>
-                  <div className="form-group">
-                    <label htmlFor="email">Email Address</label>
-                    <div className="input-container">
-                      <input
-                        id="email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={email}
-                        onChange={(e)=>setEmail(e.target.value)}
-                        required
-                        autoComplete="username"
-                      />
-                      <div className="input-icon" aria-hidden>✉</div>
-                    </div>
+              <form onSubmit={handleSubmit} noValidate>
+                <div className="form-group">
+                  <label htmlFor="email">Email Address</label>
+                  <div className="input-container">
+                    <input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e)=>setEmail(e.target.value)}
+                      required
+                      autoComplete="username"
+                    />
+                    <div className="input-icon" aria-hidden>✉</div>
                   </div>
+                </div>
 
-                  <div className="form-group">
-                    <label htmlFor="password">Password</label>
-                    <div className="input-container">
-                      <input
-                        id="password"
-                        type="password"
-                        placeholder="Enter your password"
-                        value={password}
-                        onChange={(e)=>setPassword(e.target.value)}
-                        required
-                        autoComplete="current-password"
-                      />
-                      <div className="input-icon" aria-hidden>🔒</div>
-                    </div>
+                <div className="form-group">
+                  <label htmlFor="password">Password</label>
+                  <div className="input-container">
+                    <input
+                      id="password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e)=>setPassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                    />
+                    <div className="input-icon" aria-hidden>🔒</div>
                   </div>
-
-                  <button type="submit" className={btnClass} disabled={status==="loading"}>
-                    {btnText}
-                  </button>
-                </form>
-
-                {/* ...inside the Login component render... */}
-<div className="forgot-link">
-  <button
-    type="button"
-    className="link-as-btn"
-    onClick={() => { setResetEmail(email || ""); setForgotStep(1); }}
-  >
-    Forgot your password?
-  </button>
-</div>
-
-
-                <div className="divider"><span>OR</span></div>
-
-                <div className="signup-section">
-                  Don&apos;t have an account? <Link to="/createaccount">Create Account</Link>
-                </div>
-              </>
-            )}
-
-            {/* ---------- FORGOT: STEP 1 (EMAIL) ---------- */}
-            {forgotStep === 1 && (
-              <form onSubmit={handleSendCode} className="forgot-form" noValidate>
-                <h2>Reset Password</h2>
-                <p>Enter your registered email. We’ll send a verification code.</p>
-
-                <div className="form-group">
-                  <label htmlFor="resetEmail">Email</label>
-                  <input
-                    id="resetEmail"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={resetEmail}
-                    onChange={(e)=>setResetEmail(e.target.value)}
-                    required
-                  />
                 </div>
 
-                {fpMsg && <div className="helper-text">{fpMsg}</div>}
+                {status === "error" && errMsg && (
+                  <div className="helper-text error">{errMsg}</div>
+                )}
 
-                <div className="row-actions">
-                  <button type="button" className="btn-secondary" onClick={()=>setForgotStep(0)}>
-                    Back
-                  </button>
-                  <button type="submit" className="btn-primary" disabled={fpLoading}>
-                    {fpLoading ? "Sending…" : "Send Code"}
-                  </button>
-                </div>
+                <button type="submit" className={btnClass} disabled={status==="loading"}>
+                  {btnText}
+                </button>
               </form>
-            )}
 
-            {/* ---------- FORGOT: STEP 2 (CODE) ---------- */}
-            {forgotStep === 2 && (
-              <form onSubmit={handleVerifyCode} className="forgot-form" noValidate>
-                <h2>Enter Verification Code</h2>
-                <p>We sent a code to <strong>{resetEmail}</strong>.</p>
+              <div className="forgot-link">
+                <button
+                  type="button"
+                  className="link-as-btn"
+                  onClick={() => { setResetEmail(email || ""); setForgotStep(1); }}
+                >
+                  Forgot your password?
+                </button>
+              </div>
 
-                <div className="form-group">
-                  <label htmlFor="resetCode">Verification Code</label>
-                  <input
-                    id="resetCode"
-                    type="text"
-                    placeholder="6-digit code"
-                    value={resetCode}
-                    onChange={(e)=>setResetCode(e.target.value)}
-                    required
-                  />
-                </div>
+              <div className="divider"><span>OR</span></div>
 
-                {fpMsg && <div className="helper-text">{fpMsg}</div>}
+              <div className="signup-section">
+                Don&apos;t have an account? <Link to="/createaccount">Create Account</Link>
+              </div>
+            </>
+          )}
 
-                <div className="row-actions">
-                  <button type="button" className="btn-secondary" onClick={()=>setForgotStep(1)}>
-                    Back
-                  </button>
-                  <button type="submit" className="btn-primary" disabled={fpLoading}>
-                    {fpLoading ? "Verifying…" : "Verify Code"}
-                  </button>
-                </div>
-              </form>
-            )}
+          {/* ---------- FORGOT: STEP 1 (EMAIL) ---------- */}
+          {forgotStep === 1 && (
+            <form onSubmit={handleSendCode} className="forgot-form" noValidate>
+              <h2>Reset Password</h2>
+              <p>Enter your registered email. We’ll send a verification code.</p>
 
-            {/* ---------- FORGOT: STEP 3 (NEW PASSWORD) ---------- */}
-            {forgotStep === 3 && (
-              <form onSubmit={handleResetPassword} className="forgot-form" noValidate>
-                <h2>Create New Password</h2>
+              <div className="form-group">
+                <label htmlFor="resetEmail">Email</label>
+                <input
+                  id="resetEmail"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={resetEmail}
+                  onChange={(e)=>setResetEmail(e.target.value)}
+                  required
+                />
+              </div>
 
-                <div className="form-group">
-                  <label htmlFor="newPass">New Password</label>
-                  <input
-                    id="newPass"
-                    type="password"
-                    placeholder="At least 6 characters"
-                    value={newPassword}
-                    onChange={(e)=>setNewPassword(e.target.value)}
-                    required
-                  />
-                </div>
+              {fpMsg && <div className="helper-text">{fpMsg}</div>}
 
-                {fpMsg && <div className="helper-text">{fpMsg}</div>}
+              <div className="row-actions">
+                <button type="button" className="btn-secondary" onClick={()=>setForgotStep(0)}>
+                  Back
+                </button>
+                <button type="submit" className="btn-primary" disabled={fpLoading}>
+                  {fpLoading ? "Sending…" : "Send Code"}
+                </button>
+              </div>
+            </form>
+          )}
 
-                <div className="row-actions">
-                  <button type="button" className="btn-secondary" onClick={()=>setForgotStep(2)}>
-                    Back
-                  </button>
-                  <button type="submit" className="btn-primary" disabled={fpLoading}>
-                    {fpLoading ? "Updating…" : "Update Password"}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+          {/* ---------- FORGOT: STEP 2 (CODE) ---------- */}
+          {forgotStep === 2 && (
+            <form onSubmit={handleVerifyCode} className="forgot-form" noValidate>
+              <h2>Enter Verification Code</h2>
+              <p>We sent a code to <strong>{resetEmail}</strong>.</p>
+
+              <div className="form-group">
+                <label htmlFor="resetCode">Verification Code</label>
+                <input
+                  id="resetCode"
+                  type="text"
+                  placeholder="6-digit code"
+                  value={resetCode}
+                  onChange={(e)=>setResetCode(e.target.value)}
+                  required
+                />
+              </div>
+
+              {fpMsg && <div className="helper-text">{fpMsg}</div>}
+
+              <div className="row-actions">
+                <button type="button" className="btn-secondary" onClick={()=>setForgotStep(1)}>
+                  Back
+                </button>
+                <button type="submit" className="btn-primary" disabled={fpLoading}>
+                  {fpLoading ? "Verifying…" : "Verify Code"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ---------- FORGOT: STEP 3 (NEW PASSWORD) ---------- */}
+          {forgotStep === 3 && (
+            <form onSubmit={handleResetPassword} className="forgot-form" noValidate>
+              <h2>Create New Password</h2>
+
+              <div className="form-group">
+                <label htmlFor="newPass">New Password</label>
+                <input
+                  id="newPass"
+                  type="password"
+                  placeholder="At least 6 characters"
+                  value={newPassword}
+                  onChange={(e)=>setNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              {fpMsg && <div className="helper-text">{fpMsg}</div>}
+
+              <div className="row-actions">
+                <button type="button" className="btn-secondary" onClick={()=>setForgotStep(2)}>
+                  Back
+                </button>
+                <button type="submit" className="btn-primary" disabled={fpLoading}>
+                  {fpLoading ? "Updating…" : "Update Password"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
         </div>
       </div>
     </div>

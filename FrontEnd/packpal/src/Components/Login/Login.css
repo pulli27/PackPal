@@ -4,7 +4,7 @@
 /* Page wrapper (scoped, replaces global body styles) */
 .login{
   font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  background:linear-gradient(135deg,#ffffff 0%,#ffffff 100%);
   min-height:100vh;
   display:flex;
   align-items:center;
@@ -44,6 +44,7 @@
   overflow:hidden; width:100%;
   max-width:clamp(1200px, 90vw, 1500px); /* wider */
   min-height:560px;
+  margin-left: 60px;
   display:flex; position:relative; z-index:10; animation:cardAppear 1s ease-out;
 }
 .login .login-container.mounted{ transform:translateZ(0); }
@@ -54,7 +55,7 @@
 
 /* Brand side */
 .login .brand-side{
-  flex:1; background:linear-gradient(135deg,#405ca6 0%, #112230 100%);
+  flex:1; background:linear-gradient(135deg,#253865 30%, #dfcb48 100%);
   position:relative; display:flex; flex-direction:column; justify-content:center; align-items:center;
   padding:60px 200px; color:#fff; overflow:hidden;
 }

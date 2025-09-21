@@ -1,10 +1,12 @@
+// src/Components/Sidebar/Sidebarsanu.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import "./Sidebarsanu.css";
 
 export default function Sidebar({ onLogout }) {
   const [open, setOpen] = useState(false);
   const sidebarRef = useRef(null);
+  const navigate = useNavigate();
 
   // Close on outside click (mobile)
   useEffect(() => {
@@ -26,12 +28,18 @@ export default function Sidebar({ onLogout }) {
 
   const logout = () => {
     if (!window.confirm("Are you sure you want to logout?")) return;
-    alert("You have been logged out successfully!");
-    onLogout?.();
+
+    // (Optional) clear any stored auth
+    try {
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+    } catch {}
+
+    onLogout?.(); // keep your existing callback if any
+    navigate("/login", { replace: true }); // ✅ redirect to /login
   };
 
   return (
-    // ✅ Page-scope wrapper to isolate styles
     <div className="sidebarsanu">
       <aside
         ref={sidebarRef}
@@ -89,6 +97,7 @@ export default function Sidebar({ onLogout }) {
           <NavLink
             to="/settingsanu"
             className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}
+            onClick={() => setOpen(false)}
           >
             <i className="fas fa-cog" /> Settings
           </NavLink>

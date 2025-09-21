@@ -1,7 +1,5 @@
-
-// src/Components/Sidebar/Sidebar.jsx
 import React, { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import "./Sidebarsa.css";
 
 export default function Sidebar({
@@ -11,6 +9,7 @@ export default function Sidebar({
 }) {
   const [active, setActive] = useState(initialActive);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Restore last page once
   useEffect(() => {
@@ -29,7 +28,7 @@ export default function Sidebar({
       "/discounts": "discounts",
       "/finance": "finance",
       "/reports": "reports",
-      "/settingssa": "settings", // ✅ added
+      "/settingssa": "settings",
     };
     const key = map[path];
     if (key) setActive(key);
@@ -41,7 +40,7 @@ export default function Sidebar({
     discounts: "Discounts",
     finance: "Finance",
     reports: "Reports",
-    settings: "Settings", // ✅ added
+    settings: "Settings",
   };
 
   const handleNavigate = (key) => {
@@ -58,17 +57,21 @@ export default function Sidebar({
   const logout = () => {
     const ok = window.confirm("Are you sure you want to logout?");
     if (!ok) return;
+
     if (window.showNotification) {
       window.showNotification("Logging out...", "info");
     }
     try {
       localStorage.removeItem("financehub:lastPage");
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
     } catch {}
+
     setTimeout(() => {
       alert("You have been logged out successfully!");
-      onLogout?.();          // let parent clear auth / redirect if needed
-      onNavigate?.("login"); // optional: hint parent to route to login
-    }, 800);
+      onLogout?.();                 // let parent clear auth if needed
+      navigate("/login", { replace: true }); // ✅ redirect to /login
+    }, 400);
   };
 
   return (
@@ -136,7 +139,7 @@ export default function Sidebar({
           </NavLink>
         </li>
 
-        {/* ✅ New: Settings */}
+        {/* Settings */}
         <li>
           <NavLink
             to="/settingssa"
@@ -150,7 +153,6 @@ export default function Sidebar({
         </li>
       </ul>
 
-      {/* Divider + Logout button (uses your CSS .logout-section / .logout-btn) */}
       <div className="nav-divider" />
       <div className="logout-section">
         <button type="button" className="logout-btn" onClick={logout}>
