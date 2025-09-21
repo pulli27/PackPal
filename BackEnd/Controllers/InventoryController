@@ -143,10 +143,71 @@ const removeByBusinessId = async (req, res, next) => {
   }
 };
 
+/* ---------- NEW: /api/inventory/summary ---------- */
+/**
+ * Returns totals usable by the Finance Dashboard.
+ * {
+ *   inventory: { totalValue, totalQty, itemCount },
+ *   products:  { totalValue, totalQty, itemCount }  // 0s if Product model not found
+ * }
+ */
+const summary = async (_req, res, next) => {
+  try {
+    // Inventory totals (based on fields used in this controller)
+    const invDocs = await Inventory.find({}).lean();
+    const inventory = invDocs.reduce(
+      (acc, d) => {
+        const qty  = toNum(d.quantity ?? d.qty ?? d.stock ?? 0);
+        const unit = toNum(d.unitPrice ?? d.costPrice ?? d.price ?? 0);
+        acc.totalValue += unit * qty;
+        acc.totalQty   += qty;
+        acc.itemCount  += 1;
+        return acc;
+      },
+      { totalValue: 0, totalQty: 0, itemCount: 0 }
+    );
+
+    // Try to include product/catalog totals if a model exists.
+    // We try a few common model names/paths; if none exist, keep zeros.
+    let products = { totalValue: 0, totalQty: 0, itemCount: 0 };
+    let ProductModel = null;
+    try {
+      // adjust these paths if your product model lives elsewhere
+      ProductModel =
+        require("../Model/ProductModel") ||
+        require("../Model/Product") ||
+        require("../Model/CartModel");
+    } catch (_) {
+      ProductModel = null;
+    }
+
+    if (ProductModel) {
+      const prodDocs = await ProductModel.find({}).lean();
+      products = prodDocs.reduce(
+        (acc, p) => {
+          const qty  = toNum(p.stock ?? p.qty ?? p.quantity ?? 0);
+          // prefer selling price; fall back to other fields
+          const unit = toNum(p.price ?? p.sellingPrice ?? p.unitPrice ?? p.costPrice ?? 0);
+          acc.totalValue += unit * qty;
+          acc.totalQty   += qty;
+          acc.itemCount  += 1;
+          return acc;
+        },
+        { totalValue: 0, totalQty: 0, itemCount: 0 }
+      );
+    }
+
+    return res.json({ inventory, products });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   listInventory,
   getByBusinessId,
   createItem,
   updateByBusinessId,
   removeByBusinessId,
+  summary, // ✅ added export
 };

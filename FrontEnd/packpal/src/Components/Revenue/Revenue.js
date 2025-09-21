@@ -30,7 +30,10 @@ const sumUnitsFromTransactions = (arr) => {
   return arr.reduce((s, t) => {
     const direct = toNum(t?.qty ?? t?.quantity ?? t?.units ?? 0, 0);
     const items  = Array.isArray(t?.items) ? t.items : [];
-    const itemsQty = items.reduce((x, it) => x + toNum(it?.qty ?? it?.quantity ?? it?.units ?? it?.count ?? 0, 0), 0);
+    const itemsQty = items.reduce((x, it) => x + toNum(
+      it?.qty ?? it?.quantity ?? it?.units ?? it?.count ?? 0,
+      0
+    ), 0);
     return s + (itemsQty || direct);
   }, 0);
 };
@@ -41,8 +44,6 @@ function Revenue() {
   const productRef = useRef(null);
   const dateFromRef = useRef(null);
   const dateToRef   = useRef(null);
-  //const deptRef     = useRef(null);
-  //const channelRef  = useRef(null);
   const chartsRef   = useRef({});
 
   /* ---------- Toast helper ---------- */
@@ -77,6 +78,21 @@ function Revenue() {
   const [ordersKpi, setOrdersKpi] = useState({ units: 0 });
   const [marginPct, setMarginPct] = useState(0);
 
+  // Added: loading flags to support your pasted IIFEs
+  const [revLoading, setRevLoading] = useState(true);
+  const [invLoading, setInvLoading] = useState(true);
+
+  /* ---------- Inventory (added to host your new code) ---------- */
+  const [inv, setInv] = useState({
+    inventoryValue: 0,
+    productValue: 0,
+    combinedValue: 0,
+    inventoryQty: 0,
+    productQty: 0,
+    inventoryItems: 0,
+    productItems: 0,
+  });
+
   /* ---------- Table + Chart source ---------- */
   const [txRows, setTxRows] = useState([]);       // recent transactions list
   const [revLine, setRevLine] = useState([]);     // 12 numbers for months
@@ -103,16 +119,58 @@ function Revenue() {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
-      /* Revenue KPI */
+    const fetchAll = async () => {
+      /* ========================
+         Your pasted async blocks
+         (wrapped here so await is valid)
+         ======================== */
+
+      // REVENUE (from /transactions/summary) -> mapped to this page's KPI
       try {
-        const { data } = await api.get("/transactions/revenue");
-        if (!cancelled) setRevKpi({ revenue: toNum(data?.revenue, 0) });
-      } catch {
-        if (!cancelled) setRevKpi({ revenue: 0 });
+        const { data } = await api.get("/transactions/summary");
+        if (!cancelled) {
+          setRevKpi({ revenue: Number(data.revenue || 0) });
+          setRevLoading(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          notify(e?.response?.data?.message || "Failed to load revenue", "error");
+          setRevKpi({ revenue: 0 });
+          setRevLoading(false);
+        }
       }
 
-      /* Orders KPI (units) */
+      // INVENTORY (from /inventory/summary) -> stored locally (not shown in UI here)
+      try {
+        const { data } = await api.get("/inventory/summary");
+        if (!cancelled) {
+          const invObj = data?.inventory || {};
+          const prodObj = data?.products || {};
+          const inventoryValue = Number(invObj.totalValue || 0);
+          const productValue   = Number(prodObj.totalValue || 0);
+          const combinedValue  = inventoryValue + productValue;
+
+          setInv({
+            inventoryValue,
+            productValue,
+            combinedValue,
+            inventoryQty: invObj.totalQty || 0,
+            productQty: prodObj.totalQty || 0,
+            inventoryItems: invObj.itemCount || 0,
+            productItems: prodObj.itemCount || 0,
+          });
+          setInvLoading(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          notify(e?.response?.data?.message || "Failed to load inventory", "error");
+          setInvLoading(false);
+        }
+      }
+
+      /* ===== Existing logic in this page ===== */
+
+      // Orders KPI (units)
       try {
         let units = 0;
         try {
@@ -128,7 +186,7 @@ function Revenue() {
         if (!cancelled) setOrdersKpi({ units: 0 });
       }
 
-      /* Recent transactions + aggregate for charts */
+      // Recent transactions + aggregate for charts
       try {
         const { data: list } = await api.get("/transactions?limit=200&sort=-date");
         if (cancelled) return;
@@ -141,7 +199,7 @@ function Revenue() {
         const byProduct = new Map();
 
         (Array.isArray(list) ? list : []).forEach((t) => {
-          if (t?.status === "refund") return;
+          if ((t?.status || "").toLowerCase() === "refund") return;
           const dt = new Date(t?.date || t?.createdAt || t?.updatedAt || Date.now());
           const m  = dt.getMonth();
           const y  = dt.getFullYear();
@@ -167,29 +225,30 @@ function Revenue() {
         }
       }
 
-      /* Profit margin */
+      // Profit margin (uses the same summary revenue we set above)
       try {
-        const [{ data: revData }, { data: payroll }, { data: contrib }, { data: invSum }] =
+        const [{ data: revSummary }, { data: payroll }, { data: contrib }, { data: invSum }] =
           await Promise.all([
-            api.get("/transactions/revenue"),
+            api.get("/transactions/summary"),
             api.get("/salary/summary").catch(() => ({ data: { totalNet: 0 } })),
             api.get("/contributions/summary").catch(() => ({ data: { grandTotal: 0 } })),
             api.get("/inventory/summary").catch(() => ({ data: {} })),
           ]);
 
-        const revenueVal   = toNum(revData?.revenue, 0);
-        const payrollTotal = toNum(payroll?.totalNet, 0);
-        const contribTotal = toNum(contrib?.grandTotal, 0);
-        const inventoryOnly= toNum(invSum?.inventory?.totalValue, 0);
-        const expenses     = payrollTotal + contribTotal + inventoryOnly;
-        const pct          = revenueVal > 0 ? ((revenueVal - expenses) / revenueVal) * 100 : 0;
+        const revenueVal    = toNum(revSummary?.revenue, 0);
+        const payrollTotal  = toNum(payroll?.totalNet, 0);
+        const contribTotal  = toNum(contrib?.grandTotal, 0);
+        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
+        const expenses      = payrollTotal + contribTotal + inventoryOnly;
+        const pct           = revenueVal > 0 ? ((revenueVal - expenses) / revenueVal) * 100 : 0;
 
         if (!cancelled) setMarginPct(pct);
       } catch {
         if (!cancelled) setMarginPct(0);
       }
-    })();
+    };
 
+    fetchAll();
     return () => { cancelled = true; };
   }, []);
 
@@ -282,13 +341,6 @@ function Revenue() {
       chartsRef.current = {};
     };
   }, [revLine, catBars, baseOptions]);
-
-  /* ---------- Filters (UI only unless you wire server params) ---------- */
-  //const applyFilters = async () => {
-    //const start = dateFromRef.current?.value || "";
-    //const end   = dateToRef.current?.value || "";
-    //notify(`Filters applied: ${start || "—"} → ${end || "—"} (Category/Channel not wired)`, "info");
-  //};
 
   /* ---------- Actions: View / Invoice / PDF ---------- */
   const viewOrder = (tx) => setSelectedTx(tx);
@@ -462,8 +514,6 @@ function Revenue() {
           <p>Clean, professional view of sales performance, trends and targets</p>
         </div>
 
-        
-
         {/* KPI Cards */}
         <section className="rev-kpi-grid rev-fade-in">
           <article className="rev-kpi">
@@ -474,7 +524,9 @@ function Revenue() {
                 <div className="rev-kpi-sub">Total Sales</div>
               </div>
             </div>
-            <div className="rev-kpi-value">{fmtLKR(revKpi.revenue)}</div>
+            <div className="rev-kpi-value">
+              {revLoading ? "…" : fmtLKR(revKpi.revenue)}
+            </div>
             <div className="rev-kpi-meta">
               <span>{new Date().toLocaleString("en-US", { month: "long", year: "numeric" })}</span>
               <span className="rev-kpi-change"><i className="fas fa-arrow-up" /> +0.0%</span>

@@ -7,11 +7,10 @@ import Sidebar from "../Sidebar/Sidebarsanu";
 import { api } from "../../lib/api";
 
 /* ===== helpers ===== */
-const fmtLKRNum = (n) => {
-  const x = Number(n || 0);
-  return Math.round(x).toLocaleString("en-LK");
-};
+const fmtLKRNum = (n) => Math.round(Number(n || 0)).toLocaleString("en-LK");
 const fmtLKR = (n) => `LKR ${fmtLKRNum(n)}`;
+const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+const clamp0 = (v) => Math.max(0, num(v));
 
 const showNotification = (message, type = "info") => {
   document.querySelectorAll(".notification").forEach((n) => n.remove());
@@ -38,9 +37,9 @@ const showNotification = (message, type = "info") => {
   setTimeout(() => { n.style.animation = "fd-slideOut .25s ease"; setTimeout(() => n.remove(), 250); }, 2600);
 };
 
-/* ===== month utils ===== */
+/* month utils */
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const CHART_MONTHS = 4; // show last 4 months: first 3 = 0, last month = jump
+const CHART_MONTHS = 4;
 const lastNMonthsLabels = (n = CHART_MONTHS) => {
   const now = new Date();
   return Array.from({ length: n }, (_, i) => {
@@ -48,87 +47,96 @@ const lastNMonthsLabels = (n = CHART_MONTHS) => {
     return MONTHS[d.getMonth()];
   });
 };
-
-/* Fallback: 0,0,0,..., value (jump in the latest month) */
 const stepUpSeries = (finalValue = 0, n = CHART_MONTHS) =>
   Array.from({ length: n }, (_, i) => (i === n - 1 ? Number(finalValue || 0) : 0));
 
+/* discount math like you described */
+const isPercentType = (t) => {
+  const s = String(t || "").trim().toLowerCase();
+  return s === "percentage" || s === "percent" || s === "%" || s === "pct" || s === "pc";
+};
+const discountedUnit = ({ price, discountType, discountValue }) => {
+  const p = clamp0(price);
+  const v = num(discountValue, 0);
+  if (v <= 0) return p;
+
+  if (isPercentType(discountType)) {
+    const pct = Math.max(0, Math.min(100, v));
+    return clamp0(p * (1 - pct / 100));
+  }
+  // treat as flat amount off
+  return clamp0(p - v);
+};
+
 export default function FinanceDashboard() {
-  // Canvas refs
   const revenueRef = useRef(null);
   const expenseRef = useRef(null);
   const cashFlowRef = useRef(null);
 
-  // Inventory + Products KPI
   const [inv, setInv] = useState({
     inventoryValue: 0, inventoryQty: 0, inventoryItems: 0,
     productValue: 0, productQty: 0, productItems: 0,
-    combinedValue: 0,
+    combinedValue: 0, productDiscount: 0,
   });
   const [invLoading, setInvLoading] = useState(true);
 
-  // Revenue KPI
   const [rev, setRev] = useState({ revenue: 0, count: 0, monthly: [] });
   const [revLoading, setRevLoading] = useState(true);
 
-  // Expenses KPI (note: still excludes product value)
   const [exp, setExp] = useState({
-    total: 0,
-    payroll: 0,
-    contrib: 0,
-    inventory: 0,
-    monthly: [],
-    loading: true,
+    total: 0, payroll: 0, contrib: 0, inventory: 0, monthly: [], loading: true,
   });
 
-  //const lastUpdated = useMemo(() => new Date().toLocaleDateString(), []);
-
-  // Net Profit derived (Revenue - Expenses)
   const netProfit = useMemo(() => {
     if (revLoading || exp.loading) return null;
-    const r = Number(rev?.revenue || 0);
-    const e = Number(exp?.total || 0);
-    return r - e;
+    return num(rev.revenue) - num(exp.total);
   }, [rev, revLoading, exp]);
 
-  /* Load KPIs */
   useEffect(() => {
-    // INVENTORY + PRODUCTS (KPI card)
+    // INVENTORY + PRODUCTS (products computed from list with discount)
     (async () => {
       try {
-        // Try dedicated products summary; fall back to nested fields under inventory summary if present
         const invP = api.get("/inventory/summary").catch(() => ({ data: {} }));
-        const prodP = api.get("/products/summary").catch(() => ({ data: {} }));
+        // Try both likely routes for product list
+        const prodListP = api.get("/products").catch(() => api.get("/api/products"));
 
-        const [{ data: invSum }, { data: prodSum }] = await Promise.all([invP, prodP]);
+        const [{ data: invSum }, prodListRes] = await Promise.all([invP, prodListP]);
+        const productsRaw = prodListRes?.data ?? [];
+        const products = Array.isArray(productsRaw)
+          ? productsRaw
+          : productsRaw?.items ?? productsRaw?.data ?? [];
 
-        // Inventory-only (store/warehouse)
+        // inventory-only (warehouse/store)
         const invObj = invSum?.inventory ?? invSum ?? {};
-        const inventoryValue = Number(invObj?.totalValue || 0);
-        const inventoryQty   = Number(invObj?.totalQty   || 0);
-        const inventoryItems = Number(invObj?.itemCount  || 0);
+        const inventoryValue = num(invObj?.totalValue, 0);
+        const inventoryQty   = num(invObj?.totalQty, 0);
+        const inventoryItems = num(invObj?.itemCount, 0);
 
-        // Product/catalog value (ready-to-sell product valuation)
-        const productValue = Number(
-          prodSum?.totalValue ??
-          invSum?.products?.totalValue ??
-          invSum?.productValue ??
-          0
-        );
-        const productQty = Number(
-          prodSum?.totalQty ??
-          invSum?.products?.totalQty ??
-          invSum?.productQty ??
-          0
-        );
-        const productItems = Number(
-          prodSum?.itemCount ??
-          invSum?.products?.itemCount ??
-          invSum?.productItems ??
-          0
-        );
+        // compute product inventory value from list: (price after discount) * stock
+        let productValue = 0;
+        let productQty = 0;
+        let productItems = 0;
+        let productDiscountTotal = 0;
 
-        const combinedValue = inventoryValue + productValue;
+        for (const r of products) {
+          const price = num(r.price ?? r.unitPrice, 0);
+          const stock = num(r.stock ?? r.quantity, 0);
+          const type  = r.discountType;
+          const dval  = num(r.discountValue, 0);
+
+          const unitAfter = discountedUnit({ price, discountType: type, discountValue: dval });
+          productValue += unitAfter * stock;
+          productQty   += stock;
+          productItems += 1;
+
+          // track discount (for info line)
+          if (dval > 0) {
+            const perUnitDisc = isPercentType(type) ? price * (dval / 100) : dval;
+            productDiscountTotal += Math.min(price, perUnitDisc) * stock;
+          }
+        }
+
+        const combinedValue = clamp0(inventoryValue + productValue);
 
         setInv({
           inventoryValue,
@@ -138,9 +146,10 @@ export default function FinanceDashboard() {
           productQty,
           productItems,
           combinedValue,
+          productDiscount: productDiscountTotal,
         });
       } catch (e) {
-        showNotification(e?.response?.data?.message || "Failed to load inventory & product summary", "error");
+        showNotification(e?.response?.data?.message || "Failed to load inventory & products", "error");
       } finally {
         setInvLoading(false);
       }
@@ -149,16 +158,12 @@ export default function FinanceDashboard() {
     // REVENUE
     (async () => {
       try {
-        const { data } = await api.get("/transactions/revenue");
-        setRev(
-          data && typeof data === "object"
-            ? {
-                revenue: Number(data.revenue || 0),
-                count: Number(data.count || 0),
-                monthly: Array.isArray(data.monthly) ? data.monthly : [],
-              }
-            : { revenue: 0, count: 0, monthly: [] }
-        );
+        const { data } = await api.get("/transactions/summary");
+        setRev({
+          revenue: num(data.revenue, 0),
+          count: num(data.count, 0),
+          monthly: Array.isArray(data.monthly) ? data.monthly : [],
+        });
       } catch (e) {
         showNotification(e?.response?.data?.message || "Failed to load revenue", "error");
       } finally {
@@ -166,7 +171,7 @@ export default function FinanceDashboard() {
       }
     })();
 
-    // EXPENSES = payroll (net) + EPF/ETF + inventory-only (no products)
+    // EXPENSES (inventory-only; products excluded)
     (async () => {
       try {
         const payrollP = api.get("/salary/summary").catch(() => ({ data: { totalNet: 0, monthly: [] } }));
@@ -176,26 +181,21 @@ export default function FinanceDashboard() {
         const [{ data: payroll }, { data: contrib }, { data: invSum }] =
           await Promise.all([payrollP, contribP, invP]);
 
-        const payrollTotal = Number(payroll?.totalNet || 0);
-        const contribTotal = Number(contrib?.grandTotal || 0);
+        const payrollTotal = num(payroll?.totalNet, 0);
+        const contribTotal = num(contrib?.grandTotal, 0);
+        const inventoryOnly = num(invSum?.inventory?.totalValue, 0);
 
-        // inventory-only from backend nested object (keep excluding products from expenses)
-        let inventoryOnly = Number(invSum?.inventory?.totalValue || 0);
-        if (!Number.isFinite(inventoryOnly)) inventoryOnly = 0;
-
-        // Optional monthly (if backend gives)
         let monthly = [];
         const pArr = Array.isArray(payroll?.monthly) ? payroll.monthly : null;
         const cArr = Array.isArray(contrib?.monthly) ? contrib.monthly : null;
         const iArr = Array.isArray(invSum?.monthly) ? invSum.monthly : null;
-
         if (pArr || cArr || iArr) {
           const len = Math.max(pArr?.length || 0, cArr?.length || 0, iArr?.length || 0);
           monthly = Array.from({ length: len }).map((_, i) => ({
             month: pArr?.[i]?.month ?? cArr?.[i]?.month ?? iArr?.[i]?.month ?? `M${i + 1}`,
-            payroll: Number(pArr?.[i]?.value ?? pArr?.[i]?.payroll ?? 0),
-            contrib: Number(cArr?.[i]?.value ?? cArr?.[i]?.contrib ?? 0),
-            inventory: Number(iArr?.[i]?.inventory ?? 0),
+            payroll: num(pArr?.[i]?.value ?? pArr?.[i]?.payroll, 0),
+            contrib: num(cArr?.[i]?.value ?? cArr?.[i]?.contrib, 0),
+            inventory: num(iArr?.[i]?.inventory, 0),
           }));
         }
 
@@ -221,22 +221,15 @@ export default function FinanceDashboard() {
     Chart.defaults.color = "#334155";
 
     let revenueChart, expenseChart, cashFlowChart;
+    const toNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-    const toNum = (v) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    // Build labels and series (prefer backend monthly, else show 0,0,0, step-up now)
     const labels = lastNMonthsLabels(CHART_MONTHS);
 
-    // Revenue
     const revMonthly = Array.isArray(rev?.monthly) && rev.monthly.length
       ? rev.monthly
       : labels.map((m, idx) => ({ month: m, value: stepUpSeries(rev?.revenue || 0, labels.length)[idx] }));
     const revenueSeries = revMonthly.map((m) => toNum(m?.value ?? m?.revenue));
 
-    // Expenses
     const expMonthly = Array.isArray(exp?.monthly) && exp.monthly.length
       ? exp.monthly
       : labels.map((m, idx) => ({
@@ -245,24 +238,17 @@ export default function FinanceDashboard() {
           contrib: stepUpSeries(exp?.contrib || 0, labels.length)[idx],
           inventory: stepUpSeries(exp?.inventory || 0, labels.length)[idx],
         }));
-
     const expensesSeries = expMonthly.map((m) => toNum(m?.payroll) + toNum(m?.contrib) + toNum(m?.inventory));
 
-    // Destroy if re-running
     const destroyAll = () => {
-      if (revenueChart) revenueChart.destroy();
-      if (expenseChart) expenseChart.destroy();
-      if (cashFlowChart) cashFlowChart.destroy();
+      revenueChart?.destroy();
+      expenseChart?.destroy();
+      cashFlowChart?.destroy();
     };
     destroyAll();
 
-    // Common options
     const grid = { color: "rgba(148, 163, 184, 0.18)", drawBorder: false };
-    const ticks = {
-      padding: 6,
-      callback: (v) => fmtLKRNum(v),
-      maxTicksLimit: 6,
-    };
+    const ticks = { padding: 6, callback: (v) => fmtLKRNum(v), maxTicksLimit: 6 };
     const tooltip = {
       callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtLKR(ctx.parsed.y)}` },
       displayColors: false,
@@ -272,7 +258,7 @@ export default function FinanceDashboard() {
     };
     const legend = { position: "top", labels: { usePointStyle: true, boxWidth: 8, padding: 8 } };
 
-    // 1) Revenue vs Expenses (line)
+    // 1) Revenue vs Expenses
     if (revenueRef.current) {
       const ctx = revenueRef.current.getContext("2d");
       revenueChart = new Chart(ctx, {
@@ -280,74 +266,39 @@ export default function FinanceDashboard() {
         data: {
           labels,
           datasets: [
-            {
-              label: "Revenue",
-              data: revenueSeries,
-              borderColor: "#2563EB",
-              backgroundColor: "rgba(37, 99, 235, .10)",
-              borderWidth: 2.5,
-              fill: true,
-              tension: 0.35,
-              pointRadius: 2.5,
-            },
-            {
-              label: "Expenses",
-              data: expensesSeries,
-              borderColor: "#DC2626",
-              backgroundColor: "rgba(220, 38, 38, .08)",
-              borderWidth: 2.5,
-              fill: true,
-              tension: 0.35,
-              pointRadius: 2.5,
-            },
+            { label: "Revenue",  data: revenueSeries,  borderColor: "#2563EB", backgroundColor: "rgba(37,99,235,.10)", borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 2.5 },
+            { label: "Expenses", data: expensesSeries, borderColor: "#DC2626", backgroundColor: "rgba(220,38,38,.08)", borderWidth: 2.5, fill: true, tension: 0.35, pointRadius: 2.5 },
           ],
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: { padding: 6 },
+          responsive: true, maintainAspectRatio: false, layout: { padding: 6 },
           plugins: { legend, tooltip },
-          scales: {
-            x: { grid: { display: false } },
-            y: { grid, ticks, beginAtZero: true },
-          },
+          scales: { x: { grid: { display: false } }, y: { grid, ticks, beginAtZero: true } },
         },
       });
     }
 
-    // 2) Expense Breakdown (doughnut)
+    // 2) Expense Breakdown
     if (expenseRef.current) {
       const ctx = expenseRef.current.getContext("2d");
       expenseChart = new Chart(ctx, {
         type: "doughnut",
         data: {
           labels: ["Payroll", "EPF/ETF", "Inventory"],
-          datasets: [{
-            data: [exp?.payroll || 0, exp?.contrib || 0, exp?.inventory || 0],
-            backgroundColor: ["#7C3AED", "#059669", "#F59E0B"],
-            borderWidth: 0,
-            hoverOffset: 8,
-          }],
+          datasets: [{ data: [exp?.payroll || 0, exp?.contrib || 0, exp?.inventory || 0], backgroundColor: ["#7C3AED", "#059669", "#F59E0B"], borderWidth: 0, hoverOffset: 8 }],
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, padding: 8 } },
-            tooltip: {
-              callbacks: { label: (ctx) => `${ctx.label}: ${fmtLKR(ctx.parsed)}` },
-              displayColors: false,
-              backgroundColor: "#111827",
-              titleColor: "#fff",
-              bodyColor: "#fff",
-            },
+            tooltip: { callbacks: { label: (c) => `${c.label}: ${fmtLKR(c.parsed)}` }, displayColors: false, backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#fff" },
           },
           cutout: "64%",
         },
       });
     }
 
-    // 3) Monthly Cash Flow (bar; inflow positive, outflow negative)
+    // 3) Monthly Cash Flow
     if (cashFlowRef.current) {
       const ctx = cashFlowRef.current.getContext("2d");
       cashFlowChart = new Chart(ctx, {
@@ -355,23 +306,15 @@ export default function FinanceDashboard() {
         data: {
           labels,
           datasets: [
-            { label: "Cash Inflow",  data: revenueSeries, backgroundColor: "#16A34A", borderRadius: 5, order: 1 },
+            { label: "Cash Inflow",  data: revenueSeries,                       backgroundColor: "#16A34A", borderRadius: 5, order: 1 },
             { label: "Cash Outflow", data: expensesSeries.map((v) => -toNum(v)), backgroundColor: "#EF4444", borderRadius: 5, order: 2 },
           ],
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: { padding: 6 },
-          plugins: { legend, tooltip },
+          responsive: true, maintainAspectRatio: false, layout: { padding: 6 }, plugins: { legend, tooltip },
           scales: {
             x: { grid: { display: false } },
-            y: {
-              grid,
-              ticks,
-              suggestedMin: Math.min(0, -Math.max(...expensesSeries) * 1.1),
-              suggestedMax: Math.max(...revenueSeries) * 1.1,
-            },
+            y: { grid, ticks, suggestedMin: Math.min(0, -Math.max(...expensesSeries) * 1.1), suggestedMax: Math.max(...revenueSeries) * 1.1 },
           },
         },
       });
@@ -412,25 +355,24 @@ export default function FinanceDashboard() {
               <div className="kpi-title">Net Profit</div>
               <div className="kpi-value">{netProfit === null ? "…" : fmtLKR(netProfit)}</div>
               <div className={`kpi-change ${Number(netProfit) >= 0 ? "positive" : "negative"}`}>
-                {netProfit === null
-                  ? "calculating…"
-                  : Number(netProfit) >= 0
-                    ? "↗ Revenue exceeds expenses"
-                    : "↘ Expenses exceed revenue"}
+                {netProfit === null ? "calculating…" : Number(netProfit) >= 0 ? "↗ Revenue exceeds expenses" : "↘ Expenses exceed revenue"}
               </div>
             </div>
 
             <div className="kpi-card">
               <div className="kpi-title">Inventory Value</div>
-              <div className="kpi-value">
-                {invLoading ? "…" : fmtLKR(inv.combinedValue)}
-              </div>
+              <div className="kpi-value">{invLoading ? "…" : fmtLKR(inv.combinedValue)}</div>
               <div className="kpi-change positive">
                 {invLoading
                   ? "loading…"
                   : `Inventory ${fmtLKR(inv.inventoryValue)} • Products ${fmtLKR(inv.productValue)}  |  ` +
                     `${(inv.inventoryItems + inv.productItems) || 0} items • ${(inv.inventoryQty + inv.productQty) || 0} units`}
               </div>
+              {!invLoading && num(inv.productDiscount) > 0 && (
+                <div className="kpi-subtle">
+                
+                </div>
+              )}
             </div>
           </section>
 
@@ -452,7 +394,7 @@ export default function FinanceDashboard() {
           </section>
 
           <section className="bottom-charts">
-            <div className="chart-card">
+            <div className="chart-card-monthly">
               <div className="chart-title">💰 Monthly Cash Flow</div>
               <div className="chart-container small">
                 <canvas ref={cashFlowRef} />
