@@ -79,12 +79,11 @@ export default function SalaryCal() {
     load();
   }, []);
 
-  // ---------- CREATE ----------
+ 
   async function create() {
     if (!form.EmpId || !form.Emp_Name || !form.Base_Sal)
       return toast("EmpId, Name, Salary required", "warning");
 
-    // validate final (trimmed) values
     if (!isLettersOnly(form.Emp_Name))
       return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
     if (form.Designation && !isLettersOnly(form.Designation))
