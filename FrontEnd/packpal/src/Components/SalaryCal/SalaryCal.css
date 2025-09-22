@@ -47,6 +47,7 @@
   border: none;
   transition: all 0.3s ease;
   text-decoration: none;
+
 }
 .salarycal .section .tab-btn:hover {
   background: rgba(102,126,234,0.1);
@@ -109,7 +110,7 @@
   transition: transform .3s ease, box-shadow .3s ease;
   margin: 5px;
   color: #fff;
-  margin-left: 940px;   /* keep your big CTA alignment */
+  margin-left: 0px;   /* keep your big CTA alignment */
 }
 .salarycal .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,.2); }
 .salarycal .btn-primary { background: linear-gradient(45deg,#354fc5,#15122f); }
@@ -138,17 +139,20 @@
 .salarycal tbody tr:hover { background: #f8f9ff; }
 
 /* Actions cell – keep buttons side-by-side */
-.salarycal .actions {
+/* --- Force table action buttons to sit side-by-side --- */
+.salarycal td.actions {
   display: flex;
-  gap: 8px;                 /* a bit more breathing room */
+  gap: 8px;
   align-items: center;
   flex-wrap: nowrap;
 }
-.salarycal table .actions .btn {
-  margin-left: 0;           /* remove the big global margin INSIDE the table */
-  padding: 8px 14px;        /* tighter for row buttons */
-  white-space: nowrap;      /* avoid line breaks on narrow columns */
+
+.salarycal td.actions .btn {
+  margin-left: 0 !important;   /* override the 940px margin */
+  padding: 8px 14px;           /* compact size works better in rows */
+  white-space: nowrap;
 }
+
 
 /* Modal (scoped, pretty) */
 .salarycal .salary-modal {

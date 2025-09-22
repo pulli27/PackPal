@@ -148,6 +148,8 @@
 }
 .Attendance td{ padding:15px; border-bottom:1px solid #e0e6ed; }
 .Attendance tbody tr:hover{ background:#f8f9ff; }
+
+/* Default actions cell */
 .Attendance .actions{
   display:flex;
   gap:10px;
@@ -199,3 +201,46 @@
   .Attendance .form-grid{ grid-template-columns:1fr; }
   .Attendance .section .nav{ flex-direction:column; }
 }
+
+/* ===========================
+   FORCE EDIT/DELETE INLINE
+   (place at bottom to override)
+   =========================== */
+/* FORCE the actions cell to lay out buttons horizontally */
+.Attendance td.actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;   /* or flex-start */
+  gap: 10px !important;
+  white-space: nowrap !important;
+}
+
+/* FORCE each button to be inline-sized, not full width */
+.Attendance td.actions .btn {
+  display: inline-flex !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 8px 16px !important;
+  line-height: 1 !important;
+  font-size: 0.85rem !important;
+  box-shadow: none !important;
+}
+
+/* If your table body or cells were turned into grid somewhere, neutralize it */
+.Attendance table td.actions {
+  grid-auto-flow: initial !important;
+}
+
+/* Safety net even if you forgot class="actions" on the cell */
+.Attendance table td:last-child {
+  white-space: nowrap !important;
+}
+.Attendance table td:last-child .btn {
+  display: inline-flex !important;
+  width: auto !important;
+  margin: 0 !important;
+}
+.Attendance table td:last-child .btn + .btn {
+  margin-left: 10px !important;
+}
+
