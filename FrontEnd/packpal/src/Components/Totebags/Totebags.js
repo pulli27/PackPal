@@ -20,6 +20,10 @@ const imgFallback = (e) => {
   e.currentTarget.src = svg;
 };
 
+/* ---------- constants (fixes no-undef) ---------- */
+const STORAGE_KEY = "packPalCart";
+const CART_PAGE = "/cart"; // change if your cart route is different
+
 /* ---------- products ---------- */
 const PRODUCTS = [
   { id: "t1", category: "canvas", title: "Market Canvas Tote", price: 2990, image: { src: "/imagess/MCT.jpeg" }, badge: "CANVAS", rating: 4.9, reviews: 214, descLong: "Heavy-duty canvas, wide gusset and interior slip pocket. Roomy enough for produce, books, and a water bottle.", specs: { Color: "Natural", Material: "16oz Canvas", Closure: "Open top", Weight: "540g" }, },
@@ -41,7 +45,7 @@ const CATEGORIES = ["all", "canvas", "leather", "work", "beach", "foldable"];
 export default function Totebags() {
   const [currentCategory, setCurrentCategory] = useState("all");
   const [term, setTerm] = useState("");
-  const [cart, setCart] = useState([]); // only used for header count
+  const [cart, setCart] = useState([]); // used to show count in Header
   const [wishlist, setWishlist] = useState(() => new Set());
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsProduct, setDetailsProduct] = useState(null);
@@ -89,7 +93,7 @@ export default function Totebags() {
     return `Showing ${visibleProducts.length} ${
       visibleProducts.length === 1 ? "product" : "products"
     } in ${scope}`;
-  }, [visibleProducts.length, term, currentCategory]);
+  }, [visibleProducts, term, currentCategory]);
 
   /* Add to Cart: persist + navigate to /cart */
   const addToCart = (product) => {
@@ -133,7 +137,7 @@ export default function Totebags() {
 
   return (
     <div className="page-wrap">
-       <Header />
+      <Header cartCount={cart.length} />
 
       <div className="hb-page">
         {/* ================= HERO ================= */}
@@ -313,7 +317,7 @@ export default function Totebags() {
         </div>
       </div>
 
-      <Footer /> 
+      <Footer />
     </div>
   );
 }
