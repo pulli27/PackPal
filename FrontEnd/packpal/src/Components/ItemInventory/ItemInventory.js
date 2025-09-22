@@ -81,6 +81,7 @@ export default function ItemInventory() {
       editingIndexRef.current = -1;
       updateRopPreview();
       $("itemName")?.setCustomValidity("");
+      $("quantity")?.setCustomValidity("");
     }
 
     function updateStats() {
@@ -146,6 +147,7 @@ export default function ItemInventory() {
       editingIndexRef.current = index;
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
       validateNameField();
+      validateQuantityField(); // ensure existing 0 never passes
     }
 
     async function deleteItem(index) {
@@ -523,6 +525,19 @@ export default function ItemInventory() {
       return ok;
     }
 
+    // STRICT quantity > 0 validation
+    function validateQuantityField() {
+      if (!qtyInput) return true;
+      const n = parseInt(qtyInput.value, 10);
+      const ok = Number.isInteger(n) && n > 0;
+      if (!ok) {
+        qtyInput.setCustomValidity("Quantity must be a positive whole number (greater than 0).");
+      } else {
+        qtyInput.setCustomValidity("");
+      }
+      return ok;
+    }
+
     function sanitizeNameOnInput() {
       if (!nameInput) return;
       const v = nameInput.value;
@@ -537,10 +552,15 @@ export default function ItemInventory() {
       if (bad.has(e.key)) e.preventDefault();
     }
     function sanitizePasteToDigits(e) {
-      const txt = (e.clipboardData?.getData("text") ?? "").replace(/[^\d]/g, "");
+      const txtRaw = (e.clipboardData?.getData("text") ?? "");
+      // Keep digits only, drop leading zeros to avoid "0"
+      let txt = txtRaw.replace(/[^\d]/g, "");
+      // Remove leading zeros
+      txt = txt.replace(/^0+/, "");
       if (txt !== "") {
         e.preventDefault();
         e.target.value = txt;
+        validateQuantityField();
       }
     }
     function sanitizePasteToDecimal(e) {
@@ -604,6 +624,7 @@ export default function ItemInventory() {
       e.preventDefault();
 
       if (!validateNameField()) { nameInput?.reportValidity(); return; }
+      if (!validateQuantityField()) { qtyInput?.reportValidity(); return; }
 
       const data = {
         id: $("itemId").value.trim(),
@@ -615,9 +636,9 @@ export default function ItemInventory() {
         leadTimeDays: parseInt($("leadTimeDays").value, 10) || 0,
       };
 
-      // guards: ensure integers for qty/avg/lead; non-negative; and price is non-negative number
-      if (!Number.isInteger(data.quantity) || data.quantity < 0) {
-        alert("Quantity must be a non-negative whole number.");
+      // guards: strict positive quantity, integers for qty/avg/lead; non-negative price
+      if (!Number.isInteger(data.quantity) || data.quantity <= 0) {
+        alert("Quantity must be a positive whole number (greater than 0).");
         $("quantity")?.focus();
         return;
       }
@@ -683,10 +704,27 @@ export default function ItemInventory() {
     // --- NEW: attach validation listeners ---
     nameInput?.addEventListener("input", sanitizeNameOnInput);
 
-    // Quantity (integers only)
-    qtyInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
+    // Quantity (integers only); disallow 0; strip leading zeros
+    qtyInput?.addEventListener("keydown", (e) => {
+      // block scientific/ops keys
+      preventInvalidNumberKeys(e, { allowDot: false });
+      // prevent entering 0 as the very first character
+      if (e.key === "0" && (e.target.value === "" || e.target.selectionStart === 0)) {
+        e.preventDefault();
+      }
+    });
+    qtyInput?.addEventListener("input", () => {
+      // strip leading zeros
+      if (qtyInput.value) qtyInput.value = qtyInput.value.replace(/^0+/, "");
+      validateQuantityField();
+    });
     qtyInput?.addEventListener("paste", sanitizePasteToDigits);
-    qtyInput?.addEventListener("blur", () => { if (qtyInput) qtyInput.value = (qtyInput.value || "").replace(/[^\d]/g, ""); });
+    qtyInput?.addEventListener("blur", () => {
+      // final guard: empty or non-positive -> empty so native validity kicks in with min=1
+      const n = parseInt(qtyInput.value, 10);
+      if (!Number.isInteger(n) || n <= 0) qtyInput.value = "";
+      validateQuantityField();
+    });
 
     // Unit Price (decimal allowed, but no e/E/+/−)
     priceInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: true }));
@@ -816,6 +854,8 @@ export default function ItemInventory() {
                     required
                     pattern="[A-Za-z ]+"
                     title="Only letters and spaces are allowed"
+                    onInvalid={(e) => e.target.setCustomValidity("Item Name must contain only letters and spaces.")}
+                    onInput={(e) => e.target.setCustomValidity("")}
                   />
                 </div>
                 <div className="form-group">
@@ -827,10 +867,12 @@ export default function ItemInventory() {
                   <input
                     id="quantity"
                     type="number"
-                    min="0"
+                    min="1"
                     step="1"
                     inputMode="numeric"
                     required
+                    onInvalid={(e) => e.target.setCustomValidity("Quantity must be greater than 0")}
+                    onInput={(e) => e.target.setCustomValidity("")}
                   />
                 </div>
 
