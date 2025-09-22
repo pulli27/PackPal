@@ -109,7 +109,7 @@
   transition: transform .3s ease, box-shadow .3s ease;
   margin: 5px;
   color: #fff;
-  margin-left: 940px;
+  margin-left: 940px;   /* keep your big CTA alignment */
 }
 .salarycal .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,.2); }
 .salarycal .btn-primary { background: linear-gradient(45deg,#354fc5,#15122f); }
@@ -136,9 +136,20 @@
 }
 .salarycal td { padding: 15px; border-bottom: 1px solid #e0e6ed; }
 .salarycal tbody tr:hover { background: #f8f9ff; }
-.salarycal .actions { display: flex; gap: 5px; }
 
-/* Modal (scoped) */
+/* Actions cell – keep buttons side-by-side */
+.salarycal .actions {
+  display: flex;
+  gap: 8px;                 /* a bit more breathing room */
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.salarycal table .actions .btn {
+  margin-left: 0;           /* remove the big global margin INSIDE the table */
+  padding: 8px 14px;        /* tighter for row buttons */
+  white-space: nowrap;      /* avoid line breaks on narrow columns */
+}
+
 /* Modal (scoped, pretty) */
 .salarycal .salary-modal {
   display: none;                   /* hidden by default */
@@ -230,7 +241,9 @@
   justify-content: flex-end;
   margin-top: 18px;
 }
-.salarycal .btn { margin-left: 0; }               /* kill the big left margin */
+/* only modal buttons lose the big left margin */
+.salarycal .modal-actions .btn { margin-left: 0; }
+
 .salarycal .btn-success { background: linear-gradient(45deg,#11998e,#38ef7d); }
 .salarycal .btn-warning { background: linear-gradient(45deg,#f59e0b,#fbbf24); }
 

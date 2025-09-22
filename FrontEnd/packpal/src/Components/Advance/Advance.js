@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./Advance.css";
 import Sidebar from "../Sidebar/Sidebarsanu";
 import { NavLink } from "react-router-dom";
@@ -8,15 +8,12 @@ const rs = (n) => `Rs. ${Math.round(Number(n || 0)).toLocaleString()}`;
 const toast = (msg, type = "info") => alert(`${type.toUpperCase()}: ${msg}`);
 
 export default function Advance() {
-  const [employees, setEmployees] = useState([]);   // [{ EmpId, Emp_Name, Base_Sal }]
+  const [employees, setEmployees] = useState([]);
   const [empLoading, setEmpLoading] = useState(true);
-
-  const [rows, setRows] = useState([]);             // table rows
+  const [rows, setRows] = useState([]);
   const [loadingRows, setLoadingRows] = useState(true);
-
   const [selectedEmpId, setSelectedEmpId] = useState("");
 
-  // ------- employees for dropdown -------
   async function loadEmployees() {
     try {
       setEmpLoading(true);
@@ -29,12 +26,10 @@ export default function Advance() {
     }
   }
 
-  // ------- advances from DB (shown in table) -------
   async function loadAdvances() {
     try {
       setLoadingRows(true);
       const { data } = await api.get("/advance?includeEmployee=1");
-      // map backend fields -> UI row
       const mapped = (data.advances || []).map(a => ({
         _id: a._id,
         empId: a.empId,
@@ -54,66 +49,35 @@ export default function Advance() {
   }
 
   useEffect(() => {
-    // load both at page load
     loadEmployees();
     loadAdvances();
   }, []);
 
- // const empIndex = useMemo(() => {
-   // const m = new Map();
-    //for (const e of employees) m.set(e.EmpId, e);
-    //return m;
-  //}, [employees]);
-
-  // compute & create (server does the calc+insert)
-  // Advance.jsx
-async function addCalculatedRow() {
-  if (!selectedEmpId) return toast("Select an employee first", "warning");
-
-  try {
-    // ✅ create (server computes + inserts)
-    await api.post("/advance/compute", { empId: selectedEmpId });
-
-    // ✅ refresh table
-    await loadAdvances();
-
-    setSelectedEmpId("");
-    toast("Computed and saved", "success");
-  } catch (e) {
-    const msg = e?.response?.data?.message || e.message || "Compute failed";
-    // nice special-case for duplicate (same empId + month)
-    if (e?.response?.status === 409) {
-      toast(msg || "Advance for this employee and period already exists", "warning");
-      await loadAdvances(); // still refresh in case it existed already
-    } else {
-      toast(msg, "error");
-    }
-  }
-}
-
+  // ✅ ONLY ONE VERSION – this actually creates the row
   async function addCalculatedRow() {
     if (!selectedEmpId) return toast("Select an employee first", "warning");
     try {
-     // const { data } = await api.post("/advance/compute", { empId: selectedEmpId });
-      // Optionally append optimistically:
-      // setRows(prev => [...prev, { ...map data ... }]);
-      // But then immediately normalize with a reload:
+      const resp = await api.post("/advance/compute", { empId: selectedEmpId });
+      console.log("compute/created:", resp.status, resp.data);
       await loadAdvances();
       setSelectedEmpId("");
       toast("Computed and saved", "success");
     } catch (e) {
       const msg = e?.response?.data?.message || e.message || "Compute failed";
-      toast(msg, "error");
+      if (e?.response?.status === 409) {
+        toast(msg || "Advance for this employee and period already exists", "warning");
+        await loadAdvances(); // show the existing row
+      } else {
+        toast(msg, "error");
+      }
     }
   }
 
   async function removeRow(idOrEmpId) {
-    // We have _id from loadAdvances(); prefer deleting by _id
     const row = rows.find(r => r._id === idOrEmpId || r.empId === idOrEmpId);
     const _id = row?._id;
     if (!_id) return toast("Cannot delete: missing id", "error");
     if (!window.confirm("Delete this advance record?")) return;
-
     try {
       await api.delete(`/advance/${_id}`);
       await loadAdvances();
@@ -126,7 +90,6 @@ async function addCalculatedRow() {
   return (
     <div className="advance page-wrap">
       <Sidebar />
-
       <div className="container">
         <h1>Employee Salary Management</h1>
         <p>Real-time salary insights and employee payroll management</p>
@@ -219,7 +182,6 @@ async function addCalculatedRow() {
             </table>
           </div>
 
-          
         </div>
       </div>
     </div>
