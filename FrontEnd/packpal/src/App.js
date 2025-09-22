@@ -44,6 +44,17 @@ import Setting from "./Components/Settings/Settingsanu";
 
 
 //// e.g. src/Components/Totebags/Totebags.js
+import AboutPage from './Components/AboutPage/AboutPage';
+import HandBag from './Components/HandBag/HandBag';
+import Home from "./Components/Home/Home";
+import Accessories from "./Components/Accessories/Accessories";
+import Header from './Components/Header/Header';
+import Clutches from './Components/Clutches/Clutches';
+import KidsBag from './Components/KidsBag/KidsBag';
+import Footer from './Components/Footer/Footer';
+import SizeGuide from './Components/SizeGuide/SizeGuide';
+import Sales from './Components/Sales/Sales';
+import Faq from './Components/Faq/Faq';
 import Totebags from "./Components/Totebags/Totebags";
 
 /* 404 fallback */
@@ -74,11 +85,14 @@ export default function App() {
       <Route path="/accessories" element={<Accessories />} />
       <Route path="/clutches" element={<Clutches />} />
       <Route path="/kidsbag" element={<KidsBag />} />
+      <Route path="/totebag" element={<Totebags />} />
       <Route path="/sizeguide" element={<SizeGuide />} />
       <Route path="/sale" element={<Sales />} />
       <Route path="/faq" element={<Faq />} />
       <Route path="/customer" element={<CustomerView />} />
       <Route path="/cart" element={<Cart />} />
+      <Route path="/header" element={<Header />} />
+      <Route path="/footer" element={<Footer />} />
 
       {/* Internal / dashboards */}
       {/* pulli */}
@@ -118,10 +132,7 @@ export default function App() {
       <Route path="/finance/salary" element={<SalaryManagement />} />
 
       
-     {/*Totebags*/}
-        <Route path="/" element={<Navigate to="/totes" replace />} />
-        <Route path="/totes" element={<Totebags />} />
-        {/* catch-all */}
+     
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

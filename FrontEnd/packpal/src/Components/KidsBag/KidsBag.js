@@ -4,7 +4,8 @@ import "./KidsBag.css";
 import Header from "../Header/Header";
 import Footer from "../Footer/Footer";
 
-const CART_PAGE = "/checkout"; // go to the React route
+const CART_PAGE = "/cart"; // go to the React route
+const STORAGE_KEY = "packPalCart";
 
 // ---------- Product Data (12 items; includes two Age 13–16) ----------
 const PRODUCTS = [
@@ -64,18 +65,26 @@ export default function KidsBags() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // ---------- LINKED Add to Cart (persists + navigates with state) ----------
   const addToCart = (p) => {
-    const stored = JSON.parse(localStorage.getItem("packPalCart") || "[]");
-    stored.push({
-      id: Date.now(),
+    const item = {
+      id: Date.now(), // unique id for this cart line
       name: p.title,
       price: parsePrice(p.priceText) || p.price || 0,
       quantity: 1,
       icon: "🎒",
       img: p.img,
-    });
-    localStorage.setItem("packPalCart", JSON.stringify(stored));
-    navigate(CART_PAGE);
+    };
+
+    // persist to localStorage (same key Cart.js expects)
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      stored.push(item);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    } catch {}
+
+    // navigate to cart and pass the just-added item for Cart.js to merge
+    navigate(CART_PAGE, { state: { justAdded: item } });
   };
 
   const toggleWish = (p) => {
@@ -192,6 +201,7 @@ export default function KidsBags() {
                   <p className="desc">{p.desc}</p>
 
                   <div className="actions">
+                    {/* LINKED Add to Cart */}
                     <button className="btn btn-primary" onClick={() => addToCart(p)}>Add to Cart</button>
                     <button className="btn btn-secondary" onClick={() => setDetails(p)}>More</button>
                     <button className="btn btn-heart" title="Wishlist" onClick={() => toggleWish(p)}>
@@ -243,6 +253,7 @@ export default function KidsBags() {
             </div>
 
             <div className="detail-actions">
+              {/* LINKED Add to Cart from modal too */}
               <button className="btn btn-primary" onClick={() => addToCart(details)}>Add to Cart</button>
               <button className="btn btn-heart" title="Wishlist" onClick={() => toggleWish(details)}>
                 {wishlist.has(details.title) ? "♥" : "♡"}
