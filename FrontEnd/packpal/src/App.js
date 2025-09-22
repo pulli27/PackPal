@@ -57,6 +57,7 @@ import Sales from './Components/Sales/Sales';
 import Faq from './Components/Faq/Faq';
 import Totebags from "./Components/Totebags/Totebags";
 import Feedback from "./Components/Feedback/Feedback";
+import LogoutHeader from "./Components/Header/LogoutHeader";
 
 /* 404 fallback */
 function NotFound() {
@@ -94,6 +95,7 @@ export default function App() {
       <Route path="/customer" element={<CustomerView />} />
       <Route path="/cart" element={<Cart />} />
       <Route path="/header" element={<Header />} />
+      <Route path="/logoutheader" element={<LogoutHeader />} />
       <Route path="/footer" element={<Footer />} />
 
       {/* Internal / dashboards */}

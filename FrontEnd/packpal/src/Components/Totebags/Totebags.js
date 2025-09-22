@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./Totebags.css";
 // If you have shared Header/Footer, uncomment these:
-// import Header from "../Header/Header";
-// import Footer from "../Footer/Footer";
+import Header from "../Header/Header";
+import Footer from "../Footer/Footer";
 
 /* ---------- helpers ---------- */
 const money = (n) =>
@@ -274,7 +274,7 @@ export default function Totebags() {
 
   return (
     <div className="page-wrap">
-      {/* <Header /> */}
+       <Header />
 
       <div className="hb-page">
         {/* ================= HERO ================= */}
@@ -579,7 +579,7 @@ export default function Totebags() {
         </div>
       </div>
 
-      {/* <Footer /> */}
+      <Footer /> 
     </div>
   );
 }
