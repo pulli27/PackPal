@@ -150,9 +150,7 @@ export default function App() {
       <Route path="/reportshiru" element={<Reportshiru />} />
       <Route path="/quality" element={<Quality />} />
       <Route path="/settinghiru" element={<Settinghiru />} />
-
-
-     
+      
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
