@@ -203,7 +203,7 @@ export default function Home() {
                 >
                   <div className="product-image"><img src="/images/smart_bag.png" alt="Smart Tech Backpack" /></div>
                   <h3 className="product-title">Smart Tech Backpack</h3>
-                  <div className="product-price">$199.99</div>
+                  <div className="product-price">LKR 4000</div>
                   <p className="product-description">
                     Revolutionary backpack with built-in USB charging and anti-theft features.
                   </p>
@@ -222,7 +222,7 @@ export default function Home() {
                 >
                   <div className="product-image"><img src="/images/kids.png" alt="Kids Adventure Pack" /></div>
                   <h3 className="product-title">Kids Adventure Pack</h3>
-                  <div className="product-price">$79.99</div>
+                  <div className="product-price">LKR 3550</div>
                   <p className="product-description">Colorful and durable backpack designed for young explorers.</p>
                   <button
                     className="product-btn"
@@ -239,7 +239,7 @@ export default function Home() {
                 >
                   <div className="product-image"><img src="/images/tote.png" alt="Designer Tote Bag" /></div>
                   <h3 className="product-title">Designer Tote Bag</h3>
-                  <div className="product-price">$149.99</div>
+                  <div className="product-price">LKR 2580</div>
                   <p className="product-description">Spacious tote bag crafted from premium materials.</p>
                   <button
                     className="product-btn"
@@ -266,9 +266,9 @@ export default function Home() {
                   data-product="signature-handbag"
                   onClick={() => showNotification("Viewing Signature Handbag details...")}
                 >
-                  <div className="product-image"><FaShoppingBag /></div>
+                  <div className="product-image"><img src="/images/handbag1.jpg" alt="Designer Tote Bag" /></div>
                   <h3 className="product-title">Signature Handbag</h3>
-                  <div className="product-price">$299.99</div>
+                  <div className="product-price">LKR 3500</div>
                   <p className="product-description">Premium leather construction and timeless design.</p>
                   <button
                     className="product-btn"
@@ -283,9 +283,9 @@ export default function Home() {
                   data-product="professional-briefcase"
                   onClick={() => showNotification("Viewing Professional Briefcase details...")}
                 >
-                  <div className="product-image"><FaBriefcase /></div>
+                  <div className="product-image"><img src="/images/briefcase.jpg" alt="Designer Tote Bag" /></div>
                   <h3 className="product-title">Professional Briefcase</h3>
-                  <div className="product-price">$249.99</div>
+                  <div className="product-price">LKR 2500</div>
                   <p className="product-description">Executive briefcase with multiple compartments.</p>
                   <button
                     className="product-btn"
@@ -300,9 +300,9 @@ export default function Home() {
                   data-product="travel-duffel"
                   onClick={() => showNotification("Viewing Travel Duffel details...")}
                 >
-                  <div className="product-image"><FaSuitcase /></div>
+                  <div className="product-image"><img src="/images/travel1.jpg" alt="Designer travel Bag" /></div>
                   <h3 className="product-title">Travel Duffel</h3>
-                  <div className="product-price">$189.99</div>
+                  <div className="product-price">LKR 3000</div>
                   <p className="product-description">Spacious duffel with weather-resistant coating.</p>
                   <button
                     className="product-btn"
