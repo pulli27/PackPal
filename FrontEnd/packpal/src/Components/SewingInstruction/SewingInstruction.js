@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import "./SewingInstruction.css";
 import Sidebarhiru from "../Sidebar/Sidebarhiru";
 import { api } from "../../lib/api2";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable"; // <-- use function import
 
 // Normalize date for <input type="date"> and display
 const toDateInput = (d) => {
@@ -12,6 +14,11 @@ const toDateInput = (d) => {
     return String(d).slice(0, 10);
   }
 };
+
+// Only letters and spaces are allowed for Sewing Person
+const PERSON_RE = /^[A-Za-z ]+$/;
+const sanitizePerson = (v) =>
+  v.replace(/[^A-Za-z ]+/g, "").replace(/\s{2,}/g, " ");
 
 export default function SewingInstruction() {
   // ---------- dialogs ----------
@@ -32,6 +39,8 @@ export default function SewingInstruction() {
     priority: "High",
     status: "In Progress",
   });
+
+  const [personError, setPersonError] = useState("");
 
   // ---------- open/close dialogs ----------
   useEffect(() => {
@@ -106,6 +115,7 @@ export default function SewingInstruction() {
 
   const openCreate = () => {
     resetForm();
+    setPersonError("");
     setEditing({ id: null });
   };
   const openEdit = (row) => {
@@ -117,6 +127,7 @@ export default function SewingInstruction() {
       priority: row.priority,
       status: row.status,
     });
+    setPersonError("");
     setEditing({ id: row.id });
   };
 
@@ -135,22 +146,65 @@ export default function SewingInstruction() {
     }
   };
 
+  // General handler except for Sewing Person (custom rules)
   const handleChange = (e) => {
     const key = e.target.id.replace("f_", "");
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+    let value = e.target.value;
+
+    if (key === "person") {
+      value = sanitizePerson(value);
+      if (value && !PERSON_RE.test(value)) {
+        setPersonError("Letters and spaces only (no numbers or symbols).");
+      } else {
+        setPersonError("");
+      }
+    }
+
+    setForm((f) => ({ ...f, [key]: value }));
+  };
+
+  // Block disallowed keys for Sewing Person while typing
+  const handlePersonKeyDown = (e) => {
+    const allowedControl = new Set([
+      "Backspace",
+      "Delete",
+      "Tab",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+    ]);
+    const isLetterOrSpace = /^[A-Za-z ]$/.test(e.key);
+    if (!isLetterOrSpace && !allowedControl.has(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  // Sanitize pasted content for Sewing Person
+  const handlePersonPaste = (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    const clean = sanitizePerson(text);
+    document.execCommand("insertText", false, clean);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!form.bag || !form.person || !form.deadline) {
       alert("Bag, Person and Deadline are required");
+      return;
+    }
+    if (!PERSON_RE.test(form.person)) {
+      setPersonError("Letters and spaces only (no numbers or symbols).");
+      alert("Sewing Person must contain letters and spaces only.");
       return;
     }
 
     const payload = {
       bag: form.bag,
       details: form.details || "",
-      person: form.person,
+      person: form.person.trim(),
       deadline: form.deadline, // "YYYY-MM-DD"
       priority: form.priority,
       status: form.status,
@@ -210,41 +264,62 @@ export default function SewingInstruction() {
     }
   };
 
-  // CSV export
-  const exportCSV = () => {
-    const header = [
-      "Bag Type",
-      "Sewing Person",
-      "Deadline",
-      "Priority",
-      "Status",
-      "Details",
-    ];
-    const rows = (items || []).map((i) => [
-      i.bag,
-      i.person,
-      i.deadline,
-      i.priority,
-      i.status,
+  // ---------- PDF export (fixed: use autoTable(doc, ...)) ----------
+  const exportPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    const runDate = new Date().toLocaleString();
+    const title = "Sewing Instructions Report";
+
+    // Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text(title, 40, 40);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generated: ${runDate}`, 40, 58);
+    doc.text(`Total Records: ${items.length}`, 40, 72);
+
+    const head = [["Bag Type", "Sewing Person", "Deadline", "Priority", "Status", "Details"]];
+    const body = (items || []).map((i) => [
+      i.bag || "",
+      i.person || "",
+      i.deadline || "",
+      i.priority || "",
+      i.status || "",
       i.details || "",
     ]);
-    const toCSV = (rows) =>
-      rows
-        .map((r) =>
-          r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")
-        )
-        .join("\n");
-    const blob = new Blob([toCSV([header, ...rows])], {
-      type: "text/csv;charset=utf-8;",
+
+    autoTable(doc, {
+      startY: 88,
+      head,
+      body,
+      styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
+      headStyles: { fillColor: [33, 150, 243] },
+      columnStyles: {
+        0: { cellWidth: 130 },
+        1: { cellWidth: 150 },
+        2: { cellWidth: 100 },
+        3: { cellWidth: 90 },
+        4: { cellWidth: 110 },
+        5: { cellWidth: "auto" },
+      },
+      didDrawPage: () => {
+        const pageCount = doc.getNumberOfPages
+          ? doc.getNumberOfPages()
+          : doc.internal.getNumberOfPages();
+        const str = `Page ${pageCount}`;
+        doc.setFontSize(9);
+        doc.text(
+          str,
+          doc.internal.pageSize.getWidth() - 60,
+          doc.internal.pageSize.getHeight() - 20
+        );
+      },
+      margin: { left: 40, right: 40 },
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sewing_instructions.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+
+    doc.save("sewing_instructions_report.pdf");
   };
 
   const BadgePriority = ({ p }) => {
@@ -299,8 +374,8 @@ export default function SewingInstruction() {
         <header className="topbar">
           <h1 className="page-title">Sewing Instructions</h1>
           <div className="topbar-actions">
-            <button className="btn btn-primary" onClick={exportCSV}>
-              <span className="icon" aria-hidden="true">📄</span> Generate Report
+            <button className="btn btn-primary" onClick={exportPDF}>
+              <span className="icon" aria-hidden="true">📄</span> Download PDF
             </button>
             <button className="avatar" title="Profile" aria-label="Profile">
               👤
@@ -407,8 +482,21 @@ export default function SewingInstruction() {
                 type="text"
                 value={form.person}
                 onChange={handleChange}
+                onKeyDown={handlePersonKeyDown}
+                onPaste={handlePersonPaste}
+                inputMode="text"
+                autoComplete="off"
+                maxLength={60}
+                pattern="[A-Za-z ]+"
+                title="Letters and spaces only (no numbers or symbols)."
+                aria-invalid={personError ? "true" : "false"}
                 required
               />
+              {personError && (
+                <small className="error" role="alert">
+                  {personError}
+                </small>
+              )}
             </label>
             <label>
               Deadline
