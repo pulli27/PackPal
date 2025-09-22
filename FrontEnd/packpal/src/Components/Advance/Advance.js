@@ -66,6 +66,31 @@ export default function Advance() {
   //}, [employees]);
 
   // compute & create (server does the calc+insert)
+  // Advance.jsx
+async function addCalculatedRow() {
+  if (!selectedEmpId) return toast("Select an employee first", "warning");
+
+  try {
+    // ✅ create (server computes + inserts)
+    await api.post("/advance/compute", { empId: selectedEmpId });
+
+    // ✅ refresh table
+    await loadAdvances();
+
+    setSelectedEmpId("");
+    toast("Computed and saved", "success");
+  } catch (e) {
+    const msg = e?.response?.data?.message || e.message || "Compute failed";
+    // nice special-case for duplicate (same empId + month)
+    if (e?.response?.status === 409) {
+      toast(msg || "Advance for this employee and period already exists", "warning");
+      await loadAdvances(); // still refresh in case it existed already
+    } else {
+      toast(msg, "error");
+    }
+  }
+}
+
   async function addCalculatedRow() {
     if (!selectedEmpId) return toast("Select an employee first", "warning");
     try {
