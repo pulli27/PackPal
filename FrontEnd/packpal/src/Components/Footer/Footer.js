@@ -178,11 +178,7 @@ function Footer() {
         About Us
       </NavLink>
     </li>
-    <li>
-      <NavLink className="animated-link" to="/contact">
-        Contact Us
-      </NavLink>
-    </li>
+   
     <li>
       <NavLink className="animated-link" to="/sizeguide">
         Size Guide
