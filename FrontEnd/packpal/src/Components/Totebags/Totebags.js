@@ -1,12 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Totebags.css";
+// If you have shared Header/Footer, uncomment these:
 import Header from "../Header/Header";
 import Footer from "../Footer/Footer";
-
-/* ---------- constants (MUST match Cart.js) ---------- */
-const STORAGE_KEY = "packPalCart";
-const CART_PAGE = "/cart";
 
 /* ---------- helpers ---------- */
 const money = (n) =>
@@ -136,7 +133,7 @@ export default function Totebags() {
 
   return (
     <div className="page-wrap">
-      <Header />
+       <Header />
 
       <div className="hb-page">
         {/* ================= HERO ================= */}
@@ -316,7 +313,7 @@ export default function Totebags() {
         </div>
       </div>
 
-      <Footer />
+      <Footer /> 
     </div>
   );
 }

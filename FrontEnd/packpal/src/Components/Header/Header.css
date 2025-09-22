@@ -59,25 +59,31 @@
   line-height: 1;          /* keeps vertical centering tidy */
   white-space: nowrap;     /* prevents wrapping under the logo */
   background:linear-gradient(45deg,#fff,#f7f7ff);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  margin-top: 0;           /* guard against global margins */
-}
-.user-chip{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:8px 12px; border-radius:16px;
-  background:rgba(255,255,255,.10); color:#fff; font-weight:600;
-}
-.user-dot{
-  width:8px; height:8px; border-radius:50%;
-  background:#10b981; display:inline-block;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
 }
 
-/* ===== NAV (center) ===== */
-.ppx-header .nav{
-  flex: 1 1 auto;                 /* take remaining space between logo and actions */
-  display:flex; justify-content:center;
-  border:0; background:transparent;
+/* Actions */
+.ppx-header .header-actions{display:flex;align-items:center;gap:12px; white-space:nowrap;}
+.ppx-header .btn{
+  padding:10px 16px;border-radius:20px;border:1px solid rgba(255,255,255,.35);
+  background:rgba(255,255,255,.1);color:#fff;text-decoration:none;font-weight:600;
+  display:inline-flex;gap:8px;align-items:center; backdrop-filter: blur(6px); cursor:pointer;
+}
+.ppx-header .btn:hover{box-shadow:0 6px 18px rgba(2,6,23,.18);transform:translateY(-1px)}
+.ppx-header .btn-primary{
+  border:none;background:linear-gradient(45deg,var(--primary),var(--secondary));color:#0B1026;
+}
+.ppx-header .btn-primary:hover{filter:saturate(1.05) brightness(1.01)}
+.ppx-header .cart-btn{
+  width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.35);
+  display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(255,255,255,.1);
+  cursor:pointer; backdrop-filter: blur(6px);
+}
+.ppx-header .cart-btn:hover{background:linear-gradient(45deg,var(--primary),var(--secondary));color:#0B1026}
+.ppx-header .cart-badge{
+  position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;
+  background:linear-gradient(45deg,#ef4444,#f97316);color:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:.75rem;font-weight:800;
 }
 .ppx-header .nav-list{
   display:flex; align-items:center; gap:18px; list-style:none; padding:0; margin:0;

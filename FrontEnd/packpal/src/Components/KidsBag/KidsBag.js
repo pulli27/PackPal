@@ -17,7 +17,7 @@ const PRODUCTS = [
   { id:"p6",category:"backpacks",age:"9-12",badge:"GLOW",title:"Galaxy Print Backpack",ratingText:"★★★★☆",reviews:142,priceText:"LKR1900",price:1900,desc:"Reflective strips and bottle pocket for busy days.",img:"/images/GalaxyPrintBackpack.jpeg",tags:"KIDS,GLOW,Reflective",specs:["Material: Polyester","Capacity: 18L","Weight: 520g","Safety: Reflective strips"] },
   { id:"p7",category:"backpacks",age:"6-8",badge:"UNICORN",title:"Magic Unicorn Backpack",ratingText:"★★★★★",reviews:196,priceText:"LKR2200",price:2200,desc:"Sparkly panel, padded back, easy-pull zippers.",img:"/images/MagicUnicornBackpack.jpeg",tags:"KIDS,UNICORN,Sparkly",specs:["Material: PU & fabric","Capacity: 14L","Weight: 500g","Design: Sparkly panel"] },
   { id:"p8",category:"backpacks",age:"9-12",badge:"ERGONOMIC",title:"Starry Night Backpack",ratingText:"★★★★☆",reviews:117,priceText:"LKR2800",price:2800,desc:"Ergonomic straps and breathable back panel.",img:"/images/StarryNightBackpack.jpeg",tags:"KIDS,ERGONOMIC,Breathable",specs:["Material: Nylon","Capacity: 17L","Weight: 510g","Ergonomics: Breathable back panel"] },
-  { id:"p9",category:"trolley",age:"6-8",badge:"ROLL-EASY",title:"Dino Wheels Trolley",ratingText:"★★★★★",reviews:98,priceText:"$59.99",price:59.99,desc:"Quiet wheels, telescopic handle, detachable backpack module.",img:"/images/DinoWheelsTrolley.jpeg",tags:"KIDS,TROLLEY,Roll-easy",specs:["Type: Trolley","Wheels: Quiet","Handle: Telescopic","Module: Detachable backpack"] },
+  { id:"p9",category:"trolley",age:"6-8",badge:"ROLL-EASY",title:"Dino Wheels Trolley",ratingText:"★★★★★",reviews:98,priceText:"LKR1280",price:59.99,desc:"Quiet wheels, telescopic handle, detachable backpack module.",img:"/images/DinoWheelsTrolley.jpeg",tags:"KIDS,TROLLEY,Roll-easy",specs:["Type: Trolley","Wheels: Quiet","Handle: Telescopic","Module: Detachable backpack"] },
   { id:"p10",category:"trolley",age:"3-5",badge:"LIGHT",title:"Tiny Traveler Trolley",ratingText:"★★★★☆",reviews:62,priceText:"LKR800",price:800,desc:"Soft corners and stable base for little rollers.",img:"/images/TinyTravelerTrolley.jpeg",tags:"KIDS,TROLLEY,Lightweight",specs:["Type: Trolley","Corners: Soft","Base: Stable","Best for: Toddlers"] },
   { id:"p11",category:"backpacks",age:"13-16",badge:"TEEN",title:"Teen Pro Study Backpack",ratingText:"★★★★★",reviews:134,priceText:"LKR4200",price:4200,desc:"22L ripstop, 15″ laptop sleeve, reflective trim.",img:"/images/TeenProStudyBackpack.jpeg",tags:"TEEN,STUDY,Laptop Sleeve",specs:["Material: Ripstop nylon","Capacity: 22L","Weight: 650g",'Laptop: 15" sleeve'] },
   { id:"p12",category:"backpacks",age:"13-16",badge:"USB",title:"SprintX Teen Backpack",ratingText:"★★★★☆",reviews:91,priceText:"LKR3800",price:3800,desc:"20L capacity, USB port, ergonomic straps for long days.",img:"/images/SprintXTeenBackpack.jpeg",tags:"TEEN,USB,Ergonomic",specs:["Material: Polyester","Capacity: 20L","Weight: 600g","Feature: USB charging port"] },
@@ -120,7 +120,7 @@ export default function KidsBags() {
 
           <div className="hero-content">
             <h1>Bright &amp; Tough Kids Bags</h1>
-            <p>Fun designs, durable materials, comfy straps – built for school, play and everything in between.</p>
+            <p>Crafted for play, school, and beyond.</p>
 
             <div className="search-container">
               <input

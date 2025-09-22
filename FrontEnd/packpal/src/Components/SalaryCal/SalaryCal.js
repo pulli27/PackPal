@@ -9,13 +9,20 @@ const rs = (n) => `Rs. ${Math.round(Number(n || 0)).toLocaleString()}`;
 const toast = (msg, type = "info") => alert(`${type.toUpperCase()}: ${msg}`);
 
 // === Validation helpers ===
-// Only letters (allow spaces). No digits/symbols.
+// Final (strict) sanitizer: letters + single spaces, trimmed
 const sanitizeLettersOnly = (v) =>
   String(v || "")
     .replace(/[^A-Za-z\s]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 
+// Live (typing) sanitizer: letters + spaces, collapse multiples, DO NOT trim
+const sanitizeLettersOnlyLive = (v) =>
+  String(v || "")
+    .replace(/[^A-Za-z\s]/g, "")
+    .replace(/\s{2,}/g, " ");
+
+// Validator: letters and single spaces between words
 const isLettersOnly = (v) => {
   const s = String(v || "").trim();
   if (!s) return false;
@@ -77,6 +84,7 @@ export default function SalaryCal() {
     if (!form.EmpId || !form.Emp_Name || !form.Base_Sal)
       return toast("EmpId, Name, Salary required", "warning");
 
+    // validate final (trimmed) values
     if (!isLettersOnly(form.Emp_Name))
       return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
     if (form.Designation && !isLettersOnly(form.Designation))
@@ -92,6 +100,7 @@ export default function SalaryCal() {
     try {
       const payload = {
         ...form,
+        // finalize by trimming here
         Emp_Name: sanitizeLettersOnly(form.Emp_Name),
         Designation: sanitizeLettersOnly(form.Designation),
         Bank_Name: sanitizeLettersOnly(form.Bank_Name),
@@ -126,6 +135,7 @@ export default function SalaryCal() {
     if (!editing.EmpId || !editing.Emp_Name || editing.Base_Sal === "")
       return toast("EmpId, Name, Salary required", "warning");
 
+    // validate final (trimmed) values
     if (!isLettersOnly(editing.Emp_Name))
       return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
     if (editing.Designation && !isLettersOnly(editing.Designation))
@@ -140,6 +150,7 @@ export default function SalaryCal() {
 
     const payload = {
       EmpId: editing.EmpId,
+      // finalize by trimming here
       Emp_Name: sanitizeLettersOnly(editing.Emp_Name),
       Designation: sanitizeLettersOnly(editing.Designation),
       Epf_No: editing.Epf_No,
@@ -176,22 +187,22 @@ export default function SalaryCal() {
     }
   }
 
-  // Sanitizing on type for Add form fields
+  // Sanitizing on type for Add form fields (LIVE: keep spaces)
   const handleAddChange = (k, val) => {
     let v = val;
     if (k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch") {
-      v = sanitizeLettersOnly(v);
+      v = sanitizeLettersOnlyLive(v); // ← no trim while typing
     }
     if (k === "Acc_No") v = sanitizeDigitsOnly(v);
     if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, ""); // strips e/E/+/- and any symbols
     setForm((s) => ({ ...s, [k]: v }));
   };
 
-  // Sanitizing on type for Edit form fields
+  // Sanitizing on type for Edit form fields (LIVE: keep spaces)
   const handleEditChange = (k, val) => {
     let v = val;
     if (k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch") {
-      v = sanitizeLettersOnly(v);
+      v = sanitizeLettersOnlyLive(v); // ← no trim while typing
     }
     if (k === "Acc_No") v = sanitizeDigitsOnly(v);
     if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, "");
@@ -267,7 +278,7 @@ export default function SalaryCal() {
                       step={k === "Base_Sal" ? "0.01" : undefined}
                       onKeyDown={
                         k === "Base_Sal" || k === "Acc_No" ? blockExpKeys : undefined
-                      } // blocks e/E/+/- while typing
+                      }
                       pattern={
                         k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch"
                           ? "[A-Za-z ]+"
@@ -385,7 +396,7 @@ export default function SalaryCal() {
                     step={k === "Base_Sal" ? "0.01" : undefined}
                     onKeyDown={
                       k === "Base_Sal" || k === "Acc_No" ? blockExpKeys : undefined
-                    } // blocks e/E/+/- while typing
+                    }
                     pattern={
                       k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch"
                         ? "[A-Za-z ]+"

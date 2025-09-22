@@ -26,7 +26,6 @@
   text-decoration:none;
   color:#fff;
 
-  /* hard reset to remove any blue card/padding leaking from global styles */
   background:transparent !important;
   padding:0 !important;
   margin:0 !important;
@@ -37,12 +36,12 @@
 
 /* Bigger logo image */
 .ppx-header .logo-img{
-  height:120px;     /* ← increased size */
+  height:120px;
   width: 120px;
   margin-left:-80px;
   display: block;
   object-fit: contain;
-  border-radius: 0; /* no rounded corners; change to 12px if you want */
+  border-radius: 0;
   animation: ppxLogoFloat 3s ease-in-out infinite;
 }
 
@@ -52,17 +51,19 @@
   50%{transform:translateY(-2px) rotate(2deg)}
 }
 
-/* Brand text stays inline, not under the logo */
+/* Brand text stays inline */
 .ppx-header .logo-text{
   font-size:1.8rem;
   font-weight:900;
-  line-height: 1;          /* keeps vertical centering tidy */
-  white-space: nowrap;     /* prevents wrapping under the logo */
+  line-height:1;
+  white-space: nowrap;
   background:linear-gradient(45deg,#fff,#f7f7ff);
   -webkit-background-clip:text;
   -webkit-text-fill-color:transparent;
-  margin-top: 0;           /* guard against global margins */
+  margin-top:0;
 }
+
+/* User chip */
 .user-chip{
   display:inline-flex; align-items:center; gap:8px;
   padding:8px 12px; border-radius:16px;
@@ -75,7 +76,7 @@
 
 /* ===== NAV (center) ===== */
 .ppx-header .nav{
-  flex: 1 1 auto;                 /* take remaining space between logo and actions */
+  flex: 1 1 auto;
   display:flex; justify-content:center;
   border:0; background:transparent;
 }
@@ -94,7 +95,7 @@
 }
 .ppx-header .nav-link:hover::after{ width:70%; }
 
-/* Dropdown (from the nav item) */
+/* Dropdown */
 .ppx-header .nav-item{ position:relative; }
 .ppx-header .dropdown{
   position:absolute; top:100%; left:50%; transform:translateX(-50%) translateY(8px);
@@ -120,14 +121,28 @@
 .ppx-header .header-actions{
   display:flex; align-items:center; gap:12px; white-space:nowrap;
 }
+
+/* Base button */
 .ppx-header .btn{
   padding:10px 16px; border-radius:20px; border:1px solid rgba(255,255,255,.35);
   background:rgba(255,255,255,.1); color:#fff; text-decoration:none; font-weight:600;
   display:inline-flex; gap:8px; align-items:center; backdrop-filter: blur(6px); cursor:pointer;
 }
 .ppx-header .btn:hover{ box-shadow:0 6px 18px rgba(2,6,23,.18); transform:translateY(-1px); }
-.ppx-header .btn-primary{ border:none; background:linear-gradient(45deg,var(--primary),var(--secondary)); color:var(--ink); }
-.ppx-header .btn-primary:hover{ filter:saturate(1.05) brightness(1.01); }
+
+/* Red Logout button */
+.ppx-header .btn-logout{
+  border:none;
+  background: linear-gradient(45deg, #ef4444, #dc2626);
+  color:#fff;
+  font-weight:800;
+}
+.ppx-header .btn-logout:hover{
+  filter: brightness(1.03) saturate(1.05);
+  box-shadow: 0 10px 24px rgba(220, 38, 38, .35);
+}
+
+/* Cart */
 .ppx-header .cart-btn{
   width:44px; height:44px; border-radius:50%;
   border:1px solid rgba(255,255,255,.35);
@@ -142,7 +157,7 @@
   font-size:.75rem; font-weight:800;
 }
 
-/* Small screens: quick fallback */
+/* Small screens: hide nav row */
 @media (max-width: 1100px){
   .ppx-header .nav{ display:none; }
 }

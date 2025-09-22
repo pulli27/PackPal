@@ -118,6 +118,7 @@
   font-size:3rem; margin-bottom:1rem;
   color:var(--hero-text);
   text-shadow:0 1px 0 rgba(255,255,255,.35);
+  font-weight:800; /* <-- BOLD "ABOUT US" */
 }
 .about-page .about-hero p{
   font-size:1.1rem; margin-bottom:0; color:var(--hero-text-muted);

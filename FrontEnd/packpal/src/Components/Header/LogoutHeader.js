@@ -1,19 +1,25 @@
+// src/Components/Header/LogoutHeader.jsx
 import React from "react";
 import {
   FaHome, FaLayerGroup, FaPuzzlePiece, FaTags, FaGift,
-  FaChevronDown, FaUser, FaUserPlus, FaShoppingCart,
+  FaChevronDown, FaShoppingCart,
 } from "react-icons/fa";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import "./Header.css";
-import { useAuth } from "../../auth/AuthContext"; // <-- add
 
-export default function Header({
+export default function LogoutHeader({
   cartCount = 0,
   onCartClick = () => {},
   onDropdown = () => {},
 }) {
   const navigate = useNavigate();
-  const { isAuthed, user, logout } = useAuth(); // <-- read auth
+
+  const handleLogout = () => {
+    localStorage.removeItem("pp:token");
+    localStorage.removeItem("pp:role");
+    navigate("/home", { replace: true });
+    // or: window.location.reload();
+  };
 
   return (
     <div className="ppx-header">
@@ -21,12 +27,12 @@ export default function Header({
         <div className="header-content">
           <div className="header-top">
             {/* Brand */}
-            <Link to="/" className="logo" aria-label="PackPal Home">
+            <Link to="/home" className="logo" aria-label="PackPal Home">
               <img src="/new logo.png" alt="PackPal" className="logo-img" />
               <div className="logo-text">PackPal</div>
             </Link>
 
-            {/* Nav */}
+            {/* Nav - same links */}
             <nav className="nav" aria-label="Primary">
               <ul className="nav-list">
                 <li className="nav-item">
@@ -66,11 +72,13 @@ export default function Header({
                     <FaPuzzlePiece /> Accessories
                   </NavLink>
                 </li>
+
                 <li className="nav-item">
                   <NavLink to="/sale" className="nav-link">
                     <FaTags /> Sales
                   </NavLink>
                 </li>
+
                 <li className="nav-item">
                   <NavLink to="/aboutpage" className="nav-link">
                     <FaGift /> About Us
@@ -81,35 +89,12 @@ export default function Header({
 
             {/* Actions */}
             <div className="header-actions">
-              {!isAuthed ? (
-                <>
-                  <button className="btn" onClick={() => navigate("/login")}>
-                    <FaUser /><span>Login</span>
-                  </button>
-                  <button className="btn btn-primary" onClick={() => navigate("/createaccount")}>
-                    <FaUserPlus /><span>Register</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Optional user chip */}
-                  <div className="user-chip">
-                    <span className="user-dot" />
-                    {user?.name || user?.email || "Logged in"}
-                  </div>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => { logout(); navigate("/"); }}
-                    title="Sign out"
-                  >
-                    Logout
-                  </button>
-                </>
-              )}
-
+              <button className="btn btn-logout" onClick={handleLogout} title="Sign out" aria-label="Logout">
+                Logout
+              </button>
               <button className="cart-btn" onClick={onCartClick} aria-label="Open cart">
                 <FaShoppingCart />
-                <div className="cart-badge" id="cartBadge" aria-live="polite">{cartCount}</div>
+                <div className="cart-badge" aria-live="polite">{cartCount}</div>
               </button>
             </div>
           </div>
