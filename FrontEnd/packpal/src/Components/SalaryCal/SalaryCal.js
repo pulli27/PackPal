@@ -252,7 +252,7 @@ export default function SalaryCal() {
 
           <h2>Employee Information</h2>
           <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
-            + Add New Employee
+            + Add Employee Details
           </button>
 
           {addOpen && (

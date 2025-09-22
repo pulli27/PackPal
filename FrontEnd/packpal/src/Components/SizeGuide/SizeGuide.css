@@ -271,6 +271,7 @@
   font-size: 1rem;
   transition: all 0.3s ease;
 }
+
 .sizeguide-root .input-group input:focus {
   outline: none;
   border-color: #D4AF37;
