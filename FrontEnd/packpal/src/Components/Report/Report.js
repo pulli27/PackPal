@@ -12,6 +12,11 @@ const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const PRODUCTS_PATH = "/api/products";
 const ITEMS_PATH = "/api/inventory";
 
+/* ====== Branding / Assets ====== */
+const SYSTEM_NAME = "PackPal — Inventory & Analytics";
+const LOGO_PATH = "/logo.png";           // <-- put logo here (public/logo.png)
+const SIGNATURE_PATH = "/signature.png"; // <-- optional (public/signature.png)
+
 /* ---------------- Helpers ---------------- */
 const money = (n) => "LKR " + Number(n || 0).toLocaleString();
 
@@ -92,6 +97,21 @@ function inRange(dateStr, startStr, endStr) {
   return t >= s && t <= e;
 }
 const rafDelay = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+// fetch an image in /public as dataURL for jsPDF headers/footers
+async function loadImageAsDataURL(path) {
+  try {
+    const res = await fetch(path, { cache: "no-cache" });
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
 /* ======================================== */
 
@@ -180,7 +200,7 @@ export default function Report() {
       // ---------- Month range ----------
       const valueMonths = monthsBetween(start, end);
 
-      // ---------- Values per month (robust, date-safe) ----------
+      // ---------- Values per month ----------
       const prodValByMonth = new Map(valueMonths.map((m) => [m, 0]));
       const itemValByMonth = new Map(valueMonths.map((m) => [m, 0]));
 
@@ -194,7 +214,6 @@ export default function Report() {
         return ymKey(clampToMonth(d));
       }
 
-      // products → stock value per month
       for (const p of products) {
         const price = Number(discountedUnitPrice(p)) || 0;
         const stock = Number(p.stock) || 0;
@@ -206,7 +225,6 @@ export default function Report() {
         prodValByMonth.set(mk, (prodValByMonth.get(mk) || 0) + val);
       }
 
-      // items → value per month
       for (const it of items) {
         const qty = Number(it.quantity) || 0;
         const unit = Number(it.unitPrice) || 0;
@@ -360,7 +378,7 @@ export default function Report() {
       chartsRef.current.push(c);
     }
 
-    // Monthly Inventory Value — combined (filled) + products + items
+    // Monthly Inventory Value — combined + products + items
     if (valueRef.current) {
       const c = new Chart(valueRef.current.getContext("2d"), {
         type: "line",
@@ -375,7 +393,7 @@ export default function Report() {
               fill: true,
               tension: 0.18,
               borderWidth: 2,
-              order: 1, // behind
+              order: 1,
             },
             {
               label: "Products Value (LKR)",
@@ -464,12 +482,12 @@ export default function Report() {
     }
   }
 
-  /* ---------------- PDF generator (no duplicate breaks) ---------------- */
+  /* ---------------- PDF generator with LOGO + SIGNATURE ---------------- */
   async function generateReport() {
     const startDate = document.getElementById("startDate")?.value || "";
     const endDate = document.getElementById("endDate")?.value || "";
 
-    // Refresh charts for the range and wait one frame so canvases are painted
+    // Refresh charts and wait a frame so canvases are painted
     await loadAndRender({ start: startDate, end: endDate });
     await rafDelay();
 
@@ -483,14 +501,17 @@ export default function Report() {
 
     const today = new Date();
 
-    // Cover (force ONE page break after)
+    // ===== Cover (with your logo) =====
     const cover = document.createElement("section");
     cover.className = "pdf-cover";
     cover.style.breakAfter = "page";
     cover.style.pageBreakAfter = "always";
     cover.innerHTML = `
       <div class="brand-row">
-        <div class="brand-chip"><i class="fas fa-briefcase"></i> PackPal</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <img src="${LOGO_PATH}" alt="logo" style="height:40px;width:auto;object-fit:contain" />
+          <div class="brand-chip"><i class="fas fa-briefcase"></i> ${SYSTEM_NAME}</div>
+        </div>
         <div style="font-size:12px;color:#475569">Generated: ${today.toLocaleDateString()}</div>
       </div>
       <div class="cover-title">Inventory & Analytics Report</div>
@@ -506,7 +527,7 @@ export default function Report() {
     `;
     pdfRoot.appendChild(cover);
 
-    // TOC (force ONE page break after)
+    // ===== TOC =====
     const toc = document.createElement("section");
     toc.className = "pdf-section";
     toc.style.breakAfter = "page";
@@ -519,7 +540,7 @@ export default function Report() {
     `;
     pdfRoot.appendChild(toc);
 
-    // KPI section (no auto pagebreak here)
+    // ===== KPI section =====
     const kpiSec = document.createElement("section");
     kpiSec.className = "pdf-section";
     kpiSec.innerHTML = `
@@ -550,7 +571,7 @@ export default function Report() {
       kpiGrid.appendChild(k);
     });
 
-    // Figures
+    // ===== Figures (charts) =====
     const escapeHtml = (s = "") =>
       s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
     const tocList = toc.querySelector("#tocList");
@@ -592,6 +613,36 @@ export default function Report() {
       figNum++;
     }
 
+    // ===== Signature page =====
+    const sig = document.createElement("section");
+    sig.className = "pdf-section";
+    sig.style.breakBefore = "page";
+    sig.style.pageBreakBefore = "always";
+    sig.innerHTML = `
+      <div class="figure" style="padding-top:12px">
+        <div class="figure-title">Authorization</div>
+        <div style="margin-top:24px;display:flex;gap:60px;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div style="height:80px;display:flex;align-items:flex-end">
+              <img src="${SIGNATURE_PATH}" alt="signature" style="max-height:70px;width:auto;object-fit:contain" onerror="this.style.display='none'"/>
+            </div>
+            <div style="border-top:1px solid #cbd5e1;margin-top:10px;padding-top:6px;font-size:12px">
+              Authorized Signature
+              <div style="color:#64748b">Date: ${new Date().toISOString().slice(0,10)}</div>
+            </div>
+          </div>
+          <div style="flex:1;min-width:240px">
+            <div style="height:80px"></div>
+            <div style="border-top:1px solid #cbd5e1;margin-top:10px;padding-top:6px;font-size:12px">
+              Prepared By
+              <div style="color:#64748b">Date: ${new Date().toISOString().slice(0,10)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    pdfRoot.appendChild(sig);
+
     document.body.appendChild(pdfRoot);
 
     const opt = {
@@ -602,6 +653,9 @@ export default function Report() {
       html2canvas: { scale: 3, useCORS: true, backgroundColor: "#ffffff", logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
+
+    // Preload logo for page headers
+    const logoDataUrl = await loadImageAsDataURL(LOGO_PATH);
 
     try {
       await html2pdf()
@@ -614,29 +668,39 @@ export default function Report() {
           const pageW = pdf.internal.pageSize.getWidth();
           const pageH = pdf.internal.pageSize.getHeight();
 
-          // Fill TOC pages: assume first figure starts at page 3 (Cover + TOC)
-          const tocItems = tocList.querySelectorAll("li");
+          // TOC pages: assume first figure starts at page 3 (Cover + TOC)
+          const tocItems = toc.querySelectorAll("li");
           let figureStartPage = 3;
           tocItems.forEach((li, idx) => {
             li.querySelector("span:last-child").textContent = figureStartPage + idx;
           });
 
+          // Header/footer on each page + logo
           for (let i = 1; i <= total; i++) {
             pdf.setPage(i);
-            pdf.setFontSize(9);
-            pdf.setTextColor(120);
-            pdf.text("PackPal • Inventory & Analytics", 10, 8);
             pdf.setDrawColor(220);
             pdf.line(10, 10, pageW - 10, 10);
 
+            if (logoDataUrl) {
+              pdf.addImage(logoDataUrl, "PNG", 10, 12, 10, 10);
+              pdf.setFontSize(10);
+              pdf.setTextColor(30);
+              pdf.text(SYSTEM_NAME, 22, 19);
+            } else {
+              pdf.setFontSize(10);
+              pdf.setTextColor(30);
+              pdf.text(SYSTEM_NAME, 10, 19);
+            }
+
             const label = `Page ${i} of ${total}`;
+            pdf.setFontSize(9);
             pdf.setTextColor(120);
             pdf.text(new Date().toLocaleDateString(), 10, pageH - 6);
             pdf.text(`Period: ${startDate || "—"} → ${endDate || "—"}`, 10, pageH - 12);
             pdf.text(label, pageW - 10 - pdf.getTextWidth(label), pageH - 6);
           }
         })
-        .save();
+        .save(); // <-- triggers download automatically
     } finally {
       pdfRoot.remove();
     }
@@ -651,15 +715,19 @@ export default function Report() {
         <div className="header">
           <div className="container">
             <div className="header-content">
-              <div>
-                <div className="header-title">
-                  <i className="fas fa-chart-line" />
-                  Reports & Analytics
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <img src={LOGO_PATH} alt="logo" style={{ height: 28 }} />
+                <div>
+                  <div className="header-title">
+                    <i className="fas fa-chart-line" />
+                    Reports & Analytics
+                  </div>
+                  <p className="header-subtitle">{SYSTEM_NAME}</p>
                 </div>
-                <p className="header-subtitle">Comprehensive inventory and business intelligence</p>
               </div>
-              <button onClick={generateReport} className="btn-primary">
-                <i className="fas fa-download" /> Generate Report
+              {/* Renamed button — downloads PDF on click */}
+              <button onClick={generateReport} className="btn-primary" aria-label="Download report as PDF">
+                <i className="fas fa-file-arrow-down" /> Download PDF
               </button>
             </div>
           </div>
