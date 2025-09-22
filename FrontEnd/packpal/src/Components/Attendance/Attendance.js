@@ -6,18 +6,28 @@ import { api } from "../../lib/api";
 
 const toast = (m, t = "info") => alert(`${t.toUpperCase()}: ${m}`);
 
-// helpers for 0–31 validation
+// helpers for 0–31 validation (allow empty string while typing)
 const clamp0to31 = (v) => {
-  const n = Number(v ?? 0);
-  if (!Number.isFinite(n)) return 0;
+  if (v === "" || v === null || v === undefined) return "";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
   if (n < 0) return 0;
   if (n > 31) return 31;
   return n;
 };
+
 const anyOver31 = (obj) =>
   ["workingDays", "leaveAllowed", "noPayLeave", "leaveTaken"].some(
     (k) => Number(obj?.[k] ?? 0) > 31
   );
+
+// derive noPayLeave from leaveTaken and leaveAllowed (0–31, no negatives)
+const deriveNoPay = (leaveTaken, leaveAllowed) => {
+  const lt = Number(leaveTaken || 0);
+  const la = Number(leaveAllowed || 0);
+  const np = Math.max(0, lt - la);
+  return np > 31 ? 31 : np;
+};
 
 export default function Attendance() {
   const [employees, setEmployees] = useState([]);   // [{ EmpId, Emp_Name }]
@@ -28,8 +38,13 @@ export default function Attendance() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({
-    empId: "", period: "", workingDays: 0, overtimeHrs: 0,
-    leaveAllowed: 0, noPayLeave: 0, leaveTaken: 0, other: ""
+    empId: "",
+    period: "",
+    workingDays: "",
+    overtimeHrs: "",
+    leaveAllowed: "",
+    noPayLeave: "",
+    leaveTaken: ""
   });
 
   const [editing, setEditing] = useState(null);
@@ -37,11 +52,14 @@ export default function Attendance() {
   async function loadEmployees() {
     try {
       setEmpLoading(true);
-      // use the same endpoint used by Advance: /finances/min-list
       const { data } = await api.get("/finances/min-list");
       setEmployees(data.employees || []);
     } catch (e) {
-      toast(e?.response?.data?.message || "Failed to load employees (GET /finances/min-list). Check backend & CORS.", "error");
+      toast(
+        e?.response?.data?.message ||
+          "Failed to load employees (GET /finances/min-list). Check backend & CORS.",
+        "error"
+      );
     } finally {
       setEmpLoading(false);
     }
@@ -59,34 +77,51 @@ export default function Attendance() {
     }
   }
 
-  useEffect(() => { loadEmployees(); loadAttendance(); }, []);
+  useEffect(() => {
+    loadEmployees();
+    loadAttendance();
+  }, []);
 
   // CREATE
   async function create() {
     if (!form.empId || !form.period)
       return toast("Employee and period are required", "warning");
 
-    // enforce <= 31 for specific fields
-    if (anyOver31(form)) {
-      return toast("Working Days, Leave Allowed, No Pay Leave, and Leave Taken cannot exceed 31.", "warning");
+    // ensure auto field is consistent before submit
+    const autoNoPay = deriveNoPay(form.leaveTaken, form.leaveAllowed);
+    const payload = {
+      empId: form.empId,
+      period: form.period,
+      workingDays: Number(form.workingDays || 0),
+      overtimeHrs: Number(form.overtimeHrs || 0),
+      leaveAllowed: Number(form.leaveAllowed || 0),
+      noPayLeave: autoNoPay,
+      leaveTaken: Number(form.leaveTaken || 0)
+    };
+
+    if (anyOver31(payload)) {
+      return toast(
+        "Working Days, Leave Allowed, No Pay Leave, and Leave Taken cannot exceed 31.",
+        "warning"
+      );
     }
 
     try {
-      const payload = {
-        ...form,
-        workingDays: Number(form.workingDays || 0),
-        overtimeHrs: Number(form.overtimeHrs || 0),
-        leaveAllowed: Number(form.leaveAllowed || 0),
-        noPayLeave: Number(form.noPayLeave || 0),
-        leaveTaken: Number(form.leaveTaken || 0),
-      };
       const { data } = await api.post("/attendance", payload);
-      // append to end so newest is last
       setRows((p) => [...p, data]);
       setAddOpen(false);
-      setForm({ empId: "", period: "", workingDays: 0, overtimeHrs: 0, leaveAllowed: 0, noPayLeave: 0, leaveTaken: 0, other: "" });
-      // reload to include joined employee name if backend returns minimal doc
-      try { await loadAttendance(); } catch {}
+      setForm({
+        empId: "",
+        period: "",
+        workingDays: "",
+        overtimeHrs: "",
+        leaveAllowed: "",
+        noPayLeave: "",
+        leaveTaken: ""
+      });
+      try {
+        await loadAttendance();
+      } catch {}
       toast("Attendance added", "success");
     } catch (e) {
       toast(e?.response?.data?.message || "Add failed", "error");
@@ -98,26 +133,32 @@ export default function Attendance() {
     const id = editing?._id;
     if (!id) return toast("Missing _id", "error");
 
-    // enforce <= 31 for specific fields on edit
-    if (anyOver31(editing)) {
-      return toast("Working Days, Leave Allowed, No Pay Leave, and Leave Taken cannot exceed 31.", "warning");
+    // ensure auto field is consistent before submit
+    const autoNoPay = deriveNoPay(editing.leaveTaken, editing.leaveAllowed);
+    const payload = {
+      empId: editing.empId,
+      period: editing.period,
+      workingDays: Number(editing.workingDays || 0),
+      overtimeHrs: Number(editing.overtimeHrs || 0),
+      leaveAllowed: Number(editing.leaveAllowed || 0),
+      noPayLeave: autoNoPay,
+      leaveTaken: Number(editing.leaveTaken || 0)
+    };
+
+    if (anyOver31(payload)) {
+      return toast(
+        "Working Days, Leave Allowed, No Pay Leave, and Leave Taken cannot exceed 31.",
+        "warning"
+      );
     }
 
     try {
-      const payload = {
-        empId: editing.empId,
-        period: editing.period,
-        workingDays: Number(editing.workingDays || 0),
-        overtimeHrs: Number(editing.overtimeHrs || 0),
-        leaveAllowed: Number(editing.leaveAllowed || 0),
-        noPayLeave: Number(editing.noPayLeave || 0),
-        leaveTaken: Number(editing.leaveTaken || 0),
-        other: editing.other || "",
-      };
       const { data } = await api.put(`/attendance/${id}`, payload);
       setRows((p) => p.map((r) => (r._id === id ? data : r)));
       setEditing(null);
-      try { await loadAttendance(); } catch {}
+      try {
+        await loadAttendance();
+      } catch {}
       toast("Updated", "success");
     } catch (e) {
       toast(e?.response?.data?.message || "Update failed", "error");
@@ -136,11 +177,41 @@ export default function Attendance() {
     }
   }
 
-  // onChange helpers for add/edit numeric fields to clamp 0–31 live
-  const onAddNum = (key) => (e) =>
-    setForm((s) => ({ ...s, [key]: clamp0to31(e.target.value) }));
-  const onEditNum = (key) => (e) =>
-    setEditing((s) => ({ ...s, [key]: clamp0to31(e.target.value) }));
+  // onChange helpers for add/edit numeric fields
+  // For leaveAllowed/leaveTaken we also auto-recompute noPayLeave
+  const onAddNum = (key) => (e) => {
+    const vRaw = e.target.value;
+    const v = vRaw === "" ? "" : clamp0to31(vRaw);
+
+    setForm((s) => {
+      const next = { ...s, [key]: v };
+      if (key === "leaveAllowed" || key === "leaveTaken") {
+        const autoNoPay = deriveNoPay(
+          key === "leaveTaken" ? v : next.leaveTaken,
+          key === "leaveAllowed" ? v : next.leaveAllowed
+        );
+        next.noPayLeave = autoNoPay;
+      }
+      return next;
+    });
+  };
+
+  const onEditNum = (key) => (e) => {
+    const vRaw = e.target.value;
+    const v = vRaw === "" ? "" : clamp0to31(vRaw);
+
+    setEditing((s) => {
+      const next = { ...s, [key]: v };
+      if (key === "leaveAllowed" || key === "leaveTaken") {
+        const autoNoPay = deriveNoPay(
+          key === "leaveTaken" ? v : next.leaveTaken,
+          key === "leaveAllowed" ? v : next.leaveAllowed
+        );
+        next.noPayLeave = autoNoPay;
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="Attendance page-wrap">
@@ -151,11 +222,36 @@ export default function Attendance() {
 
         <div className="section">
           <div className="nav">
-            <NavLink to="/finance/employees"  className={({isActive}) => `tab-btn ${isActive ? "active" : ""}`}>👥 Employees</NavLink>
-            <NavLink to="/finance/attendance" className={({isActive}) => `tab-btn ${isActive ? "active" : ""}`}>📅 Attendance</NavLink>
-            <NavLink to="/finance/advance"    className={({isActive}) => `tab-btn ${isActive ? "active" : ""}`}>💰 Advance</NavLink>
-            <NavLink to="/finance/salary"     className={({isActive}) => `tab-btn ${isActive ? "active" : ""}`}>📊 Salary Management</NavLink>
-            <NavLink to="/finance/transfers"  className={({isActive}) => `tab-btn ${isActive ? "active" : ""}`}>💸 Salary Transfers</NavLink>
+            <NavLink
+              to="/finance/employees"
+              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
+            >
+              👥 Employees
+            </NavLink>
+            <NavLink
+              to="/finance/attendance"
+              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
+            >
+              📅 Attendance
+            </NavLink>
+            <NavLink
+              to="/finance/advance"
+              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
+            >
+              💰 Advance
+            </NavLink>
+            <NavLink
+              to="/finance/salary"
+              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
+            >
+              📊 Salary Management
+            </NavLink>
+            <NavLink
+              to="/finance/transfers"
+              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
+            >
+              💸 Salary Transfers
+            </NavLink>
           </div>
 
           <h2>Payroll Attendance</h2>
@@ -171,7 +267,9 @@ export default function Attendance() {
                   <label>Employee</label>
                   <select
                     value={form.empId}
-                    onChange={(e) => setForm((s) => ({ ...s, empId: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, empId: e.target.value }))
+                    }
                     disabled={empLoading}
                   >
                     <option value="">
@@ -191,11 +289,14 @@ export default function Attendance() {
                   <input
                     type="month"
                     value={form.period}
-                    onChange={(e) => setForm((s) => ({ ...s, period: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, period: e.target.value }))
+                    }
                   />
                 </div>
 
-                <div className="form-group"><label>Working Days</label>
+                <div className="form-group">
+                  <label>Working Days</label>
                   <input
                     type="number"
                     min={0}
@@ -204,14 +305,18 @@ export default function Attendance() {
                     onChange={onAddNum("workingDays")}
                   />
                 </div>
-                <div className="form-group"><label>Overtime Hours</label>
+                <div className="form-group">
+                  <label>Overtime Hours</label>
                   <input
                     type="number"
                     value={form.overtimeHrs}
-                    onChange={(e) => setForm((s) => ({ ...s, overtimeHrs: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, overtimeHrs: e.target.value }))
+                    }
                   />
                 </div>
-                <div className="form-group"><label>Leave Allowed</label>
+                <div className="form-group">
+                  <label>Leave Allowed</label>
                   <input
                     type="number"
                     min={0}
@@ -220,16 +325,18 @@ export default function Attendance() {
                     onChange={onAddNum("leaveAllowed")}
                   />
                 </div>
-                <div className="form-group"><label>No Pay Leave</label>
+                <div className="form-group">
+                  <label>No Pay Leave</label>
                   <input
                     type="number"
                     min={0}
                     max={31}
                     value={form.noPayLeave}
-                    onChange={onAddNum("noPayLeave")}
+                    readOnly
                   />
                 </div>
-                <div className="form-group"><label>Leave Taken</label>
+                <div className="form-group">
+                  <label>Leave Taken</label>
                   <input
                     type="number"
                     min={0}
@@ -238,17 +345,21 @@ export default function Attendance() {
                     onChange={onAddNum("leaveTaken")}
                   />
                 </div>
-                <div className="form-group"><label>Other</label>
-                  <input
-                    type="text"
-                    value={form.other}
-                    onChange={(e) => setForm((s) => ({ ...s, other: e.target.value }))}
-                  />
-                </div>
               </div>
 
-              <button className="btn btn-success" onClick={create} disabled={empLoading}>Save Attendance</button>
-              <button className="btn btn-warning" onClick={() => setAddOpen(false)}>Cancel</button>
+              <button
+                className="btn btn-success"
+                onClick={create}
+                disabled={empLoading}
+              >
+                Save Attendance
+              </button>
+              <button
+                className="btn btn-warning"
+                onClick={() => setAddOpen(false)}
+              >
+                Cancel
+              </button>
             </div>
           )}
 
@@ -262,31 +373,49 @@ export default function Attendance() {
                 <th>Leave Allowed</th>
                 <th>No Pay Leave</th>
                 <th>Leave Taken</th>
-                <th>Other</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="9">Loading…</td></tr>
-              ) : rows.length === 0 ? (
-                <tr><td colSpan="9">No attendance yet</td></tr>
-              ) : rows.map((r) => (
-                <tr key={r._id}>
-                  <td>{r.employeeName ? `${r.empId} - ${r.employeeName}` : r.empId}</td>
-                  <td>{r.period}</td>
-                  <td>{r.workingDays || 0}</td>
-                  <td>{r.overtimeHrs || 0}</td>
-                  <td>{r.leaveAllowed || 0}</td>
-                  <td>{r.noPayLeave || 0}</td>
-                  <td>{r.leaveTaken || 0}</td>
-                  <td>{r.other || ""}</td>
-                  <td className="actions">
-                    <button className="btn btn-warning" onClick={() => setEditing(r)}>Edit</button>
-                    <button className="btn btn-danger" onClick={() => remove(r._id)}>Delete</button>
-                  </td>
+                <tr>
+                  <td colSpan="8">Loading…</td>
                 </tr>
-              ))}
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan="8">No attendance yet</td>
+                </tr>
+              ) : (
+                rows.map((r) => (
+                  <tr key={r._id}>
+                    <td>
+                      {r.employeeName
+                        ? `${r.empId} - ${r.employeeName}`
+                        : r.empId}
+                    </td>
+                    <td>{r.period}</td>
+                    <td>{r.workingDays ?? 0}</td>
+                    <td>{r.overtimeHrs ?? 0}</td>
+                    <td>{r.leaveAllowed ?? 0}</td>
+                    <td>{r.noPayLeave ?? 0}</td>
+                    <td>{r.leaveTaken ?? 0}</td>
+                    <td className="actions">
+                      <button
+                        className="btn btn-warning"
+                        onClick={() => setEditing(r)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => remove(r._id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -296,10 +425,17 @@ export default function Attendance() {
       {editing && (
         <div
           className="att-modal"
-          onClick={(e) => { if (e.currentTarget === e.target) setEditing(null); }}
+          onClick={(e) => {
+            if (e.currentTarget === e.target) setEditing(null);
+          }}
         >
           <div className="att-modal-content">
-            <button className="att-modal-close" onClick={() => setEditing(null)}>×</button>
+            <button
+              className="att-modal-close"
+              onClick={() => setEditing(null)}
+            >
+              ×
+            </button>
             <h2>Edit Attendance</h2>
 
             <div className="form-grid">
@@ -307,7 +443,9 @@ export default function Attendance() {
                 <label>Employee</label>
                 <select
                   value={editing.empId || ""}
-                  onChange={(e) => setEditing((s) => ({ ...s, empId: e.target.value }))}
+                  onChange={(e) =>
+                    setEditing((s) => ({ ...s, empId: e.target.value }))
+                  }
                   disabled={empLoading}
                 >
                   <option value="">
@@ -327,64 +465,111 @@ export default function Attendance() {
                 <input
                   type="month"
                   value={editing.period || ""}
-                  onChange={(e) => setEditing((s) => ({ ...s, period: e.target.value }))}
+                  onChange={(e) =>
+                    setEditing((s) => ({ ...s, period: e.target.value }))
+                  }
                 />
               </div>
 
-              <div className="form-group"><label>Working Days</label>
+              <div className="form-group">
+                <label>Working Days</label>
                 <input
                   type="number"
                   min={0}
                   max={31}
-                  value={editing.workingDays ?? 0}
+                  value={
+                    editing.workingDays === 0
+                      ? 0
+                      : editing.workingDays === "" || editing.workingDays == null
+                      ? ""
+                      : editing.workingDays
+                  }
                   onChange={onEditNum("workingDays")}
                 />
               </div>
-              <div className="form-group"><label>Overtime Hours</label>
+              <div className="form-group">
+                <label>Overtime Hours</label>
                 <input
                   type="number"
-                  value={editing.overtimeHrs ?? 0}
-                  onChange={(e) => setEditing((s) => ({ ...s, overtimeHrs: e.target.value }))}
+                  value={
+                    editing.overtimeHrs === 0
+                      ? 0
+                      : editing.overtimeHrs === "" || editing.overtimeHrs == null
+                      ? ""
+                      : editing.overtimeHrs
+                  }
+                  onChange={(e) =>
+                    setEditing((s) => ({
+                      ...s,
+                      overtimeHrs: e.target.value === "" ? "" : e.target.value,
+                    }))
+                  }
                 />
               </div>
-              <div className="form-group"><label>Leave Allowed</label>
+              <div className="form-group">
+                <label>Leave Allowed</label>
                 <input
                   type="number"
                   min={0}
                   max={31}
-                  value={editing.leaveAllowed ?? 0}
+                  value={
+                    editing.leaveAllowed === 0
+                      ? 0
+                      : editing.leaveAllowed === "" ||
+                        editing.leaveAllowed == null
+                      ? ""
+                      : editing.leaveAllowed
+                  }
                   onChange={onEditNum("leaveAllowed")}
                 />
               </div>
-              <div className="form-group"><label>No Pay Leave</label>
+              <div className="form-group">
+                <label>No Pay Leave</label>
                 <input
                   type="number"
                   min={0}
                   max={31}
-                  value={editing.noPayLeave ?? 0}
-                  onChange={onEditNum("noPayLeave")}
+                  value={
+                    editing.noPayLeave === 0
+                      ? 0
+                      : editing.noPayLeave === "" || editing.noPayLeave == null
+                      ? ""
+                      : editing.noPayLeave
+                  }
+                  readOnly
                 />
               </div>
-              <div className="form-group"><label>Leave Taken</label>
+              <div className="form-group">
+                <label>Leave Taken</label>
                 <input
                   type="number"
                   min={0}
                   max={31}
-                  value={editing.leaveTaken ?? 0}
+                  value={
+                    editing.leaveTaken === 0
+                      ? 0
+                      : editing.leaveTaken === "" || editing.leaveTaken == null
+                      ? ""
+                      : editing.leaveTaken
+                  }
                   onChange={onEditNum("leaveTaken")}
-                />
-              </div>
-              <div className="form-group"><label>Other</label>
-                <input
-                  type="text"
-                  value={editing.other || ""}
-                  onChange={(e) => setEditing((s) => ({ ...s, other: e.target.value }))}
                 />
               </div>
             </div>
 
-            <button className="btn btn-success" onClick={saveEdit} disabled={empLoading}>Save Changes</button>
-            <button className="btn btn-warning" onClick={() => setEditing(null)}>Cancel</button>
+            <button
+              className="btn btn-success"
+              onClick={saveEdit}
+              disabled={empLoading}
+            >
+              Save Changes
+            </button>
+            <button
+              className="btn btn-warning"
+              onClick={() => setEditing(null)}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
