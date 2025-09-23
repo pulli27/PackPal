@@ -83,11 +83,11 @@
   gap:15px;
   margin-bottom:20px;
 }
-.Attendance .form-group{ display:flex; flex-direction:column; }
-.Attendance label{ font-weight:600; color:#2c3e50; margin-bottom:5px; }
+.Attendance .form-group{ display:flex; flex-direction:column;}
+.Attendance label{ font-weight:600; color:#2c3e50; margin-bottom:5px;}
 .Attendance input,
 .Attendance select{
-  padding:12px;
+  padding:8px;
   border:2px solid #e0e6ed;
   border-radius:8px;
   font-size:14px;
@@ -116,8 +116,8 @@
   box-shadow:0 10px 20px rgba(0,0,0,.2);
 }
 .Attendance .btn-primary{ background:linear-gradient(45deg,#354fc5,#15122f); }
-.Attendance .btn-success{ background:linear-gradient(45deg,#2281ad,#3f8d9e); }
-.Attendance .btn-warning{ background:linear-gradient(45deg,#22b845,#1bb82a); }
+.Attendance .btn-success{ background:linear-gradient(45deg,hsl(199, 67%, 41%),#3f8d9e); }
+.Attendance .btn-warning{ background:linear-gradient(45deg,#1e7b35,#1e7b35); }
 .Attendance .btn-danger { background:linear-gradient(45deg,#e72121,#e72121); }
 
 /* Left-aligned action rows (Add, Save/Cancel) */
@@ -140,7 +140,7 @@
   box-shadow:0 5px 15px rgba(0,0,0,.08);
 }
 .Attendance th{
-  background:linear-gradient(45deg,#667eea,#764ba2);
+  background:linear-gradient(45deg,#354fc5,#15122f);
   color:#fff;
   padding:15px;
   text-align:left;

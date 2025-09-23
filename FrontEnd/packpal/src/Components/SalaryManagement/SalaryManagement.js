@@ -1,4 +1,3 @@
-// FrontEnd/src/components/SalaryManagement/SalaryManagement.jsx
 import React, { useEffect, useState } from "react";
 import "./SalaryManagement.css";
 import Sidebar from "../Sidebar/Sidebarsanu";
@@ -253,7 +252,7 @@ export default function SalaryManagement() {
   }
 
   return (
-    <div className="salarycal">
+    <div className="salarymgmt">{/* <- different page wrapper */}
       <Sidebar />
       <div className="container">
         <h1>Employee Salary Management</h1>
