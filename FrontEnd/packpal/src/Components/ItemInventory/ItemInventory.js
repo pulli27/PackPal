@@ -310,7 +310,7 @@ export default function ItemInventory() {
       if (m) m.style.display = "none";
     }
 
-    /* ===== vector icons + export/print/download (unchanged) ===== */
+    /* ===== vector icons + export/print/download ===== */
     function drawReceiptIcon(doc, x, y) {
       doc.setDrawColor(53, 99, 255);
       doc.setLineWidth(0.4);
@@ -338,6 +338,7 @@ export default function ItemInventory() {
       doc.line(x+4, y+2, x+4, y+4);
     }
 
+    // ***************  MODIFIED: exportToPDF with logo LEFT and text block RIGHT  ***************
     async function exportToPDF() {
       try {
         await ensurePdfTools();
@@ -345,20 +346,99 @@ export default function ItemInventory() {
         const jsPDF = getJsPDFCtor();
         const doc = new jsPDF("p", "mm", "a4");
 
+        // Colors & layout
+        const PAGE = { left: 14, right: 196, top: 12, width: 210, height: 297 };
+        const HEADER_HEIGHT = 24;             // height used by letterhead block
+        const CONTENT_TOP = HEADER_HEIGHT + 10;
+
+        // Your org details (edit as needed)
+        const ORG = {
+          name: "PackPal (Pvt) Ltd",
+          address: "No. 42, Elm Street, Colombo",
+          email: "hello@packpal.lk"
+        };
+
         const BLUE = [53, 99, 255];
         const BLUE_HEAD = [64, 97, 239];
         const GREY = [110, 119, 129];
         const ORANGE = [244, 143, 64];
         const RED = [231, 76, 60];
 
-        drawReceiptIcon(doc, 14, 9);
+        // Try load logo from /public (adjust file name if needed)
+        let logoImg = null;
+        try {
+          const img = new Image();
+          img.src = "/new logo.png"; // <-- put the file in public/
+          await img.decode();
+          logoImg = img;
+        } catch (e) {
+          // ignore -> use placeholder
+        }
+
+        // Draw the company letterhead on the current page (logo LEFT, text block RIGHT)
+        function drawLetterhead(docInstance) {
+          const x = PAGE.left;
+          const y = PAGE.top;
+
+          const LOGO_W = 18, LOGO_H = 18;
+
+          // Logo stays on LEFT
+          if (logoImg) {
+            docInstance.addImage(logoImg, "PNG", x, y, LOGO_W, LOGO_H);
+          } else {
+            // simple placeholder if logo not found
+            docInstance.setDrawColor(210, 175, 55);
+            docInstance.setLineWidth(0.6);
+            docInstance.circle(x + LOGO_W/2, y + LOGO_H/2, 8, "S");
+            docInstance.setFillColor(210, 175, 55);
+            docInstance.circle(x + LOGO_W/2, y + LOGO_H/2, 3.2, "F");
+          }
+
+          // RIGHT-aligned text block
+          const textRightX = PAGE.right; // align to right margin
+          const ty = y + 4.5;
+
+          docInstance.setFontSize(14);
+          docInstance.setTextColor(25, 25, 25);
+          docInstance.setFont(undefined, "bold");
+          docInstance.text(ORG.name, textRightX, ty, { align: "right" });
+
+          docInstance.setFontSize(10);
+          docInstance.setFont(undefined, "normal");
+          docInstance.setTextColor(80, 86, 100);
+          docInstance.text(ORG.address, textRightX, ty + 6, { align: "right" });
+          docInstance.text(ORG.email,   textRightX, ty + 12, { align: "right" });
+
+          // Divider line across the page
+          docInstance.setDrawColor(210, 210, 210);
+          docInstance.setLineWidth(0.4);
+          docInstance.line(PAGE.left, y + HEADER_HEIGHT, PAGE.right, y + HEADER_HEIGHT);
+        }
+
+        // Hook to run on every new page (AutoTable calls this automatically)
+        const headerHook = () => {
+          drawLetterhead(doc);
+          // Page number at bottom-right
+          const pageStr = `Page ${doc.getNumberOfPages()}`;
+          doc.setFontSize(9);
+          doc.setTextColor(120, 120, 120);
+          doc.text(pageStr, PAGE.right, PAGE.height - 8, { align: "right" });
+        };
+
+        // First page: letterhead + report title
+        drawLetterhead(doc);
+
         doc.setFontSize(16);
         doc.setTextColor(40, 40, 40);
-        doc.text(" Inventory Management Report", 24, 16);
+        doc.setFont(undefined, "bold");
+        doc.text("Inventory Management Report", PAGE.left + 15, CONTENT_TOP - 10);
+
         doc.setFontSize(10);
         doc.setTextColor(...GREY);
-        doc.text(`Generated on ${data.summary.reportDate}`, 24, 22);
+        doc.setFont(undefined, "normal");
+        doc.text(`Generated on ${data.summary.reportDate}`, PAGE.left + 15, CONTENT_TOP - 3);
 
+        // KPI cards
         const cards = [
           [String(data.summary.totalItems), "TOTAL ITEMS"],
           [data.summary.totalQuantity.toLocaleString(), "TOTAL QUANTITY"],
@@ -367,7 +447,7 @@ export default function ItemInventory() {
           [`LKR ${Number(data.summary.avgUnitPrice || 0).toFixed(2)}`, "AVG UNIT PRICE"],
           [String(data.summary.fixedSafetyStock), "SAFETY STOCK"],
         ];
-        let cx = 14, cy = 30;
+        let cx = PAGE.left, cy = CONTENT_TOP + 10;
         const cw = 60, ch = 22, r = 3, gapX = 6, gapY = 6;
 
         cards.forEach(([num, label, danger], i) => {
@@ -384,19 +464,22 @@ export default function ItemInventory() {
 
           cx += cw + gapX;
           if ((i + 1) % 3 === 0) {
-            cx = 14;
+            cx = PAGE.left;
             cy += ch + gapY;
           }
         });
 
-        let y = cy + 6;
-        drawWarningIcon(doc, 14, y - 8);
+        // Low stock section
+        let y = cy + 8;
+        drawWarningIcon(doc, PAGE.left, y - 8);
         doc.setTextColor(40, 40, 40);
         doc.setFontSize(14);
-        doc.text("Low Stock Alert", 24, y);
+        doc.setFont(undefined, "bold");
+        doc.text("Low Stock Alert", PAGE.left + 10, y);
         y += 2;
         doc.setDrawColor(...ORANGE);
-        doc.line(14, y, 196, y);
+        doc.setLineWidth(0.3);
+        doc.line(PAGE.left, y, PAGE.right, y);
         y += 4;
 
         if (data.lowStockItems.length) {
@@ -411,23 +494,27 @@ export default function ItemInventory() {
             styles: { fontSize: 10, cellPadding: 3 },
             headStyles: { fillColor: RED, textColor: 255, halign: "left" },
             theme: "grid",
-            margin: { left: 14, right: 14 },
+            margin: { left: PAGE.left, right: PAGE.left, top: CONTENT_TOP }, // reserve header area
+            didDrawPage: headerHook,
           });
-          y = doc.lastAutoTable.finalY + 20;
+          y = doc.lastAutoTable.finalY + 18;
         } else {
           doc.setFontSize(10);
           doc.setTextColor(100, 100, 100);
-          doc.text("Great news — no items are currently below their reorder level.", 14, y);
-          y += 20;
+          doc.setFont(undefined, "normal");
+          doc.text("Great news — no items are currently below their reorder level.", PAGE.left, y);
+          y += 18;
         }
 
-        drawBoxIcon(doc, 14, y - 8);
+        // Complete Inventory
+        drawBoxIcon(doc, PAGE.left, y - 8);
         doc.setTextColor(40, 40, 40);
         doc.setFontSize(14);
-        doc.text("Complete Inventory", 24, y);
+        doc.setFont(undefined, "bold");
+        doc.text("Complete Inventory", PAGE.left + 10, y);
         y += 2;
         doc.setDrawColor(...BLUE);
-        doc.line(14, y, 196, y);
+        doc.line(PAGE.left, y, PAGE.right, y);
         y += 4;
 
         doc.autoTable({
@@ -441,21 +528,24 @@ export default function ItemInventory() {
           styles: { fontSize: 10, cellPadding: 3 },
           headStyles: { fillColor: BLUE_HEAD, textColor: 255, halign: "left" },
           theme: "grid",
-          margin: { left: 14, right: 14 },
+          margin: { left: PAGE.left, right: PAGE.left, top: CONTENT_TOP }, // reserve header area
           columnStyles: { 2: { cellWidth: 52 } },
           didParseCell: function (hook) {
             if (hook.section === "body" && hook.row.index % 2 === 0) {
               hook.cell.styles.fillColor = [247, 248, 255];
             }
           },
+          didDrawPage: headerHook,
         });
 
+        // Save PDF
         doc.save(`inventory_report_${new Date().toISOString().split("T")[0]}.pdf`);
       } catch (err) {
         console.error(err);
         alert("PDF generation failed. Check console for details.");
       }
     }
+    // ***************  /MODIFIED  ***************
 
     function printReport() {
       const src = $("reportContent")?.innerHTML || "";
@@ -464,9 +554,9 @@ export default function ItemInventory() {
         <!DOCTYPE html><html><head><title>Inventory Report</title>
         <meta charset="utf-8"/>
         <style>
-          body{font-family:Arial, sans-serif;margin:0;padding:20px;color:#333}
-          .report-header{text-align:center;margin-bottom:30px;border-bottom:2px solid #000;padding-bottom:15px}
-          .report-title{font-size:24px;margin-bottom:10px}
+          body{font-family:Arial, sans-serif;margin:0;padding:50px;color:#333}
+          .report-header{text-align:center;margin-bottom:100px;border-bottom:2px solid #000;padding-bottom:15px}
+          .report-title{font-size:24px;margin-bottom:100px}
           .report-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0}
           .report-stat{text-align:center;padding:15px;border:1px solid #333}
           .report-stat-number{font-size:18px;font-weight:bold}
@@ -505,14 +595,14 @@ export default function ItemInventory() {
     const lead = $("leadTimeDays");
     const form = $("itemForm");
 
-    // --- NEW: inputs we validate ---
+    // --- inputs we validate (single declarations) ---
     const nameInput  = $("itemName");
     const qtyInput   = $("quantity");
     const priceInput = $("unitPrice");
     const avgInput   = avg;   // avgDailyUsage
     const leadInput  = lead;  // leadTimeDays
 
-    // --- NEW: helpers for validation ---
+    // --- helpers for validation ---
     function validateNameField() {
       if (!nameInput) return true;
       const clean = (nameInput.value || "").trim();
@@ -553,9 +643,7 @@ export default function ItemInventory() {
     }
     function sanitizePasteToDigits(e) {
       const txtRaw = (e.clipboardData?.getData("text") ?? "");
-      // Keep digits only, drop leading zeros to avoid "0"
       let txt = txtRaw.replace(/[^\d]/g, "");
-      // Remove leading zeros
       txt = txt.replace(/^0+/, "");
       if (txt !== "") {
         e.preventDefault();
@@ -636,7 +724,6 @@ export default function ItemInventory() {
         leadTimeDays: parseInt($("leadTimeDays").value, 10) || 0,
       };
 
-      // guards: strict positive quantity, integers for qty/avg/lead; non-negative price
       if (!Number.isInteger(data.quantity) || data.quantity <= 0) {
         alert("Quantity must be a positive whole number (greater than 0).");
         $("quantity")?.focus();
@@ -701,26 +788,22 @@ export default function ItemInventory() {
     searchInput?.addEventListener("input", onSearch);
     form?.addEventListener("submit", onSubmit);
 
-    // --- NEW: attach validation listeners ---
+    // --- attach validation listeners ---
     nameInput?.addEventListener("input", sanitizeNameOnInput);
 
     // Quantity (integers only); disallow 0; strip leading zeros
     qtyInput?.addEventListener("keydown", (e) => {
-      // block scientific/ops keys
       preventInvalidNumberKeys(e, { allowDot: false });
-      // prevent entering 0 as the very first character
       if (e.key === "0" && (e.target.value === "" || e.target.selectionStart === 0)) {
         e.preventDefault();
       }
     });
     qtyInput?.addEventListener("input", () => {
-      // strip leading zeros
       if (qtyInput.value) qtyInput.value = qtyInput.value.replace(/^0+/, "");
       validateQuantityField();
     });
     qtyInput?.addEventListener("paste", sanitizePasteToDigits);
     qtyInput?.addEventListener("blur", () => {
-      // final guard: empty or non-positive -> empty so native validity kicks in with min=1
       const n = parseInt(qtyInput.value, 10);
       if (!Number.isInteger(n) || n <= 0) qtyInput.value = "";
       validateQuantityField();
@@ -736,12 +819,12 @@ export default function ItemInventory() {
       if (!ok) priceInput.value = v.replace(/[^\d.]/g, "");
     });
 
-    // NEW: Avg Daily Usage (integers only)
+    // Avg Daily Usage (integers only)
     avgInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
     avgInput?.addEventListener("paste", sanitizePasteToDigits);
     avgInput?.addEventListener("blur", () => { if (avgInput) avgInput.value = (avgInput.value || "").replace(/[^\d]/g, ""); });
 
-    // NEW: Lead Time (integers only)
+    // Lead Time (integers only)
     leadInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
     leadInput?.addEventListener("paste", sanitizePasteToDigits);
     leadInput?.addEventListener("blur", () => { if (leadInput) leadInput.value = (leadInput.value || "").replace(/[^\d]/g, ""); });
