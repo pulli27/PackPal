@@ -66,7 +66,7 @@ app.use("/api/inventory",     inventoryRoutes);
 app.use("/api/purchases",     purchaseRoutes);
 app.use("/api/products",      productRoutes);
 //sasangi
-app.use("/carts",             cartRoutes);
+app.use("/api/carts",             cartRoutes);
 app.use("/api/transactions",      transactionRoutes);
 //isumi
 app.use("/users",             userRouter);

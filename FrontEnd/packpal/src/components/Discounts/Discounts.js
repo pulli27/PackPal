@@ -4,7 +4,7 @@ import "./Discounts.css";
 import Sidebarsa from "../Sidebar/Sidebarsa";
 
 /* ===== ONE PLACE TO EDIT ===== */
-const URL = "http://localhost:5000/carts";
+const URL = "http://localhost:5000/api/carts";
 
 /* ===== Helpers ===== */
 const money = (n) =>

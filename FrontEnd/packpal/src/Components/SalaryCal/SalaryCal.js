@@ -6,37 +6,42 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import { api } from "../../lib/api";
 
 const rs = (n) => `Rs. ${Math.round(Number(n || 0)).toLocaleString()}`;
-const toast = (msg, type = "info") => alert(`${type.toUpperCase()}: ${msg}`);
+const toast = (msg, type = "info") =>
+  alert(`${(type?.toUpperCase?.() || String(type)).toUpperCase()}: ${msg}`);
 
-// === Validation helpers ===
-// Final (strict) sanitizer: letters + single spaces, trimmed
+// --- Sanitizers / Validators ---
 const sanitizeLettersOnly = (v) =>
   String(v || "")
     .replace(/[^A-Za-z\s]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 
-// Live (typing) sanitizer: letters + spaces, collapse multiples, DO NOT trim
 const sanitizeLettersOnlyLive = (v) =>
   String(v || "")
     .replace(/[^A-Za-z\s]/g, "")
     .replace(/\s{2,}/g, " ");
 
-// Validator: letters and single spaces between words
 const isLettersOnly = (v) => {
   const s = String(v || "").trim();
   if (!s) return false;
   return /^[A-Za-z]+(?:\s[A-Za-z]+)*$/.test(s);
 };
 
-// Digits only for account no
 const sanitizeDigitsOnly = (v) => String(v || "").replace(/\D/g, "");
 const isDigitsOnly = (v) => /^[0-9]+$/.test(String(v || ""));
 
-// Block scientific notation chars in numeric fields
 const blockExpKeys = (e) => {
   if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
 };
+
+// Fixed list of designations
+const DESIGNATION_OPTIONS = [
+  "Finance Manager",
+  "Inventory Manager",
+  "Cart Manager",
+  "User Manager",
+  "Product Manager",
+];
 
 export default function SalaryCal() {
   const [rows, setRows] = useState([]);
@@ -79,16 +84,17 @@ export default function SalaryCal() {
     load();
   }, []);
 
-  // ---------- CREATE ----------
+  // Create
   async function create() {
     if (!form.EmpId || !form.Emp_Name || !form.Base_Sal)
       return toast("EmpId, Name, Salary required", "warning");
 
-    // validate final (trimmed) values
     if (!isLettersOnly(form.Emp_Name))
       return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
+
     if (form.Designation && !isLettersOnly(form.Designation))
-      return toast("Designation: letters only (A–Z), no numbers/symbols.", "warning");
+      return toast("Designation: letters only (A–Z).", "warning");
+
     if (form.Bank_Name && !isLettersOnly(form.Bank_Name))
       return toast("Bank Name: letters only (A–Z), no numbers/symbols.", "warning");
     if (form.branch && !isLettersOnly(form.branch))
@@ -100,7 +106,6 @@ export default function SalaryCal() {
     try {
       const payload = {
         ...form,
-        // finalize by trimming here
         Emp_Name: sanitizeLettersOnly(form.Emp_Name),
         Designation: sanitizeLettersOnly(form.Designation),
         Bank_Name: sanitizeLettersOnly(form.Bank_Name),
@@ -127,7 +132,7 @@ export default function SalaryCal() {
     }
   }
 
-  // ---------- EDIT SAVE ----------
+  // Save Edit
   async function saveEdit() {
     const id = editing?._id;
     if (!id) return toast("Update failed: missing _id", "error");
@@ -135,7 +140,6 @@ export default function SalaryCal() {
     if (!editing.EmpId || !editing.Emp_Name || editing.Base_Sal === "")
       return toast("EmpId, Name, Salary required", "warning");
 
-    // validate final (trimmed) values
     if (!isLettersOnly(editing.Emp_Name))
       return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
     if (editing.Designation && !isLettersOnly(editing.Designation))
@@ -150,7 +154,6 @@ export default function SalaryCal() {
 
     const payload = {
       EmpId: editing.EmpId,
-      // finalize by trimming here
       Emp_Name: sanitizeLettersOnly(editing.Emp_Name),
       Designation: sanitizeLettersOnly(editing.Designation),
       Epf_No: editing.Epf_No,
@@ -187,22 +190,21 @@ export default function SalaryCal() {
     }
   }
 
-  // Sanitizing on type for Add form fields (LIVE: keep spaces)
+  // On-change handlers
   const handleAddChange = (k, val) => {
     let v = val;
     if (k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch") {
-      v = sanitizeLettersOnlyLive(v); // ← no trim while typing
+      v = sanitizeLettersOnlyLive(v);
     }
     if (k === "Acc_No") v = sanitizeDigitsOnly(v);
-    if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, ""); // strips e/E/+/- and any symbols
+    if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, "");
     setForm((s) => ({ ...s, [k]: v }));
   };
 
-  // Sanitizing on type for Edit form fields (LIVE: keep spaces)
   const handleEditChange = (k, val) => {
     let v = val;
     if (k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch") {
-      v = sanitizeLettersOnlyLive(v); // ← no trim while typing
+      v = sanitizeLettersOnlyLive(v);
     }
     if (k === "Acc_No") v = sanitizeDigitsOnly(v);
     if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, "");
@@ -218,83 +220,134 @@ export default function SalaryCal() {
 
         <div className="section">
           <div className="nav">
-            <NavLink
-              to="/finance/employees"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/employees" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               👥 Employees
             </NavLink>
-            <NavLink
-              to="/finance/attendance"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/attendance" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               📅 Attendance
             </NavLink>
-            <NavLink
-              to="/finance/advance"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/advance" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               💰 Advance
             </NavLink>
-            <NavLink
-              to="/finance/salary"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/salary" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               📊 Salary Management
             </NavLink>
-            <NavLink
-              to="/finance/transfers"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/transfers" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               💸 Salary Transfers
             </NavLink>
           </div>
 
           <h2>Employee Information</h2>
           <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
-            + Add New Employee
+            + Add Employee Details
           </button>
 
           {addOpen && (
             <div style={{ marginTop: 20 }}>
-              <div className="form-grid">
-                {[
-                  ["EmpId", "Employee ID"],
-                  ["Emp_Name", "Name"],
-                  ["Designation", "Designation"],
-                  ["Epf_No", "EPF No"],
-                  ["Base_Sal", "Basic Salary"],
-                  ["Bank_Name", "Bank Name"],
-                  ["branch", "Branch"],
-                  ["Acc_No", "Account No"],
-                ].map(([k, label]) => (
-                  <div className="form-group" key={k}>
-                    <label>{label}</label>
-                    <input
-                      type={k === "Base_Sal" ? "number" : "text"}
-                      value={form[k]}
-                      onChange={(e) => handleAddChange(k, e.target.value)}
-                      inputMode={k === "Base_Sal" || k === "Acc_No" ? "decimal" : "text"}
-                      step={k === "Base_Sal" ? "0.01" : undefined}
-                      onKeyDown={
-                        k === "Base_Sal" || k === "Acc_No" ? blockExpKeys : undefined
-                      }
-                      pattern={
-                        k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch"
-                          ? "[A-Za-z ]+"
-                          : undefined
-                      }
-                    />
-                  </div>
-                ))}
+              {/* Ordered fields: EmpId, Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No */}
+              <div className="form-grid two-col">
+                {/* 1. EmpId */}
+                <div className="form-group">
+                  <label>Employee ID</label>
+                  <input
+                    type="text"
+                    value={form.EmpId}
+                    onChange={(e) => handleAddChange("EmpId", e.target.value)}
+                  />
+                </div>
+
+                {/* 2. Name */}
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    value={form.Emp_Name}
+                    onChange={(e) => handleAddChange("Emp_Name", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 3. Designation (next to Name if space allows) */}
+                <div className="form-group">
+                  <label>Designation</label>
+                  <select
+                    value={form.Designation}
+                    onChange={(e) => handleAddChange("Designation", e.target.value)}
+                  >
+                    <option value="">-- Select designation --</option>
+                    {DESIGNATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. EPF No */}
+                <div className="form-group">
+                  <label>EPF No</label>
+                  <input
+                    type="text"
+                    value={form.Epf_No}
+                    onChange={(e) => handleAddChange("Epf_No", e.target.value)}
+                  />
+                </div>
+
+                {/* 5. Basic Salary */}
+                <div className="form-group">
+                  <label>Basic Salary</label>
+                  <input
+                    type="number"
+                    value={form.Base_Sal}
+                    onChange={(e) => handleAddChange("Base_Sal", e.target.value)}
+                    inputMode="decimal"
+                    step="0.01"
+                    onKeyDown={blockExpKeys}
+                  />
+                </div>
+
+                {/* 6. Bank Name */}
+                <div className="form-group">
+                  <label>Bank Name</label>
+                  <input
+                    type="text"
+                    value={form.Bank_Name}
+                    onChange={(e) => handleAddChange("Bank_Name", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 7. Branch */}
+                <div className="form-group">
+                  <label>Branch</label>
+                  <input
+                    type="text"
+                    value={form.branch}
+                    onChange={(e) => handleAddChange("branch", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 8. Account No */}
+                <div className="form-group">
+                  <label>Account No</label>
+                  <input
+                    type="text"
+                    value={form.Acc_No}
+                    onChange={(e) => handleAddChange("Acc_No", e.target.value)}
+                    inputMode="decimal"
+                    onKeyDown={blockExpKeys}
+                  />
+                </div>
               </div>
+
               <button className="btn btn-success" onClick={create}>
                 Save Employee
               </button>
-              <button
-                className="btn btn-warning"
-                onClick={() => setAddOpen(false)}
-              >
+              <button className="btn btn-warning" onClick={() => setAddOpen(false)}>
                 Cancel
               </button>
             </div>
@@ -329,9 +382,7 @@ export default function SalaryCal() {
                     <td>{r.Designation || ""}</td>
                     <td>{r.Epf_No || ""}</td>
                     <td>{rs(r.Base_Sal)}</td>
-                    <td>
-                      {[r.Bank_Name, r.branch, r.Acc_No].filter(Boolean).join(" - ")}
-                    </td>
+                    <td>{[r.Bank_Name, r.branch, r.Acc_No].filter(Boolean).join(" - ")}</td>
                     <td className="actions">
                       <button
                         className="btn btn-warning"
@@ -376,42 +427,109 @@ export default function SalaryCal() {
             </div>
 
             <div className="modal-body">
-              {[
-                "EmpId",
-                "Emp_Name",
-                "Designation",
-                "Epf_No",
-                "Base_Sal",
-                "Bank_Name",
-                "branch",
-                "Acc_No",
-              ].map((k) => (
-                <div className="form-group" key={k}>
-                  <label>{k}</label>
+              {/* Ordered fields: EmpId, Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No */}
+              <div className="form-grid two-col">
+                {/* 1. EmpId */}
+                <div className="form-group">
+                  <label>Employee ID</label>
                   <input
-                    type={k === "Base_Sal" ? "number" : "text"}
-                    value={editing?.[k] ?? ""}
-                    onChange={(e) => handleEditChange(k, e.target.value)}
-                    inputMode={k === "Base_Sal" || k === "Acc_No" ? "decimal" : "text"}
-                    step={k === "Base_Sal" ? "0.01" : undefined}
-                    onKeyDown={
-                      k === "Base_Sal" || k === "Acc_No" ? blockExpKeys : undefined
-                    }
-                    pattern={
-                      k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch"
-                        ? "[A-Za-z ]+"
-                        : undefined
-                    }
+                    type="text"
+                    value={editing?.EmpId ?? ""}
+                    onChange={(e) => handleEditChange("EmpId", e.target.value)}
                   />
                 </div>
-              ))}
+
+                {/* 2. Name */}
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    value={editing?.Emp_Name ?? ""}
+                    onChange={(e) => handleEditChange("Emp_Name", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 3. Designation (next to Name) */}
+                <div className="form-group">
+                  <label>Designation</label>
+                  <select
+                    value={editing?.Designation ?? ""}
+                    onChange={(e) => handleEditChange("Designation", e.target.value)}
+                  >
+                    <option value="">-- Select designation --</option>
+                    {DESIGNATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. EPF No */}
+                <div className="form-group">
+                  <label>EPF No</label>
+                  <input
+                    type="text"
+                    value={editing?.Epf_No ?? ""}
+                    onChange={(e) => handleEditChange("Epf_No", e.target.value)}
+                  />
+                </div>
+
+                {/* 5. Basic Salary */}
+                <div className="form-group">
+                  <label>Basic Salary</label>
+                  <input
+                    type="number"
+                    value={editing?.Base_Sal ?? ""}
+                    onChange={(e) => handleEditChange("Base_Sal", e.target.value)}
+                    inputMode="decimal"
+                    step="0.01"
+                    onKeyDown={blockExpKeys}
+                  />
+                </div>
+
+                {/* 6. Bank Name */}
+                <div className="form-group">
+                  <label>Bank Name</label>
+                  <input
+                    type="text"
+                    value={editing?.Bank_Name ?? ""}
+                    onChange={(e) => handleEditChange("Bank_Name", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 7. Branch */}
+                <div className="form-group">
+                  <label>Branch</label>
+                  <input
+                    type="text"
+                    value={editing?.branch ?? ""}
+                    onChange={(e) => handleEditChange("branch", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 8. Account No */}
+                <div className="form-group">
+                  <label>Account No</label>
+                  <input
+                    type="text"
+                    value={editing?.Acc_No ?? ""}
+                    onChange={(e) => handleEditChange("Acc_No", e.target.value)}
+                    inputMode="decimal"
+                    onKeyDown={blockExpKeys}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="modal-actions">
-              <button
-                className="btn btn-warning"
-                onClick={() => setEditing(null)}
-              >
+              <button className="btn btn-warning" onClick={() => setEditing(null)}>
                 Cancel
               </button>
               <button className="btn btn-success" onClick={saveEdit}>

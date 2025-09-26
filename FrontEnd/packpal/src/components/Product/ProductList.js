@@ -5,7 +5,8 @@ import "./ProductList.css";
 import Sidebarsa from "../Sidebar/Sidebarsa";
 
 /* ===================== ONE PLACE TO EDIT ===================== */
-const URL = "http://localhost:5000/carts";
+/* If your backend uses a different route, change it here */
+const URL = "http://localhost:5000/api/products";
 
 /* ===================== Helpers ===================== */
 const money = (n) =>
@@ -26,17 +27,22 @@ const effectivePrice = (p) => {
 };
 const saving = (p) => Math.max(0, Number(p?.price || 0) - effectivePrice(p));
 
-const toUI = (row) => ({
-  id: String(row?.id ?? row?._id ?? row?.productId ?? Math.random().toString(36).slice(2, 10)),
-  name: row?.name ?? "Unnamed",
-  category: row?.category ?? "",
-  img: row?.img ?? "",
-  price: Number(row?.price ?? 0),
-  stock: Number(row?.stock ?? 0),
-  rating: Number(row?.rating ?? 0),
-  discountType: row?.discountType ?? "none",
-  discountValue: Number(row?.discountValue ?? 0),
-});
+/* Keep BOTH: a stable UI id and the real DB id for API calls */
+const toUI = (row, idx) => {
+  const realId = String(row?._id ?? row?.id ?? row?.productId ?? "");
+  return {
+    uiId: String(idx + 1) + "-" + (realId || Math.random().toString(36).slice(2, 10)),
+    realId,                                  // <-- use THIS for PUT/DELETE
+    name: row?.name ?? "Unnamed",
+    category: row?.category ?? "",
+    img: row?.img ?? "",
+    price: Number(row?.price ?? 0),
+    stock: Number(row?.stock ?? 0),
+    rating: Number(row?.rating ?? 0),
+    discountType: row?.discountType ?? "none",
+    discountValue: Number(row?.discountValue ?? 0),
+  };
+};
 
 const unpackList = (payload) =>
   Array.isArray(payload) ? payload : payload?.products ?? payload?.items ?? payload?.data ?? [];
@@ -178,7 +184,7 @@ function ProductModal({ open, onClose, onSave, product }) {
     <div className="backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-head">
-          <h3>{product ? `Edit Product #${product.id}` : "Add Product"}</h3>
+          <h3>{product ? `Edit Product` : "Add Product"}</h3>
           <button className="x" onClick={onClose}>×</button>
         </div>
 
@@ -243,7 +249,6 @@ function ProductModal({ open, onClose, onSave, product }) {
 
             <div>
               <label>Price (LKR) <span style={{ color: "#b91c1c" }}>*</span></label>
-              {/* Use text + inputMode=decimal for strict control */}
               <input
                 className={fieldClass("price")}
                 type="text"
@@ -252,7 +257,6 @@ function ProductModal({ open, onClose, onSave, product }) {
                 value={form.price}
                 onChange={handlePriceChange}
                 onBlur={() => markTouched("price")}
-                // prevent dropping invalid paste
                 onPaste={(e) => {
                   const v = (e.clipboardData.getData("text") || "").trim();
                   if (!(v === "" || PRICE_RX.test(v))) e.preventDefault();
@@ -342,7 +346,8 @@ export default function ProductList() {
     setErr("");
     try {
       const data = await fetchHandler();
-      setProducts(unpackList(data).map(toUI));
+      const list = unpackList(data);
+      setProducts(list.map((row, i) => toUI(row, i)));
     } catch (e) {
       const msg =
         e?.response?.status === 404
@@ -374,7 +379,10 @@ export default function ProductList() {
       if (!modal.product) {
         await axios.post(URL, payload, { headers: { "Content-Type": "application/json" } });
       } else {
-        await axios.put(`${URL}/${modal.product.id}`, payload, {
+        // IMPORTANT: use realId for edits
+        const rid = modal.product.realId;
+        if (!rid) throw new Error("Missing product id for update");
+        await axios.put(`${URL}/${rid}`, payload, {
           headers: { "Content-Type": "application/json" },
         });
       }
@@ -449,9 +457,16 @@ export default function ProductList() {
               </thead>
               <tbody>
                 {productsWithSeq.map((p) => (
-                  <tr key={p.id}>
+                  <tr key={p.realId || p.uiId}>
                     <td>{p.seq}</td>
-                    <td><img className="pimg" src={imgSrc(p.img)} alt="" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")} /></td>
+                    <td>
+                      <img
+                        className="pimg"
+                        src={imgSrc(p.img)}
+                        alt=""
+                        onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")}
+                      />
+                    </td>
                     <td>{p.name}</td>
                     <td>{p.category || ""}</td>
                     <td className="right">{money(p.price)}</td>
@@ -464,8 +479,12 @@ export default function ProductList() {
                     <td className="center">{(p.rating || 0).toFixed(1)}</td>
                     <td>
                       <div className="actions">
-                        <button className="btn" onClick={() => setModal({ open: true, product: p })}>Edit</button>
-                        <button className="btn red" onClick={() => onDelete(p.id)}>Delete</button>
+                        <button className="btn" onClick={() => setModal({ open: true, product: p })}>
+                          Edit
+                        </button>
+                        <button className="btn red" onClick={() => onDelete(p.realId)}>
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -499,12 +518,14 @@ export default function ProductList() {
                     const ep = effectivePrice(p);
                     const sv = saving(p);
                     return (
-                      <tr key={p.id}>
+                      <tr key={p.realId || p.uiId}>
                         <td>{i + 1}</td>
                         <td>{p.name}</td>
                         <td className="right">{money(p.price)}</td>
                         <td>{p.discountType === "percentage" ? "Percentage" : "Fixed"}</td>
-                        <td className="right">{p.discountType === "percentage" ? pct(p.discountValue) : money(p.discountValue)}</td>
+                        <td className="right">
+                          {p.discountType === "percentage" ? pct(p.discountValue) : money(p.discountValue)}
+                        </td>
                         <td className="right">{money(ep)}</td>
                         <td className="right">{money(sv)}</td>
                       </tr>

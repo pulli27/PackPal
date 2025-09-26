@@ -6,7 +6,7 @@ import { api } from "../../lib/api";
 
 const toast = (m, t = "info") => alert(`${t.toUpperCase()}: ${m}`);
 
-// helpers for 0–31 validation (allow empty string while typing)
+
 const clamp0to31 = (v) => {
   if (v === "" || v === null || v === undefined) return "";
   const n = Number(v);
@@ -21,7 +21,6 @@ const anyOver31 = (obj) =>
     (k) => Number(obj?.[k] ?? 0) > 31
   );
 
-// derive noPayLeave from leaveTaken and leaveAllowed (0–31, no negatives)
 const deriveNoPay = (leaveTaken, leaveAllowed) => {
   const lt = Number(leaveTaken || 0);
   const la = Number(leaveAllowed || 0);
@@ -82,12 +81,11 @@ export default function Attendance() {
     loadAttendance();
   }, []);
 
-  // CREATE
+  
   async function create() {
     if (!form.empId || !form.period)
       return toast("Employee and period are required", "warning");
 
-    // ensure auto field is consistent before submit
     const autoNoPay = deriveNoPay(form.leaveTaken, form.leaveAllowed);
     const payload = {
       empId: form.empId,
@@ -128,12 +126,11 @@ export default function Attendance() {
     }
   }
 
-  // UPDATE
+  
   async function saveEdit() {
     const id = editing?._id;
     if (!id) return toast("Missing _id", "error");
 
-    // ensure auto field is consistent before submit
     const autoNoPay = deriveNoPay(editing.leaveTaken, editing.leaveAllowed);
     const payload = {
       empId: editing.empId,

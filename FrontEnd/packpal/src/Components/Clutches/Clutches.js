@@ -4,17 +4,26 @@ import "./Clutches.css";
 import Header from "../Header/Header";
 import Footer from "../Footer/Footer";
 
+const STORAGE_KEY = "packPalCart";
+const CART_PAGE = "/cart";
+
 function Clutches() {
   const navigate = useNavigate();
 
+  // resolve image path exactly like you already do (no changes to images)
   const img = (nameOrPath) => {
     if (!nameOrPath) return "";
-    if (nameOrPath.startsWith("http") || nameOrPath.startsWith("images/") || nameOrPath.startsWith("/images/")) {
+    if (
+      nameOrPath.startsWith("http") ||
+      nameOrPath.startsWith("images/") ||
+      nameOrPath.startsWith("/images/")
+    ) {
       return nameOrPath.startsWith("/") ? nameOrPath : `/${nameOrPath}`;
     }
     return `${process.env.PUBLIC_URL}/images/${nameOrPath}`;
   };
 
+  // your data (unchanged)
   const PRODUCTS = [
     { id: "c2",   title: "Elegant Style C2", price: 2500, img: "images/c2.jpg",        category: "Classic", isNew: true,  discountPct: 10, desc: "Soft pastel flap clutch with tassel accents—perfect for semi-formal events.", specs: { Color: "Blush", Strap: "Detachable", Material: "Vegan leather", Weight: "260g" }, rating: 4.6, reviews: 112 },
     { id: "c8",   title: "Stylish C8",       price: 2850, img: "images/c8.jpg",        category: "Bold",    isNew: false, discountPct: 0,  desc: "Vibrant statement clutch with tassel closure that turns heads.",           specs: { Color: "Amber", Strap: "Wristlet",   Material: "PU",            Weight: "280g" }, rating: 4.2, reviews: 87  },
@@ -26,15 +35,39 @@ function Clutches() {
     { id: "gala", title: "Golden Gala",      price: 3500, img: "images/clutchh11.jpg", category: "Crystal", isNew: false, discountPct: 0,  desc: "Sparkly silver-white clutch for premium occasions.",                       specs: { Color: "Silver",  Strap: "Chain",      Material: "Sequins",       Weight: "300g" }, rating: 4.9, reviews: 319 },
   ];
 
-  const LKR = new Intl.NumberFormat("en-LK", { style:"currency", currency:"LKR", currencyDisplay:"code", minimumFractionDigits:2, maximumFractionDigits:2 });
+  // money helper (unchanged)
+  const LKR = new Intl.NumberFormat("en-LK", {
+    style: "currency",
+    currency: "LKR",
+    currencyDisplay: "code",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   const money = (n) => LKR.format(n);
-  const finalPrice = (p) => (p.discountPct && p.discountPct > 0 ? p.price * (1 - p.discountPct / 100) : p.price);
+
+  // apply discount if any (unchanged)
+  const finalPrice = (p) =>
+    p.discountPct && p.discountPct > 0 ? p.price * (1 - p.discountPct / 100) : p.price;
 
   const [filters, setFilters] = useState({ q: "", category: "All" });
+
+  // keep the drawer cart UI, but read/write from the same storage as Cart.js
   const [cart, setCart] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("pacpal_cart") || "[]"); }
-    catch { return []; }
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      // adapt to drawer format (qty vs quantity; name vs title)
+      return stored.map((it) => ({
+        id: String(it.productId || it.id || Date.now()),
+        title: it.name || "",
+        price: Number(it.price) || 0,
+        img: it.img || "",
+        qty: Number(it.quantity) || 1,
+      }));
+    } catch {
+      return [];
+    }
   });
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [modalId, setModalId] = useState(null);
 
@@ -54,12 +87,29 @@ function Clutches() {
 
   const cartTotal = cart.reduce((a, c) => a + c.qty * c.price, 0);
 
-  useEffect(() => { localStorage.setItem("pacpal_cart", JSON.stringify(cart)); }, [cart]);
+  // keep drawer state mirrored to STORAGE_KEY so both pages are in sync
+  useEffect(() => {
+    try {
+      const forStorage = cart.map((it) => ({
+        id: Date.now() + Math.random(),  // unique line id for Cart.js
+        name: it.title,
+        price: Number(it.price) || 0,
+        quantity: Number(it.qty) || 1,
+        img: it.img,
+        icon: "👜",
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(forStorage));
+    } catch {}
+  }, [cart]);
 
+  // ---- Add to Cart wired to Cart.js ----
   const addToCart = (id) => {
     const p = PRODUCTS.find((x) => x.id === id);
     if (!p) return;
-    const price = finalPrice(p);
+    const price = Number(finalPrice(p));       // numeric LKR price (same as displayed)
+    const imageUrl = img(p.img);               // same image path you display
+
+    // 1) Update drawer UI (keeps your existing mini-cart UX)
     setCart((prev) => {
       const i = prev.findIndex((it) => it.id === id);
       if (i > -1) {
@@ -67,12 +117,37 @@ function Clutches() {
         next[i] = { ...next[i], qty: next[i].qty + 1 };
         return next;
       }
-      return [...prev, { id: p.id, title: p.title, price, img: img(p.img), qty: 1 }];
+      return [...prev, { id: p.id, title: p.title, price, img: imageUrl, qty: 1 }];
     });
-    setDrawerOpen(true);
+
+    // 2) Save a line item exactly how Cart.js expects it
+    const lineItem = {
+      id: Date.now(),             // unique row id for Cart.js
+      name: p.title,
+      price,                      // number (LKR)
+      quantity: 1,
+      img: imageUrl,
+      icon: "👜",
+    };
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      stored.push(lineItem);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    } catch {}
+
+    // 3) Go to /checkout so "Your PackPal Cart" shows it immediately
+    setDrawerOpen(false);
+    navigate(CART_PAGE, { state: { justAdded: lineItem } });
   };
-  const incItem = (id) => setCart((prev) => prev.map((it) => (it.id === id ? { ...it, qty: it.qty + 1 } : it)));
-  const decItem = (id) => setCart((prev) => prev.map((it) => (it.id === id ? { ...it, qty: it.qty - 1 } : it)).filter((it) => it.qty > 0));
+
+  const incItem = (id) =>
+    setCart((prev) => prev.map((it) => (it.id === id ? { ...it, qty: it.qty + 1 } : it)));
+  const decItem = (id) =>
+    setCart((prev) =>
+      prev
+        .map((it) => (it.id === id ? { ...it, qty: it.qty - 1 } : it))
+        .filter((it) => it.qty > 0)
+    );
   const removeAll = (id) => setCart((prev) => prev.filter((it) => it.id !== id));
 
   const ratingSnippet = (rating, reviews) => {
@@ -80,7 +155,9 @@ function Clutches() {
     return (
       <div className="rating-row" aria-label={`Rated ${r} out of 5 from ${reviews} reviews`}>
         <span className="stars" style={{ ["--rating"]: r }} aria-hidden="true" />
-        <span className="rating-num">{r} • {reviews.toLocaleString()} reviews</span>
+        <span className="rating-num">
+          {r} • {reviews.toLocaleString()} reviews
+        </span>
       </div>
     );
   };
@@ -95,15 +172,24 @@ function Clutches() {
     const drift = `${(Math.random() * 160 - 80).toFixed(0)}px`;
     const scale = (0.7 + Math.random() * 0.8).toFixed(2);
     const cls = Math.random() < 0.18 ? "lg" : Math.random() < 0.6 ? "sm" : "";
-    return <span key={i} className={`dot ${cls}`} style={{ left, "--delay": delay, "--dur": dur, "--dx": drift, "--scale": scale }} aria-hidden="true" />;
+    return (
+      <span
+        key={i}
+        className={`dot ${cls}`}
+        style={{ left, "--delay": delay, "--dur": dur, "--dx": drift, "--scale": scale }}
+        aria-hidden="true"
+      />
+    );
   });
 
   return (
     <div className="clutches-page">
-      <Header/>
+      <Header />
       {/* HERO */}
       <section className="hero" role="region" aria-label="Clutches hero">
-        <div className="dots" aria-hidden="true">{dots}</div>
+        <div className="dots" aria-hidden="true">
+          {dots}
+        </div>
 
         <div className="hero-content">
           <h1>Premium Clutch Collection</h1>
@@ -120,7 +206,11 @@ function Clutches() {
             />
             <button className="search-btn" aria-label="Search">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd"/>
+                <path
+                  fillRule="evenodd"
+                  d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+                  clipRule="evenodd"
+                />
               </svg>
             </button>
           </div>
@@ -131,7 +221,11 @@ function Clutches() {
       <section className="filters">
         <div className="chips">
           {categories.map((c) => (
-            <button key={c} className={`chip${filters.category === c ? " active" : ""}`} onClick={() => setFilters((f) => ({ ...f, category: c }))}>
+            <button
+              key={c}
+              className={`chip${filters.category === c ? " active" : ""}`}
+              onClick={() => setFilters((f) => ({ ...f, category: c }))}
+            >
               {c}
             </button>
           ))}
@@ -160,11 +254,20 @@ function Clutches() {
                     {ratingSnippet(p.rating, p.reviews)}
                     <div className="price-row">
                       <div className="price-now">{money(now)}</div>
-                      {hasDisc && (<><div className="price-old">{money(p.price)}</div><div className="price-save">Save {p.discountPct}%</div></>)}
+                      {hasDisc && (
+                        <>
+                          <div className="price-old">{money(p.price)}</div>
+                          <div className="price-save">Save {p.discountPct}%</div>
+                        </>
+                      )}
                     </div>
                     <div className="product-actions">
-                      <button className="btn btn-ghost" onClick={() => setModalId(p.id)}>More</button>
-                      <button className="btn btn-primary" onClick={() => addToCart(p.id)}>Add to Cart</button>
+                      <button className="btn btn-ghost" onClick={() => setModalId(p.id)}>
+                        More
+                      </button>
+                      <button className="btn btn-primary" onClick={() => addToCart(p.id)}>
+                        Add to Cart
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -178,11 +281,15 @@ function Clutches() {
       <aside
         className={`drawer${drawerOpen ? " open" : ""}`}
         aria-hidden={drawerOpen ? "false" : "true"}
-        onClick={(e) => { if (e.target === e.currentTarget) setDrawerOpen(false); }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setDrawerOpen(false);
+        }}
       >
         <div className="drawer-header">
           <div className="drawer-title">Shopping Cart</div>
-          <button className="close-x" onClick={() => setDrawerOpen(false)}>✕</button>
+          <button className="close-x" onClick={() => setDrawerOpen(false)}>
+            ✕
+          </button>
         </div>
 
         <div className="drawer-list">
@@ -195,10 +302,16 @@ function Clutches() {
                 <div style={{ flex: 1 }}>
                   <div className="ci-title">{item.title}</div>
                   <div className="qty-wrap">
-                    <button className="qty-btn" onClick={() => decItem(item.id)} aria-label="Decrease">−</button>
+                    <button className="qty-btn" onClick={() => decItem(item.id)} aria-label="Decrease">
+                      −
+                    </button>
                     <span className="qty-num">{item.qty}</span>
-                    <button className="qty-btn" onClick={() => incItem(item.id)} aria-label="Increase">+</button>
-                    <button className="remove" onClick={() => removeAll(item.id)} title="Remove all">✕</button>
+                    <button className="qty-btn" onClick={() => incItem(item.id)} aria-label="Increase">
+                      +
+                    </button>
+                    <button className="remove" onClick={() => removeAll(item.id)} title="Remove all">
+                      ✕
+                    </button>
                   </div>
                 </div>
                 <div className="ci-price">{money(item.price * item.qty)}</div>
@@ -208,41 +321,77 @@ function Clutches() {
         </div>
 
         <div className="drawer-footer">
-          <div className="total-row"><span>Total:</span><span>{money(cartTotal)}</span></div>
-          <button className="checkout" onClick={() => navigate("/checkout")}>Checkout</button>
+          <div className="total-row">
+            <span>Total:</span>
+            <span>{money(cartTotal)}</span>
+          </div>
+          <button className="checkout" onClick={() => navigate("/checkout")}>
+            Checkout
+          </button>
         </div>
       </aside>
 
       {/* MODAL */}
       {modalProduct && (
-        <div className="modal open" aria-hidden="false" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+        <div
+          className="modal open"
+          aria-hidden="false"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
           <div className="modal-card">
-            <div className="modal-img"><img src={img(modalProduct.img)} alt={modalProduct.title} /></div>
+            <div className="modal-img">
+              <img src={img(modalProduct.img)} alt={modalProduct.title} />
+            </div>
             <div className="modal-body">
               <h3>{modalProduct.title}</h3>
               <div className="modal-rating">
-                <span className="stars" style={{ ["--rating"]: (Math.round(modalProduct.rating * 10) / 10).toFixed(1) }} aria-hidden="true" />
+                <span
+                  className="stars"
+                  style={{
+                    ["--rating"]: (Math.round(modalProduct.rating * 10) / 10).toFixed(1),
+                  }}
+                  aria-hidden="true"
+                />
                 <span className="rating-num">
-                  {(Math.round(modalProduct.rating * 10) / 10).toFixed(1)} • {modalProduct.reviews.toLocaleString()} reviews
+                  {(Math.round(modalProduct.rating * 10) / 10).toFixed(1)} •{" "}
+                  {modalProduct.reviews.toLocaleString()} reviews
                 </span>
               </div>
               <div className="modal-price-row">
                 <div className="modal-price-now">{money(finalPrice(modalProduct))}</div>
-                {modalProduct.discountPct > 0 && <div className="modal-price-old">{money(modalProduct.price)}</div>}
+                {modalProduct.discountPct > 0 && (
+                  <div className="modal-price-old">{money(modalProduct.price)}</div>
+                )}
               </div>
               <p className="modal-desc">{modalProduct.desc}</p>
               <div className="specs">
-                {Object.entries(modalProduct.specs || {}).map(([k, v]) => <div className="spec" key={k}>{k}: {v}</div>)}
+                {Object.entries(modalProduct.specs || {}).map(([k, v]) => (
+                  <div className="spec" key={k}>
+                    {k}: {v}
+                  </div>
+                ))}
               </div>
               <div className="modal-actions">
-                <button className="btn btn-primary" onClick={() => { addToCart(modalProduct.id); closeModal(); }}>Add to Cart</button>
-                <button className="modal-close" onClick={closeModal}>Close</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    addToCart(modalProduct.id);
+                    closeModal();
+                  }}
+                >
+                  Add to Cart
+                </button>
+                <button className="modal-close" onClick={closeModal}>
+                  Close
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
-      <Footer/>
+      <Footer />
     </div>
   );
 }
