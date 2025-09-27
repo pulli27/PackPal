@@ -22,6 +22,9 @@ function HiruInventory() {
   const LOW_STOCK = 180; // UI chip threshold
   const MIN_STOCK = 20;  // hard rule: do not allow below this
 
+  // 🔹 Minimum stock guard
+  const MIN_STOCK = 20;
+
   // ---- API helpers ----
   const fetchItems = async () => {
     try {
@@ -66,6 +69,14 @@ function HiruInventory() {
       name: data?.item?.name,
       qty: Number(data?.item?.quantity ?? newQty),
     };
+  };
+
+  // ✅ Adjust dynamic Reorder Level by a delta
+  const adjustReorder = async (id, delta) => {
+    await axios.post(
+      `${API_BASE}${INVENTORY_PATH}/${encodeURIComponent(id)}/reorder-adjust`,
+      { delta: Number(delta) }
+    );
   };
 
   // initial load
@@ -142,7 +153,10 @@ function HiruInventory() {
       }
 
       // 2) Validate name match (case-insensitive)
-      if (String(current.name || "").trim().toLowerCase() !== name.toLowerCase()) {
+      if (
+        String(current.name || "").trim().toLowerCase() !==
+        name.toLowerCase()
+      ) {
         alert(
           `Item name does not match for ID ${id}.\n` +
             `Entered: "${name}" | Actual: "${current.name}".`
@@ -161,6 +175,7 @@ function HiruInventory() {
 
       const newQty = current.qty - qtyToDeduct;
 
+<<<<<<< HEAD
       // Block if it would fall below 20
       if (newQty < MIN_STOCK) {
         alert(
@@ -172,7 +187,21 @@ function HiruInventory() {
       }
 
       // 4) Update server
+=======
+      // 🔹 Block if it would fall below minimum
+      if (newQty < MIN_STOCK) {
+        alert(
+          `Minimum stock is ${MIN_STOCK}. This action would reduce "${current.name}" (ID: ${current.id}) to ${newQty}. No changes were made.`
+        );
+        return;
+      }
+
+      // 4) Update server: quantity
+>>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
       const updated = await updateItemQty(id, newQty);
+
+      // 4.1) ✅ Also raise dynamic Reorder Level by deducted amount
+      await adjustReorder(id, qtyToDeduct);
 
       // 5) Update UI table
       setItems((prev) => {
@@ -183,13 +212,7 @@ function HiruInventory() {
         return copy;
       });
 
-      alert(
-        `Quantity deducted successfully!\n\n` +
-          `Item ID: ${updated.id}\n` +
-          `Item Name: ${updated.name}\n` +
-          `Deducted: ${qtyToDeduct}\n` +
-          `New Quantity: ${updated.qty}`
-      );
+      alert(`Item ${updated.name} Ordered Successfully!\n\n`);
 
       form.reset();
       itemIdRef.current?.focus();
@@ -213,6 +236,7 @@ function HiruInventory() {
   const maxQty = Math.max(...items.map((i) => i.qty), 1);
 
   return (
+<<<<<<< HEAD
     <div className="page-wrap inventory-page">
       {/* LEFT: Sidebar */}
       <div className="sidebar">
@@ -221,6 +245,12 @@ function HiruInventory() {
 
       {/* RIGHT: Content */}
       <div className="content">
+=======
+    <div className="hiru">{/* PAGE WRAP SCOPE */}
+      <div className="inventory-page">
+        <Sidebarhiru />
+
+>>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
         <div className="container">
           <header className="title-row">
             <h1>
@@ -231,7 +261,10 @@ function HiruInventory() {
                 className="ghost-btn"
                 onClick={() => setView("table")}
                 aria-pressed={view === "table"}
+<<<<<<< HEAD
                 disabled={loading}
+=======
+>>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
               >
                 Table
               </button>
@@ -239,7 +272,10 @@ function HiruInventory() {
                 className="ghost-btn"
                 onClick={() => setView("cards")}
                 aria-pressed={view === "cards"}
+<<<<<<< HEAD
                 disabled={loading}
+=======
+>>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
               >
                 Cards
               </button>
@@ -403,7 +439,11 @@ function HiruInventory() {
 
                   <div className="form-group">
                     <label htmlFor="quantity">
+<<<<<<< HEAD
                       Quantity <span className="required">*</span>
+=======
+                      Quantity to Deduct <span className="required">*</span>
+>>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
                     </label>
                     <input
                       type="number"

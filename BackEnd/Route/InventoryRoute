@@ -1,3 +1,4 @@
+// BackEnd/Route/InventoryRoute.js
 const express = require("express");
 const {
   listInventory,
@@ -5,18 +6,22 @@ const {
   createItem,
   updateByBusinessId,
   removeByBusinessId,
-  summary,                             // ✅ import it
+  summary,
+  adjustReorder, // ✅
 } = require("../Controllers/InventoryController");
 
 const router = express.Router();
 
 /* IMPORTANT: put /summary before "/:id" */
-router.get("/summary", summary);        // ✅ now defined
+router.get("/summary", summary);
 
 router.get("/", listInventory);
 router.get("/:id", getByBusinessId);
 router.post("/", createItem);
 router.put("/:id", updateByBusinessId);
 router.delete("/:id", removeByBusinessId);
+
+// ✅ atomic dynamic reorder adjustment
+router.post("/:id/reorder-adjust", adjustReorder);
 
 module.exports = router;

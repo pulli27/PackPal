@@ -40,13 +40,13 @@ async function ensurePdfTools() {
 }
 
 export default function ItemInventory() {
-  // Seed data to render UI immediately; replaced by backend data after load
+  // Seed data (UI shows instantly; gets replaced by backend)
   const inventoryRef = useRef([
-    { id: "1001", name: "Leather Backpack",  description: "Brown leather bag", quantity: 450, unitPrice: 80.0,  avgDailyUsage: 3, leadTimeDays: 3 },
-    { id: "1002", name: "Canvas Tote",       description: "Beige shoulder bag", quantity: 300, unitPrice: 25.0,  avgDailyUsage: 2, leadTimeDays: 2 },
-    { id: "1003", name: "Laptop Briefcase",  description: "Black laptop bag",   quantity: 12,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 5 },
-    { id: "1004", name: "Travel Duffel",     description: "Large blue bag",     quantity: 500, unitPrice: 20.0,  avgDailyUsage: 2, leadTimeDays: 2 },
-    { id: "1005", name: "Travel Duffel",     description: "Large blue bag",     quantity: 10,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 7 }
+    { id: "1001", name: "Leather Backpack",  description: "Brown leather bag", quantity: 450, unitPrice: 80.0,  avgDailyUsage: 3, leadTimeDays: 3, reorderAdj: 0 },
+    { id: "1002", name: "Canvas Tote",       description: "Beige shoulder bag", quantity: 300, unitPrice: 25.0,  avgDailyUsage: 2, leadTimeDays: 2, reorderAdj: 0 },
+    { id: "1003", name: "Laptop Briefcase",  description: "Black laptop bag",   quantity: 12,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 5, reorderAdj: 0 },
+    { id: "1004", name: "Travel Duffel",     description: "Large blue bag",     quantity: 500, unitPrice: 20.0,  avgDailyUsage: 2, leadTimeDays: 2, reorderAdj: 0 },
+    { id: "1005", name: "Travel Duffel",     description: "Large blue bag",     quantity: 10,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 7, reorderAdj: 0 }
   ]);
   const editingIndexRef = useRef(-1);
 
@@ -56,8 +56,17 @@ export default function ItemInventory() {
     const toNum = (v) => Number(v) || 0;
     const asLKR = (n) => `LKR ${Number(n || 0).toLocaleString()}`;
 
+    // ✅ Effective Reorder Level includes dynamic reorderAdj
     const computeReorderLevel = (item) =>
-      Math.max(0, Math.round((toNum(item.avgDailyUsage) * toNum(item.leadTimeDays)) + SAFETY_STOCK));
+      Math.max(
+        0,
+        Math.round(
+          (toNum(item.avgDailyUsage) * toNum(item.leadTimeDays)) +
+          SAFETY_STOCK +
+          toNum(item.reorderAdj || 0)
+        )
+      );
+
     const totalPriceOf = (item) => (toNum(item.unitPrice) * toNum(item.quantity));
 
     function showInlineForm(show = true) {
@@ -109,8 +118,11 @@ export default function ItemInventory() {
           <td>${item.description}</td>
           <td class="quantity">${item.quantity}</td>
           <td class="reorder-level">${rop}</td>
+          <td class="unit-price">LKR ${Number(toNum(item.unitPrice)).toFixed(2)}</td>
+
+
           <td class="price">${asLKR(totalPrice)}</td>
-          <td class="unit-price">${Number(toNum(item.unitPrice)).toFixed(2)}</td>
+          
           <td>
             <div class="action-cell">
               <button class="btn-edit"   onclick="window.__inv_editItem(${index})">Edit</button>
@@ -147,7 +159,7 @@ export default function ItemInventory() {
       editingIndexRef.current = index;
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
       validateNameField();
-      validateQuantityField(); // ensure existing 0 never passes
+      validateQuantityField();
     }
 
     async function deleteItem(index) {
@@ -165,6 +177,7 @@ export default function ItemInventory() {
           unitPrice: Number(it.unitPrice ?? 0),
           avgDailyUsage: Number(it.avgDailyUsage ?? 0),
           leadTimeDays: Number(it.leadTimeDays ?? 0),
+          reorderAdj: Number(it.reorderAdj ?? 0),
         }));
         renderTable();
       } catch (err) {
@@ -310,18 +323,7 @@ export default function ItemInventory() {
       if (m) m.style.display = "none";
     }
 
-    /* ===== vector icons + export/print/download ===== */
-    function drawReceiptIcon(doc, x, y) {
-      doc.setDrawColor(53, 99, 255);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(x, y, 8, 8, 1.5, 1.5);
-      doc.line(x+1, y+8, x+2, y+7);
-      doc.line(x+3, y+8, x+4, y+7);
-      doc.line(x+5, y+8, x+6, y+7);
-      doc.setDrawColor(120, 130, 150);
-      doc.line(x+2, y+3, x+6, y+3);
-      doc.line(x+2, y+5, x+6, y+5);
-    }
+    /* ===== simple vector icons for PDF ===== */
     function drawWarningIcon(doc, x, y) {
       doc.setFillColor(244, 143, 64);
       doc.circle(x+4, y+4, 4, "F");
@@ -338,7 +340,7 @@ export default function ItemInventory() {
       doc.line(x+4, y+2, x+4, y+4);
     }
 
-    // ***************  MODIFIED: exportToPDF with logo LEFT and text block RIGHT  ***************
+    // ===== PDF export =====
     async function exportToPDF() {
       try {
         await ensurePdfTools();
@@ -346,16 +348,14 @@ export default function ItemInventory() {
         const jsPDF = getJsPDFCtor();
         const doc = new jsPDF("p", "mm", "a4");
 
-        // Colors & layout
         const PAGE = { left: 14, right: 196, top: 12, width: 210, height: 297 };
-        const HEADER_HEIGHT = 24;             // height used by letterhead block
+        const HEADER_HEIGHT = 24;
         const CONTENT_TOP = HEADER_HEIGHT + 10;
 
-        // Your org details (edit as needed)
         const ORG = {
           name: "PackPal (Pvt) Ltd",
           address: "No. 42, Elm Street, Colombo",
-          email: "hello@packpal.lk"
+          email: "hello@packpal.lk",
         };
 
         const BLUE = [53, 99, 255];
@@ -364,38 +364,22 @@ export default function ItemInventory() {
         const ORANGE = [244, 143, 64];
         const RED = [231, 76, 60];
 
-        // Try load logo from /public (adjust file name if needed)
         let logoImg = null;
         try {
           const img = new Image();
-          img.src = "/new logo.png"; // <-- put the file in public/
+          img.src = "/new logo.png";
           await img.decode();
           logoImg = img;
-        } catch (e) {
-          // ignore -> use placeholder
-        }
+        } catch {}
 
-        // Draw the company letterhead on the current page (logo LEFT, text block RIGHT)
         function drawLetterhead(docInstance) {
           const x = PAGE.left;
           const y = PAGE.top;
-
           const LOGO_W = 18, LOGO_H = 18;
 
-          // Logo stays on LEFT
-          if (logoImg) {
-            docInstance.addImage(logoImg, "PNG", x, y, LOGO_W, LOGO_H);
-          } else {
-            // simple placeholder if logo not found
-            docInstance.setDrawColor(210, 175, 55);
-            docInstance.setLineWidth(0.6);
-            docInstance.circle(x + LOGO_W/2, y + LOGO_H/2, 8, "S");
-            docInstance.setFillColor(210, 175, 55);
-            docInstance.circle(x + LOGO_W/2, y + LOGO_H/2, 3.2, "F");
-          }
+          if (logoImg) docInstance.addImage(logoImg, "PNG", x, y, LOGO_W, LOGO_H);
 
-          // RIGHT-aligned text block
-          const textRightX = PAGE.right; // align to right margin
+          const textRightX = PAGE.right;
           const ty = y + 4.5;
 
           docInstance.setFontSize(14);
@@ -409,23 +393,19 @@ export default function ItemInventory() {
           docInstance.text(ORG.address, textRightX, ty + 6, { align: "right" });
           docInstance.text(ORG.email,   textRightX, ty + 12, { align: "right" });
 
-          // Divider line across the page
           docInstance.setDrawColor(210, 210, 210);
           docInstance.setLineWidth(0.4);
           docInstance.line(PAGE.left, y + HEADER_HEIGHT, PAGE.right, y + HEADER_HEIGHT);
         }
 
-        // Hook to run on every new page (AutoTable calls this automatically)
         const headerHook = () => {
           drawLetterhead(doc);
-          // Page number at bottom-right
           const pageStr = `Page ${doc.getNumberOfPages()}`;
           doc.setFontSize(9);
           doc.setTextColor(120, 120, 120);
           doc.text(pageStr, PAGE.right, PAGE.height - 8, { align: "right" });
         };
 
-        // First page: letterhead + report title
         drawLetterhead(doc);
 
         doc.setFontSize(16);
@@ -438,7 +418,6 @@ export default function ItemInventory() {
         doc.setFont(undefined, "normal");
         doc.text(`Generated on ${data.summary.reportDate}`, PAGE.left + 15, CONTENT_TOP - 3);
 
-        // KPI cards
         const cards = [
           [String(data.summary.totalItems), "TOTAL ITEMS"],
           [data.summary.totalQuantity.toLocaleString(), "TOTAL QUANTITY"],
@@ -469,7 +448,7 @@ export default function ItemInventory() {
           }
         });
 
-        // Low stock section
+        // Low stock
         let y = cy + 8;
         drawWarningIcon(doc, PAGE.left, y - 8);
         doc.setTextColor(40, 40, 40);
@@ -494,7 +473,7 @@ export default function ItemInventory() {
             styles: { fontSize: 10, cellPadding: 3 },
             headStyles: { fillColor: RED, textColor: 255, halign: "left" },
             theme: "grid",
-            margin: { left: PAGE.left, right: PAGE.left, top: CONTENT_TOP }, // reserve header area
+            margin: { left: PAGE.left, right: PAGE.left, top: CONTENT_TOP },
             didDrawPage: headerHook,
           });
           y = doc.lastAutoTable.finalY + 18;
@@ -528,7 +507,7 @@ export default function ItemInventory() {
           styles: { fontSize: 10, cellPadding: 3 },
           headStyles: { fillColor: BLUE_HEAD, textColor: 255, halign: "left" },
           theme: "grid",
-          margin: { left: PAGE.left, right: PAGE.left, top: CONTENT_TOP }, // reserve header area
+          margin: { left: PAGE.left, right: PAGE.left, top: CONTENT_TOP },
           columnStyles: { 2: { cellWidth: 52 } },
           didParseCell: function (hook) {
             if (hook.section === "body" && hook.row.index % 2 === 0) {
@@ -538,14 +517,12 @@ export default function ItemInventory() {
           didDrawPage: headerHook,
         });
 
-        // Save PDF
         doc.save(`inventory_report_${new Date().toISOString().split("T")[0]}.pdf`);
       } catch (err) {
         console.error(err);
         alert("PDF generation failed. Check console for details.");
       }
     }
-    // ***************  /MODIFIED  ***************
 
     function printReport() {
       const src = $("reportContent")?.innerHTML || "";
@@ -595,14 +572,12 @@ export default function ItemInventory() {
     const lead = $("leadTimeDays");
     const form = $("itemForm");
 
-    // --- inputs we validate (single declarations) ---
     const nameInput  = $("itemName");
     const qtyInput   = $("quantity");
     const priceInput = $("unitPrice");
-    const avgInput   = avg;   // avgDailyUsage
-    const leadInput  = lead;  // leadTimeDays
+    const avgInput   = avg;
+    const leadInput  = lead;
 
-    // --- helpers for validation ---
     function validateNameField() {
       if (!nameInput) return true;
       const clean = (nameInput.value || "").trim();
@@ -615,7 +590,6 @@ export default function ItemInventory() {
       return ok;
     }
 
-    // STRICT quantity > 0 validation
     function validateQuantityField() {
       if (!qtyInput) return true;
       const n = parseInt(qtyInput.value, 10);
@@ -722,6 +696,7 @@ export default function ItemInventory() {
         unitPrice: parseFloat($("unitPrice").value) || 0,
         avgDailyUsage: parseInt($("avgDailyUsage").value, 10) || 0,
         leadTimeDays: parseInt($("leadTimeDays").value, 10) || 0,
+        // reorderAdj is NOT edited here; maintained by other flows (HiruInventory / PurchaseItems)
       };
 
       if (!Number.isInteger(data.quantity) || data.quantity <= 0) {
@@ -763,6 +738,7 @@ export default function ItemInventory() {
           unitPrice: Number(it.unitPrice ?? 0),
           avgDailyUsage: Number(it.avgDailyUsage ?? 0),
           leadTimeDays: Number(it.leadTimeDays ?? 0),
+          reorderAdj: Number(it.reorderAdj ?? 0),
         }));
 
         renderTable();
@@ -788,10 +764,10 @@ export default function ItemInventory() {
     searchInput?.addEventListener("input", onSearch);
     form?.addEventListener("submit", onSubmit);
 
-    // --- attach validation listeners ---
+    // validation listeners
     nameInput?.addEventListener("input", sanitizeNameOnInput);
 
-    // Quantity (integers only); disallow 0; strip leading zeros
+    // Quantity
     qtyInput?.addEventListener("keydown", (e) => {
       preventInvalidNumberKeys(e, { allowDot: false });
       if (e.key === "0" && (e.target.value === "" || e.target.selectionStart === 0)) {
@@ -809,7 +785,7 @@ export default function ItemInventory() {
       validateQuantityField();
     });
 
-    // Unit Price (decimal allowed, but no e/E/+/−)
+    // Unit Price
     priceInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: true }));
     priceInput?.addEventListener("paste", sanitizePasteToDecimal);
     priceInput?.addEventListener("blur", () => {
@@ -819,12 +795,12 @@ export default function ItemInventory() {
       if (!ok) priceInput.value = v.replace(/[^\d.]/g, "");
     });
 
-    // Avg Daily Usage (integers only)
+    // Avg Daily Usage
     avgInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
     avgInput?.addEventListener("paste", sanitizePasteToDigits);
     avgInput?.addEventListener("blur", () => { if (avgInput) avgInput.value = (avgInput.value || "").replace(/[^\d]/g, ""); });
 
-    // Lead Time (integers only)
+    // Lead Time
     leadInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
     leadInput?.addEventListener("paste", sanitizePasteToDigits);
     leadInput?.addEventListener("blur", () => { if (leadInput) leadInput.value = (leadInput.value || "").replace(/[^\d]/g, ""); });
@@ -836,11 +812,11 @@ export default function ItemInventory() {
     }
     window.addEventListener("click", clickHandler);
 
-    // initial
+    // initial render
     showInlineForm(false);
     renderTable();
 
-    // load from backend after initial render
+    // load from backend
     async function loadFromBackend() {
       try {
         const res = await apiInv.list();
@@ -853,6 +829,7 @@ export default function ItemInventory() {
           unitPrice: Number(it.unitPrice ?? 0),
           avgDailyUsage: Number(it.avgDailyUsage ?? 0),
           leadTimeDays: Number(it.leadTimeDays ?? 0),
+          reorderAdj: Number(it.reorderAdj ?? 0),
         }));
         renderTable();
       } catch (err) {
@@ -916,8 +893,8 @@ export default function ItemInventory() {
               <div>
                 <div className="form-title" id="formTitle">Add New Item</div>
                 <div className="hint">
-                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (fixed at 40)</b>.
-                  <br/>The value updates automatically and is read-only.
+                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (40)</b> + <b>Dynamic Adj</b>.
+                  <br/>Dynamic Adj changes automatically when stock is deducted (Hiru) or delivered (Purchases).
                   <br/><br/><b>Total price</b> is calculated automatically.
                 </div>
               </div>
@@ -1039,8 +1016,8 @@ export default function ItemInventory() {
                   <th>DESCRIPTION</th>
                   <th>QUANTITY</th>
                   <th>REORDER LEVEL</th>
-                  <th>TOTAL PRICE</th>
                   <th>UNIT PRICE</th>
+                  <th>TOTAL PRICE</th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
