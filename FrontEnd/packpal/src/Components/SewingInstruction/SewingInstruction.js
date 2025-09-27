@@ -5,6 +5,14 @@ import { api } from "../../lib/api2";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable"; // <-- use function import
 
+// ---------- CONFIG: PackPal address lines shown under the logo in the PDF ----------
+const ADDRESS_LINES = [
+  "PackPal (Pvt) Ltd.",
+  "Makola North, Makola",
+  "Sri Lanka",
+  "Tel: +94 70 000 0000  |  Email: info@packpal.lk",
+];
+
 // Normalize date for <input type="date"> and display
 const toDateInput = (d) => {
   if (!d) return "";
@@ -19,6 +27,23 @@ const toDateInput = (d) => {
 const PERSON_RE = /^[A-Za-z ]+$/;
 const sanitizePerson = (v) =>
   v.replace(/[^A-Za-z ]+/g, "").replace(/\s{2,}/g, " ");
+
+// helper to load an image from /public and return a PNG data URL
+const loadImageAsDataURL = (src) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
 
 export default function SewingInstruction() {
   // ---------- dialogs ----------
@@ -41,6 +66,14 @@ export default function SewingInstruction() {
   });
 
   const [personError, setPersonError] = useState("");
+  const [logoData, setLogoData] = useState(null); // <-- holds data URL for public/logo.png
+
+  // preload logo once
+  useEffect(() => {
+    loadImageAsDataURL("/logo.png")
+      .then(setLogoData)
+      .catch(() => setLogoData(null));
+  }, []);
 
   // ---------- open/close dialogs ----------
   useEffect(() => {
@@ -70,7 +103,13 @@ export default function SewingInstruction() {
         status: i.status,
         createdAt: i.createdAt,
       }));
-      setItems(mapped);
+      // Keep newest items at the end so refresh doesn't move the last row to the top
+      const sorted = mapped.slice().sort((a, b) => {
+        const da = new Date(a.createdAt || 0).getTime();
+        const db = new Date(b.createdAt || 0).getTime();
+        return da - db; // ascending
+      });
+      setItems(sorted);
     } catch (e) {
       console.error(e);
       alert("Failed to load sewing instructions");
@@ -192,11 +231,6 @@ export default function SewingInstruction() {
       setPersonError("Letters and spaces only (no numbers or symbols).");
       alert("Sewing Person must contain letters and spaces only."); return;
     }
-    if (!PERSON_RE.test(form.person)) {
-      setPersonError("Letters and spaces only (no numbers or symbols).");
-      alert("Sewing Person must contain letters and spaces only.");
-      return;
-    }
 
     const payload = {
       bag: form.bag,
@@ -219,40 +253,76 @@ export default function SewingInstruction() {
               : x
           )
         );
+        window.dispatchEvent(new Event("sewing:changed"));
+        localStorage.setItem("sewing:lastUpdate", String(Date.now()));
       } else {
         const { data } = await api.post("/api/sewing-instructions", payload);
         const c = data.item;
-        setItems((prev) => [
-          { id: c._id, bag: c.bag, details: c.details || "", person: c.person,
-            deadline: toDateInput(c.deadline), priority: c.priority,
-            status: c.status, createdAt: c.createdAt },
-          ...prev,
-        ]);
+        const newItem = {
+          id: c._id,
+          bag: c.bag,
+          details: c.details || "",
+          person: c.person,
+          deadline: toDateInput(c.deadline),
+          priority: c.priority,
+          status: c.status,
+          createdAt: c.createdAt,
+        };
+        // Append to end
+        setItems((prev) => [...prev, newItem]);
       }
       setEditing(null);
-      window.dispatchEvent(new Event("sewing:changed"));
-      localStorage.setItem("sewing:lastUpdate", String(Date.now()));
     } catch (e) {
       console.error(e);
       alert("Save failed");
     }
   };
 
-  // ---------- PDF export (fixed: use autoTable(doc, ...)) ----------
+  // ---------- PDF export ----------
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
     const runDate = new Date().toLocaleString();
     const title = "Sewing Instructions Report";
 
-    // Header
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text(title, 40, 40);
-    doc.setFontSize(10);
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // LEFT: logo + PackPal address
+    let leftBlockBottomY = 0;
+    const logoW = 120; // adjust if you want bigger/smaller
+    const logoH = 40;
+    const topY = 24;
+
+    if (logoData) {
+      try {
+        doc.addImage(logoData, "PNG", margin, topY, logoW, logoH);
+      } catch (_) {
+        // ignore if image fails to render
+      }
+    }
+
+    let addrY = topY + (logoData ? logoH + 8 : 0);
     doc.setFont("helvetica", "normal");
-    doc.text(`Generated: ${runDate}`, 40, 58);
-    doc.text(`Total Records: ${items.length}`, 40, 72);
+    doc.setFontSize(10);
+    ADDRESS_LINES.forEach((line, idx) => {
+      doc.text(line, margin, addrY + idx * 14); // 14pt leading
+    });
+    leftBlockBottomY = addrY + ADDRESS_LINES.length * 14;
+
+    // RIGHT: title + meta (right-aligned)
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.text(title, pageWidth - margin, 42, { align: "right" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(`Generated: ${runDate}`, pageWidth - margin, 62, { align: "right" });
+    doc.text(`Total Records: ${items.length}`, pageWidth - margin, 78, { align: "right" });
+
+    // Compute safe start for the table (no overlap with either header block)
+    const rightBlockBottomY = 96; // where the table used to start
+    const tableStartY = Math.max(rightBlockBottomY, leftBlockBottomY + 12);
 
     const head = [["Bag Type", "Sewing Person", "Deadline", "Priority", "Status", "Details"]];
     const body = (items || []).map((i) => [
@@ -265,7 +335,7 @@ export default function SewingInstruction() {
     ]);
 
     autoTable(doc, {
-      startY: 88,
+      startY: tableStartY,
       head,
       body,
       styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
@@ -284,13 +354,9 @@ export default function SewingInstruction() {
           : doc.internal.getNumberOfPages();
         const str = `Page ${pageCount}`;
         doc.setFontSize(9);
-        doc.text(
-          str,
-          doc.internal.pageSize.getWidth() - 60,
-          doc.internal.pageSize.getHeight() - 20
-        );
+        doc.text(str, pageWidth - margin, doc.internal.pageSize.getHeight() - 20, { align: "right" });
       },
-      margin: { left: 40, right: 40 },
+      margin: { left: margin, right: margin },
     });
 
     doc.save("sewing_instructions_report.pdf");

@@ -49,7 +49,7 @@ import Employee from "./Components/Employee/Employee";
 import Reportshiru from "./Components/Reports/Reportshiru";
 import Quality from "./Components/Quality/Quality";
 import Settinghiru from "./Components/Setting/Settinghiru";
-
+import HiruInventory from "./Components/HiruInventory/HiruInventory";
 
 
 //// e.g. src/Components/Totebags/Totebags.js
@@ -69,12 +69,7 @@ import Feedback from "./Components/Feedback/Feedback";
 import LogoutHeader from "./Components/Header/LogoutHeader";
 
 
-import Pdashboard from "./Components/Productdashboard/Pdashboard";
-import SewingInstruction from "./Components/SewingInstruction/SewingInstruction";
-import Employee from "./Components/Employee/Employee";
-import Reportshiru from "./Components/Reports/Reportshiru";
-import Quality from "./Components/Quality/Quality";
-import Settinghiru from "./Components/Setting/Settinghiru";
+
 
 
 /* 404 fallback */
@@ -109,6 +104,9 @@ export default function App() {
       <Route path="/sizeguide" element={<SizeGuide />} />
       <Route path="/sale" element={<Sales />} />
       <Route path="/faq" element={<Faq />} />
+      
+      <Route path="/feedback" element={<Feedback />} />
+      
       
       <Route path="/customer" element={<CustomerView />} />
       <Route path="/cart" element={<Cart />} />
@@ -153,10 +151,12 @@ export default function App() {
       <Route path="/finance/transfers" element={<SalaryTransfer />} />
       <Route path="/finance/salary" element={<SalaryManagement />} />
 
+ {/* hiru */}
         <Route path="/hirudashboard" element={<Pdashboard />} />
       <Route path="/sewing" element={<SewingInstruction />} />
       <Route path="/employee" element={<Employee />} />
       <Route path="/reportshiru" element={<Reportshiru />} />
+      <Route path="/hiruinventory" element={<HiruInventory />} />
       <Route path="/quality" element={<Quality />} />
       <Route path="/settinghiru" element={<Settinghiru />} />
 
