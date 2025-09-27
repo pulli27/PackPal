@@ -3,20 +3,18 @@ const mongoose = require("mongoose");
 
 const PurchaseSchema = new mongoose.Schema(
   {
-    // Business-friendly ID like "O-001"
     id:        { type: String, required: true, unique: true, index: true },
-
-    // Supplier
     supplier:  { type: String, required: true },
 
-    // Either a free-text items list OR an array (keep flexible for legacy)
-    items:     { type: mongoose.Schema.Types.Mixed, default: "" },
+    itemId:    { type: String, required: true, index: true },
+    itemName:  { type: String, required: true },
+    quantity:  { type: Number, required: true, min: 1 },
 
-    // Dates
+    items:     { type: mongoose.Schema.Types.Mixed, default: "" }, // legacy
+
     orderDate:    { type: Date, default: Date.now },
     deliveryDate: { type: Date },
 
-    // Workflow status
     status: {
       type: String,
       enum: ["pending", "approved", "delivered", "cancelled"],
@@ -24,25 +22,23 @@ const PurchaseSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Optional priority shown in UI
     priority: { type: String, enum: ["normal", "high", "urgent"], default: "normal" },
-
-    // Optional notes
     notes: { type: String, default: "" },
 
-    // Optional totals for summary route compatibility
+    // ✅ NEW: set once inventory has been incremented for this delivered order
+    receivedApplied: { type: Boolean, default: false },
+
+    // legacy totals
     total:      { type: Number },
     amount:     { type: Number },
     grandTotal: { type: Number },
-    date:       { type: Date }, // some legacy docs may use this field
+    date:       { type: Date },
   },
   { timestamps: true, versionKey: false }
 );
 
-// Helpful text search
-PurchaseSchema.index({ supplier: "text", id: "text" });
+PurchaseSchema.index({ supplier: "text", id: "text", itemName: "text", itemId: "text" });
 
-// ✅ Single guarded registration
 module.exports =
   mongoose.models.Purchase ||
   mongoose.model("Purchase", PurchaseSchema, "purchases");
