@@ -405,7 +405,7 @@ function HiruInventory() {
 
                   <div className="form-group">
                     <label htmlFor="quantity">
-                      Quantity<span className="required">*</span>
+                      Quantity to Deduct <span className="required">*</span>
                     </label>
                     <input
                       type="number"
