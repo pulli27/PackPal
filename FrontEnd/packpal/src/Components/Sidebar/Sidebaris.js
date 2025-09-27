@@ -152,15 +152,7 @@ export default function Sidebar({
             <i className="fa-solid fa-box-open" /> <span>Orders</span>
           </NavLink>
 
-          <NavLink
-            to="/login"
-            className={({ isActive }) =>
-              `nav-item ${isActive || active === "login" ? "active" : ""}`
-            }
-            onClick={() => handleNavigate("login")}
-          >
-            <i className="fa-solid fa-right-to-bracket" /> <span>Login</span>
-          </NavLink>
+          
 
           <NavLink
             to="/settingsis"

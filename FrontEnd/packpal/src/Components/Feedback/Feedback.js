@@ -57,7 +57,7 @@ export default function Feedback() {
     formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  // ---------- Set stats immediately (no count-up animation) ----------
+  // ---------- Set stats immediately ----------
   useEffect(() => {
     const numbers = Array.from(document.querySelectorAll(".stat-number"));
     numbers.forEach((el) => {
@@ -70,7 +70,7 @@ export default function Feedback() {
     });
   }, []);
 
-  // ---------- Keyboard shortcuts (Ctrl/Cmd + 1..5) ----------
+  // ---------- Keyboard shortcuts ----------
   useEffect(() => {
     const handler = (e) => {
       if (e.ctrlKey || e.metaKey) {
@@ -94,7 +94,6 @@ export default function Feedback() {
     const details = (fd.get("details") || "").toString().trim();
     const recommend = (fd.get("recommend") || "").toString();
 
-    // Simple validation
     if (!name || !email || !details || rating === 0) {
       formCardRef.current?.classList.add("shake-once");
       setTimeout(() => formCardRef.current?.classList.remove("shake-once"), 600);
@@ -115,14 +114,8 @@ export default function Feedback() {
     };
 
     try {
-      // Hook to MERN API if needed:
-      // await fetch('/api/feedback', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(payload)
-      // });
+      // await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
-      // success UX (no confetti/particles)
       formCardRef.current?.classList.add("dimmed");
       setTimeout(() => {
         setShowSuccess(true);
@@ -145,7 +138,7 @@ export default function Feedback() {
     }
   };
 
-  // ---------- Floating dots for banner (KidsBags style) ----------
+  // ---------- Floating dots ----------
   const dots = Array.from({ length: 36 }).map((_, i) => {
     const left = `${Math.random() * 100}%`;
     const delay = `${-Math.random() * 12}s`;
@@ -170,11 +163,14 @@ export default function Feedback() {
   });
 
   return (
-    <div>
-        <Header/>
-      {/* Hero with KidsBags-like gradient & dots */}
+    <div className="feedback-page">{/* <-- SCOPING WRAPPER */}
+      
+
+      {/* Hero */}
       <section className="hero" aria-labelledby="feedback-title">
+        <Header/>
         <div className="dots" aria-hidden="true">{dots}</div>
+        
         <div className="hero-content">
           <h1 id="feedback-title">Your Feedback Matters</h1>
           <p>
@@ -188,32 +184,22 @@ export default function Feedback() {
       <main className="main-container">
         {/* Stats */}
         <section className="stats-section" aria-labelledby="stats-heading">
-          <h2 id="stats-heading" className="stats-title">
-            Customer Satisfaction Overview
-          </h2>
+          <h2 id="stats-heading" className="stats-title">Customer Satisfaction Overview</h2>
           <div className="stats-grid" role="list">
             <div className="stat-item" role="listitem" aria-label="Average rating">
-              <div className="stat-number" data-target="4.8" data-decimals="1">
-                0
-              </div>
+              <div className="stat-number" data-target="4.8" data-decimals="1">0</div>
               <div className="stat-label">Average Rating</div>
             </div>
             <div className="stat-item" role="listitem" aria-label="Total reviews">
-              <div className="stat-number" data-target="2847" data-decimals="0">
-                0
-              </div>
+              <div className="stat-number" data-target="2847" data-decimals="0">0</div>
               <div className="stat-label">Total Reviews</div>
             </div>
             <div className="stat-item" role="listitem" aria-label="Satisfaction percentage">
-              <div className="stat-number" data-target="96" data-suffix="%" data-decimals="0">
-                0
-              </div>
+              <div className="stat-number" data-target="96" data-suffix="%" data-decimals="0">0</div>
               <div className="stat-label">% Satisfaction</div>
             </div>
             <div className="stat-item" role="listitem" aria-label="Average response time">
-              <div className="stat-number" data-target="24" data-suffix="h" data-decimals="0">
-                0
-              </div>
+              <div className="stat-number" data-target="24" data-suffix="h" data-decimals="0">0</div>
               <div className="stat-label">Response Time (hrs)</div>
             </div>
           </div>
@@ -222,11 +208,7 @@ export default function Feedback() {
         {/* Grid */}
         <div className="feedback-grid">
           {/* Form */}
-          <section
-            className="feedback-form-card"
-            aria-labelledby="form-heading"
-            ref={formCardRef}
-          >
+          <section className="feedback-form-card" aria-labelledby="form-heading" ref={formCardRef}>
             <div className="form-header">
               <h2 id="form-heading">Share Your Experience</h2>
               <p>Your feedback helps us improve and serve you better</p>
@@ -235,52 +217,23 @@ export default function Feedback() {
             <form id="feedbackForm" ref={formRef} noValidate aria-describedby="ratingText" onSubmit={onSubmit}>
               <div className="form-group">
                 <label className="form-label" htmlFor="name">Your Name</label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  className="form-input"
-                  placeholder="Enter your full name"
-                  required
-                  autoComplete="name"
-                />
+                <input id="name" name="name" type="text" className="form-input" placeholder="Enter your full name" required autoComplete="name" />
               </div>
 
               <div className="form-group">
                 <label className="form-label" htmlFor="email">Email Address</label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  className="form-input"
-                  placeholder="your.email@example.com"
-                  required
-                  autoComplete="email"
-                />
+                <input id="email" name="email" type="email" className="form-input" placeholder="your.email@example.com" required autoComplete="email" />
               </div>
 
               <div className="form-group">
                 <label className="form-label" htmlFor="order">Order Number (Optional)</label>
-                <input
-                  id="order"
-                  name="order"
-                  type="text"
-                  className="form-input"
-                  placeholder="#PAC-2025-001234"
-                  autoComplete="off"
-                />
+                <input id="order" name="order" type="text" className="form-input" placeholder="#PAC-2025-001234" autoComplete="off" />
               </div>
 
               {/* Stars */}
               <div className="rating-container" aria-live="polite">
                 <div className="rating-title" id="ratingLabel">Rate Your Experience</div>
-                <div
-                  className="star-rating"
-                  id="starRating"
-                  role="radiogroup"
-                  aria-labelledby="ratingLabel"
-                  onMouseLeave={() => setHoverRating(0)}
-                >
+                <div className="star-rating" id="starRating" role="radiogroup" aria-labelledby="ratingLabel" onMouseLeave={() => setHoverRating(0)}>
                   {[1,2,3,4,5].map((n)=>(
                     <button
                       type="button"
@@ -368,15 +321,9 @@ export default function Feedback() {
               <div className="form-group">
                 <span className="form-label">Would you recommend PackPal to friends?</span>
                 <div className="radio-row">
-                  <label className="radio">
-                    <input type="radio" name="recommend" value="yes" /> <span>Absolutely!</span>
-                  </label>
-                  <label className="radio">
-                    <input type="radio" name="recommend" value="maybe" /> <span>Maybe</span>
-                  </label>
-                  <label className="radio">
-                    <input type="radio" name="recommend" value="no" /> <span>Probably not</span>
-                  </label>
+                  <label className="radio"><input type="radio" name="recommend" value="yes" /> <span>Absolutely!</span></label>
+                  <label className="radio"><input type="radio" name="recommend" value="maybe" /> <span>Maybe</span></label>
+                  <label className="radio"><input type="radio" name="recommend" value="no" /> <span>Probably not</span></label>
                 </div>
               </div>
 
@@ -385,7 +332,6 @@ export default function Feedback() {
               </button>
             </form>
 
-            {/* Success (no bounce/confetti) */}
             {showSuccess && (
               <div className="success-animation" id="successAnimation" role="status" aria-live="polite" style={{display:'block'}}>
                 <div className="success-icon">✅</div>
@@ -410,22 +356,14 @@ export default function Feedback() {
 
             <div className="reviews-list">
               {[
-                { initials:"MJ", name:"Michael Johnson", date:"1 week ago", stars:"★★★★★",
-                  text:"“The carbon fiber wallet exceeded my expectations. Sleek design, perfect size, and the RFID protection gives me peace of mind. Worth every penny!”" },
-                { initials:"SJ", name:"Sophia Jones", date:"2 days ago", stars:"★★★★★",
-                  text:"“The PackPal leather tote is gorgeous—buttery soft and surprisingly spacious. The stitching is flawless and the color hasn’t faded at all.”" },
-                { initials:"RK", name:"Rajesh Kumar", date:"4 days ago", stars:"★★★★☆",
-                  text:"“Messenger bag feels premium. Buckles are sturdy, compartments are smart. I just wish the shoulder pad was a bit thicker.”" },
-                { initials:"NP", name:"Nethmi Perera", date:"1 day ago", stars:"★★★★★",
-                  text:"“The bag organizer is a life saver! I can find my keys and lipstick instantly. Fits perfectly in my medium tote.”" },
-                { initials:"LB", name:"Lucas Brown", date:"2 weeks ago", stars:"★★★★☆",
-                  text:"“Metro Backpack handled a heavy rain—laptop stayed dry. Shipping was a day late, but the quality makes up for it.”" },
-                { initials:"EL", name:"Emma Lopez", date:"3 days ago", stars:"★★★★★",
-                  text:"“The bag organizer is a game changer! Everything has its place now and I can find items instantly. Great quality materials and perfect fit.”" },
-                { initials:"DW", name:"David Wilson", date:"5 days ago", stars:"★★★★☆",
-                  text:"“Great selection of accessories. The keychain tracker has saved me multiple times already. Only minor issue was shipping took a day longer than expected.”" },
-                { initials:"AL", name:"Amanda Lee", date:"1 week ago", stars:"★★★★★",
-                  text:"“Outstanding customer service! Had an issue with my order and they resolved it within hours. The Italian leather belt is absolutely gorgeous.”" },
+                { initials:"MJ", name:"Michael Johnson", date:"1 week ago", stars:"★★★★★", text:"“The carbon fiber wallet exceeded my expectations. Sleek design, perfect size, and the RFID protection gives me peace of mind. Worth every penny!”" },
+                { initials:"SJ", name:"Sophia Jones", date:"2 days ago", stars:"★★★★★", text:"“The PackPal leather tote is gorgeous—buttery soft and surprisingly spacious. The stitching is flawless and the color hasn’t faded at all.”" },
+                { initials:"RK", name:"Rajesh Kumar", date:"4 days ago", stars:"★★★★☆", text:"“Messenger bag feels premium. Buckles are sturdy, compartments are smart. I just wish the shoulder pad was a bit thicker.”" },
+                { initials:"NP", name:"Nethmi Perera", date:"1 day ago", stars:"★★★★★", text:"“The bag organizer is a life saver! I can find my keys and lipstick instantly. Fits perfectly in my medium tote.”" },
+                { initials:"LB", name:"Lucas Brown", date:"2 weeks ago", stars:"★★★★☆", text:"“Metro Backpack handled a heavy rain—laptop stayed dry. Shipping was a day late, but the quality makes up for it.”" },
+                { initials:"EL", name:"Emma Lopez", date:"3 days ago", stars:"★★★★★", text:"“The bag organizer is a game changer! Everything has its place now and I can find items instantly. Great quality materials and perfect fit.”" },
+                { initials:"DW", name:"David Wilson", date:"5 days ago", stars:"★★★★☆", text:"“Great selection of accessories. The keychain tracker has saved me multiple times already. Only minor issue was shipping took a day longer than expected.”" },
+                { initials:"AL", name:"Amanda Lee", date:"1 week ago", stars:"★★★★★", text:"“Outstanding customer service! Had an issue with my order and they resolved it within hours. The Italian leather belt is absolutely gorgeous.”" },
               ].map((r, i)=>(
                 <div className="review" key={i}>
                   <div className="review-header">
@@ -473,7 +411,7 @@ export default function Feedback() {
         </section>
       </main>
 
-      {/* Quick Feedback Button (no pulse animation) */}
+      {/* Floating button */}
       <button
         className="floating-feedback"
         type="button"
@@ -482,6 +420,7 @@ export default function Feedback() {
       >
         💬 Quick Feedback
       </button>
+
       <Footer/>
     </div>
   );

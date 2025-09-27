@@ -131,8 +131,8 @@
   padding:8px 16px; border:none; border-radius:20px; font-size:12px; cursor:pointer; transition:.2s;
   font-weight:800; text-transform:uppercase; letter-spacing:.5px;
 }
-.pi .view-btn{ background:#10b981; color:#fff; }
-.pi .view-btn:hover{ background:#059669; transform:translateY(-2px); box-shadow:0 6px 16px rgba(16,185,129,.30); }
+.pi .view-btn{ background:#154abd; color:#fff; }
+.pi .view-btn:hover{ background:#056196; transform:translateY(-2px); box-shadow:0 6px 16px rgba(16,185,129,.30); }
 .pi .edit-btn{ background:#6366f1; color:#fff; }
 .pi .edit-btn:hover{ background:#4f46e5; transform:translateY(-2px); box-shadow:0 6px 16px rgba(99,102,241,.30); }
 .pi .delete-btn{ background:#ef4444; color:#fff; }

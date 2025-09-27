@@ -1,17 +1,50 @@
 import React, { useEffect, useMemo, useState } from "react";
-import "./HandBag.css"; // keep this exact casing
+import { useNavigate } from "react-router-dom";
+import "./HandBag.css";
 import Header from "../Header/Header";
 import Footer from "../Footer/Footer";
-/* ---------- helpers ---------- */
-const money = (n) => `$${Number(n || 0).toFixed(2)}`;
-const imgFallback = (e) => {
-  const svg =
-    "data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 840'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%23f3f4f6'/%3E%3Cstop offset='1' stop-color='%23e5e7eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='1200' height='840'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Segoe UI' font-size='48' fill='%2399a1b1'%3EImage unavailable%3C/text%3E%3C/svg%3E";
-  e.currentTarget.onerror = null;
-  e.currentTarget.src = svg;
+
+/* -------- constants (must match Cart.js) -------- */
+const STORAGE_KEY = "packPalCart";
+const CART_PAGE = "/cart";
+
+/* -------- fallback images for bgClass (edit paths if you have real files) -------- */
+const BG_FALLBACKS = {
+  "bag-satchel": "/images/fallback_satchel.png",
+  "bag-bucket": "/images/fallback_bucket.png",
+  "bag-quilted": "/images/fallback_quilted.png",
+  "bag-camera": "/images/fallback_camera.png",
 };
 
-/* ---------- product data (includes specs for details modal) ---------- */
+/* -------- helpers -------- */
+const svgPlaceholder = (title = "Bag") => {
+  const safe = encodeURIComponent(title.slice(0, 28));
+  return (
+    "data:image/svg+xml;charset=utf8," +
+    `%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'%3E` +
+    `%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%23f3f4f6'/%3E%3Cstop offset='1' stop-color='%23e5e7eb'/%3E%3C/linearGradient%3E%3C/defs%3E` +
+    `%3Crect fill='url(%23g)' width='800' height='600'/%3E` +
+    `%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Segoe UI' font-size='32' fill='%2399a1b1'%3E${safe}%3C/text%3E` +
+    `%3C/svg%3E`
+  );
+};
+
+const imgFallback = (e) => {
+  e.currentTarget.onerror = null;
+  e.currentTarget.src = svgPlaceholder("Image unavailable");
+};
+
+/** Parse "LKR 1,395.90" -> 1395.90 */
+const parseLKR = (text = "") => {
+  const m = (text.match(/[\d.,]+/g) || []).join("");
+  if (!m) return 0;
+  // remove thousands commas but keep final dot
+  const normalized = m.replace(/,/g, "");
+  const n = parseFloat(normalized);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/* ---------- product data ---------- */
 const PRODUCTS = [
   {
     id: "tote-1",
@@ -227,12 +260,12 @@ const StarRow = ({ rating = 4.5 }) => {
 export default function Handbags() {
   const [currentCategory, setCurrentCategory] = useState("all");
   const [term, setTerm] = useState("");
-  const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState(() => new Set());
-  const [cartOpen, setCartOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsProduct, setDetailsProduct] = useState(null);
   const [toast, setToast] = useState("");
+
+  const navigate = useNavigate();
 
   /* Toast auto-hide */
   useEffect(() => {
@@ -241,14 +274,9 @@ export default function Handbags() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  /* Esc closes modals */
+  /* Esc closes details modal */
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        setCartOpen(false);
-        setDetailsOpen(false);
-      }
-    };
+    const onKey = (e) => e.key === "Escape" && setDetailsOpen(false);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -270,30 +298,40 @@ export default function Handbags() {
   }, [currentCategory, term]);
 
   const resultsLabel = useMemo(() => {
-    if (term.trim()) {
-      return `Found ${visibleProducts.length} products for “${term.trim()}”`;
-    }
+    if (term.trim()) return `Found ${visibleProducts.length} products for “${term.trim()}”`;
     const scope = currentCategory === "all" ? "all categories" : currentCategory;
-    return `Showing ${visibleProducts.length} ${
-      visibleProducts.length === 1 ? "product" : "products"
-    } in ${scope}`;
+    return `Showing ${visibleProducts.length} ${visibleProducts.length === 1 ? "product" : "products"} in ${scope}`;
   }, [visibleProducts.length, term, currentCategory]);
 
-  /* Cart */
-  const addToCart = (product) => {
-    setCart((prev) => [...prev, { ...product, cartId: Date.now(), quantity: 1 }]);
-    setToast(`${product.title} added to cart!`);
+  /* choose an img URL for cart (src, mapped bgClass, or SVG placeholder) */
+  const getProductImage = (p) => {
+    if (p?.image?.src) return p.image.src;
+    if (p?.image?.bgClass && BG_FALLBACKS[p.image.bgClass]) return BG_FALLBACKS[p.image.bgClass];
+    return svgPlaceholder(p?.title || "Bag");
   };
-  const removeFromCart = (cartId) => {
-    setCart((prev) => prev.filter((i) => i.cartId !== cartId));
-    setToast("Item removed from cart");
-  };
-  const total = useMemo(
-    () => cart.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 1), 0),
-    [cart]
-  );
 
-  /* Wishlist */
+  /* -------- Add to Cart: SAVE correct LKR price + ALWAYS set img, then go to /checkout -------- */
+  const addToCart = (product) => {
+    const priceNumber = product.priceText ? parseLKR(product.priceText) : Number(product.price) || 0;
+    const item = {
+      id: Date.now(),            // unique line id for cart row
+      name: product.title,
+      price: priceNumber,        // <- correct LKR numeric value
+      quantity: 1,
+      img: getProductImage(product), // <- guaranteed image or SVG data URL
+      icon: "👜",
+      description: product.descLong || "", // optional (Cart.js can show it)
+    };
+
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      stored.push(item);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    } catch {}
+
+    navigate(CART_PAGE, { state: { justAdded: item } });
+  };
+
   const toggleWishlist = (id) => {
     setWishlist((prev) => {
       const next = new Set(prev);
@@ -304,7 +342,6 @@ export default function Handbags() {
     setToast(wishlist.has(id) ? "Removed from wishlist" : "Added to wishlist");
   };
 
-  /* Details modal */
   const openDetails = (product) => {
     setDetailsProduct(product);
     setDetailsOpen(true);
@@ -314,9 +351,8 @@ export default function Handbags() {
     <div className="page-wrap">
       <Header />
       <div className="hb-page">
-        {/* Hero (Accessories-style with floating dots + gold band) */}
+        {/* Hero */}
         <section className="hero">
-          {/* Floating dots layer */}
           <div className="dots" aria-hidden="true">
             {Array.from({ length: 36 }).map((_, i) => {
               const left = `${Math.random() * 100}%`;
@@ -329,13 +365,7 @@ export default function Handbags() {
                 <span
                   key={i}
                   className={`dot ${sizeCls}`}
-                  style={{
-                    left,
-                    "--delay": delay,
-                    "--dur": dur,
-                    "--dx": drift,
-                    "--scale": scale,
-                  }}
+                  style={{ left, "--delay": delay, "--dur": dur, "--dx": drift, "--scale": scale }}
                 />
               );
             })}
@@ -390,8 +420,8 @@ export default function Handbags() {
           <section id="productsGrid" className="products-grid">
             {visibleProducts.map((p) => (
               <div key={p.id} className={`product-card ${p.category}`} data-category={p.category}>
-                <div className={`product-image ${p.image.bgClass ? "bg" : ""} ${p.image.bgClass || ""}`}>
-                  {p.image.src ? (
+                <div className={`product-image ${p.image?.bgClass ? "bg" : ""} ${p.image?.bgClass || ""}`}>
+                  {p.image?.src ? (
                     <img className="fit" src={p.image.src} alt={p.title} onError={imgFallback} />
                   ) : null}
                   <div className="product-badge">{p.badge}</div>
@@ -431,77 +461,13 @@ export default function Handbags() {
           </section>
         </main>
 
-        {/* Floating Cart */}
-        <button className="floating-cart" onClick={() => setCartOpen(true)} aria-label="Open cart">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M7 4V2C7 1.45 7.45 1 8 1H16C16.55 1 17 1.45 17 2V4H20C20.55 4 21 4.45 21 5S20.55 6 20 6H19V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V6H4C3.45 6 3 5.55 3 5S3.45 4 4 4H7ZM9 3V4H15V3H9ZM7 6V19H17V6H7Z" />
-            <path d="M9 8V17H11V8H9ZM13 8V17H15V8H13Z" />
-          </svg>
-          <span className="cart-count">{cart.length}</span>
-        </button>
-
-        {/* Cart Modal */}
-        {cartOpen && (
-          <div className="modal" onClick={(e) => e.target === e.currentTarget && setCartOpen(false)}>
-            <div className="modal-panel">
-              <div className="modal-header">
-                <h2>Shopping Cart</h2>
-                <button className="close-btn" onClick={() => setCartOpen(false)}>
-                  Close
-                </button>
-              </div>
-
-              <div id="cartItems">
-                {cart.length === 0 ? (
-                  <div className="empty">Your cart is empty</div>
-                ) : (
-                  cart.map((item) => (
-                    <div key={item.cartId} className="cart-row">
-                      <div>
-                        <div className="cart-title">{item.title}</div>
-                        <div className="cart-qty">Qty: {item.quantity}</div>
-                      </div>
-                      <div className="cart-right">
-                        <div className="cart-price">{money(item.price * item.quantity)}</div>
-                        <button className="cart-remove" onClick={() => removeFromCart(item.cartId)}>
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="cart-total">
-                <div className="cart-total-row">
-                  <span>Total:</span>
-                  <span id="cartTotal">{money(total)}</span>
-                </div>
-                <button
-                  className="btn-checkout"
-                  onClick={() => {
-                    if (!cart.length) {
-                      setToast("Your cart is empty!");
-                      return;
-                    }
-                    setToast("Redirecting to secure checkout…");
-                    setTimeout(() => window.alert("Demo checkout complete."), 900);
-                  }}
-                >
-                  Proceed to Checkout
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Details Modal */}
         {detailsOpen && detailsProduct && (
           <div className="modal" onClick={(e) => e.target === e.currentTarget && setDetailsOpen(false)}>
             <div className="modal-panel details-panel">
               <div className="details-grid">
                 <div className="prod-photo">
-                  <img alt={detailsProduct.title} src={detailsProduct.image?.src} onError={imgFallback} />
+                  <img alt={detailsProduct.title} src={getProductImage(detailsProduct)} onError={imgFallback} />
                 </div>
 
                 <div className="prod-info">
@@ -527,14 +493,7 @@ export default function Handbags() {
                   </div>
 
                   <div className="details-cta">
-                    <button
-                      className="btn-primary"
-                      onClick={() => {
-                        addToCart(detailsProduct);
-                        setDetailsOpen(false);
-                        setCartOpen(true);
-                      }}
-                    >
+                    <button className="btn-primary" onClick={() => addToCart(detailsProduct)}>
                       Add to Cart
                     </button>
                     <button className="btn-soft" onClick={() => setDetailsOpen(false)}>

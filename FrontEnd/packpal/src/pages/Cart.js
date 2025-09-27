@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const STORAGE_KEY = "packPalCart";
-const TX_URL = "http://localhost:5000/transactions";
+const TX_URL = "http://localhost:5000/api/transactions";
 
 const money = (n) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR" }).format(

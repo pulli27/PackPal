@@ -265,7 +265,7 @@ export default function Home() {
                   data-product="signature-handbag"
                   onClick={() => showNotification("Viewing Signature Handbag details...")}
                 >
-                  <div className="product-image"><img src="/images/signature_handbag.png" alt="Signaturee Bag" /></div>
+                  <div className="product-image"><img src="/images/signature_handbag.jpg" alt="Signaturee Bag" /></div>
                   <h3 className="product-title">Signature Handbag</h3>
                   <div className="product-price">LKR 3500.00</div>
                   <p className="product-description">Premium leather construction and timeless design.</p>
@@ -282,7 +282,7 @@ export default function Home() {
                   data-product="professional-briefcase"
                   onClick={() => showNotification("Viewing Professional Briefcase details...")}
                 >
-                  <div className="product-image"><img src="/images/professional_bag.png" alt="professionalBag" /></div>
+                  <div className="product-image"><img src="/images/professional_bag.jpg" alt="professionalBag" /></div>
                   <h3 className="product-title">Professional Briefcase</h3>
                   <div className="product-price">LKR 2495.99</div>
                   <p className="product-description">Executive briefcase with multiple compartments.</p>
@@ -299,7 +299,7 @@ export default function Home() {
                   data-product="travel-duffel"
                   onClick={() => showNotification("Viewing Travel Duffel details...")}
                 >
-                 <div className="product-image"><img src="/images/traveller1.png" alt="traveller Bag" /></div>
+                 <div className="product-image"><img src="/images/teaveller1.jpg" alt="traveller Bag" /></div>
                   <h3 className="product-title">Travel Duffel</h3>
                   <div className="product-price">LKR 1890.00</div>
                   <p className="product-description">Spacious duffel with weather-resistant coating.</p>

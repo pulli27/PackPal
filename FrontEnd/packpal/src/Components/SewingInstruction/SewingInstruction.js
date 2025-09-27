@@ -3,7 +3,7 @@ import "./SewingInstruction.css";
 import Sidebarhiru from "../Sidebar/Sidebarhiru";
 import { api } from "../../lib/api2";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "jspdf-autotable"; // <-- use function import
 
 // Normalize date for <input type="date"> and display
 const toDateInput = (d) => {
@@ -19,34 +19,6 @@ const toDateInput = (d) => {
 const PERSON_RE = /^[A-Za-z ]+$/;
 const sanitizePerson = (v) =>
   v.replace(/[^A-Za-z ]+/g, "").replace(/\s{2,}/g, " ");
-
-// ------- Company header info -------
-const COMPANY = {
-  name: "PackPal (Pvt) Ltd",
-  lines: [
-    "No. 123, Galle Road, Colombo 04, Sri Lanka",
-    "Phone: +94 77 123 4567",
-    "Email: hello@packpal.com",
-  ],
-  logoPath: process.env.PUBLIC_URL + "/images/any.png", // put any.png in public/images
-};
-
-// Fetch an image and return dataURL (works with /public files)
-async function toDataURL(url) {
-  try {
-    const sep = url.includes("?") ? "&" : "?";
-    const res = await fetch(`${url}${sep}v=${Date.now()}`, { cache: "no-store" });
-    const blob = await res.blob();
-    return await new Promise((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(fr.result);
-      fr.onerror = reject;
-      fr.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
 
 export default function SewingInstruction() {
   // ---------- dialogs ----------
@@ -168,10 +140,11 @@ export default function SewingInstruction() {
     }
   };
 
-  // inputs
+  // General handler except for Sewing Person (custom rules)
   const handleChange = (e) => {
     const key = e.target.id.replace("f_", "");
     let value = e.target.value;
+
     if (key === "person") {
       value = sanitizePerson(value);
       if (value && !PERSON_RE.test(value)) {
@@ -180,17 +153,28 @@ export default function SewingInstruction() {
         setPersonError("");
       }
     }
+
     setForm((f) => ({ ...f, [key]: value }));
   };
 
+  // Block disallowed keys for Sewing Person while typing
   const handlePersonKeyDown = (e) => {
     const allowedControl = new Set([
-      "Backspace","Delete","Tab","ArrowLeft","ArrowRight","Home","End",
+      "Backspace",
+      "Delete",
+      "Tab",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
     ]);
     const isLetterOrSpace = /^[A-Za-z ]$/.test(e.key);
-    if (!isLetterOrSpace && !allowedControl.has(e.key)) e.preventDefault();
+    if (!isLetterOrSpace && !allowedControl.has(e.key)) {
+      e.preventDefault();
+    }
   };
 
+  // Sanitize pasted content for Sewing Person
   const handlePersonPaste = (e) => {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData("text");
@@ -200,6 +184,7 @@ export default function SewingInstruction() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!form.bag || !form.person || !form.deadline) {
       alert("Bag, Person and Deadline are required"); return;
     }
@@ -207,11 +192,17 @@ export default function SewingInstruction() {
       setPersonError("Letters and spaces only (no numbers or symbols).");
       alert("Sewing Person must contain letters and spaces only."); return;
     }
+    if (!PERSON_RE.test(form.person)) {
+      setPersonError("Letters and spaces only (no numbers or symbols).");
+      alert("Sewing Person must contain letters and spaces only.");
+      return;
+    }
+
     const payload = {
       bag: form.bag,
       details: form.details || "",
       person: form.person.trim(),
-      deadline: form.deadline,
+      deadline: form.deadline, // "YYYY-MM-DD"
       priority: form.priority,
       status: form.status,
     };
@@ -247,71 +238,22 @@ export default function SewingInstruction() {
     }
   };
 
-  // ---------- PDF export with better spacing ----------
-  const exportPDF = async () => {
+  // ---------- PDF export (fixed: use autoTable(doc, ...)) ----------
+  const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-
-    // spacing constants
-    const M = 40;              // outer margin
-    const LH = 16;             // line height for small text
-    const GAP_SM = 8;          // small vertical gap
-    const GAP_MD = 14;         // medium gap
-    const GAP_LG = 22;         // large gap before section
-
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
 
     const runDate = new Date().toLocaleString();
     const title = "Sewing Instructions Report";
 
-    // Company name
+    // Header
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
-    doc.text(COMPANY.name, M, M + 6);
-
-    // Address block with comfortable spacing
+    doc.text(title, 40, 40);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    let y = M + 6 + GAP_MD; // gap after company name
-    COMPANY.lines.forEach((line) => {
-      doc.text(line, M, y);
-      y += LH;               // consistent line height
-    });
+    doc.text(`Generated: ${runDate}`, 40, 58);
+    doc.text(`Total Records: ${items.length}`, 40, 72);
 
-    // Bigger gap before report title
-    y += GAP_LG;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text(title, M, y);
-
-    // Meta lines with a small gap between them
-    y += GAP_MD;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.text(`Generated: ${runDate}`, M, y);
-    y += GAP_SM;
-    doc.text(`Total Records: ${items.length}`, M, y);
-
-    // Right-corner logo
-    try {
-      const dataUrl = await toDataURL(COMPANY.logoPath);
-      if (dataUrl) {
-        const logoW = 120;
-        const logoH = 120 * 0.75;
-        const x = pageW - M - logoW;
-        const yTop = M - 6;
-        doc.addImage(dataUrl, "PNG", x, yTop, logoW, logoH, undefined, "FAST");
-      }
-    } catch (e) {
-      console.warn("Logo failed to load for PDF:", e);
-    }
-
-    // Optional thin divider below the header block
-    const dividerY = y + GAP_MD;
-    doc.setDrawColor(180);
-    doc.line(M, dividerY, pageW - M, dividerY);
-
-    // Table
     const head = [["Bag Type", "Sewing Person", "Deadline", "Priority", "Status", "Details"]];
     const body = (items || []).map((i) => [
       i.bag || "",
@@ -323,7 +265,7 @@ export default function SewingInstruction() {
     ]);
 
     autoTable(doc, {
-      startY: dividerY + GAP_MD, // start after divider with gap
+      startY: 88,
       head,
       body,
       styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
@@ -336,14 +278,19 @@ export default function SewingInstruction() {
         4: { cellWidth: 110 },
         5: { cellWidth: "auto" },
       },
-      margin: { left: M, right: M },
       didDrawPage: () => {
-        const pageNumber =
-          doc.getNumberOfPages ? doc.getNumberOfPages() : doc.internal.getNumberOfPages();
-        const footer = `Page ${pageNumber}`;
+        const pageCount = doc.getNumberOfPages
+          ? doc.getNumberOfPages()
+          : doc.internal.getNumberOfPages();
+        const str = `Page ${pageCount}`;
         doc.setFontSize(9);
-        doc.text(footer, pageW - M - doc.getTextWidth(footer), pageH - 20);
+        doc.text(
+          str,
+          doc.internal.pageSize.getWidth() - 60,
+          doc.internal.pageSize.getHeight() - 20
+        );
       },
+      margin: { left: 40, right: 40 },
     });
 
     doc.save("sewing_instructions_report.pdf");
@@ -491,7 +438,11 @@ export default function SewingInstruction() {
                 aria-invalid={personError ? "true" : "false"}
                 required
               />
-              {personError && <small className="error" role="alert">{personError}</small>}
+              {personError && (
+                <small className="error" role="alert">
+                  {personError}
+                </small>
+              )}
             </label>
             <label>
               Deadline
