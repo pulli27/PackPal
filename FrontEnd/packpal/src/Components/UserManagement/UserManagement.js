@@ -9,7 +9,21 @@ import autoTable from "jspdf-autotable";
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-function slugify(s = "") {  
+/* =========================
+   Name helpers / validation
+   ========================= */
+// Allow: letters (incl. many Latin accents), space, apostrophe, period, hyphen
+// Disallow: digits and other symbols
+const NAME_DISALLOWED_RE = /[^A-Za-zÀ-ÖØ-öø-ÿ' .-]/g;
+// For <input pattern> (min 2 chars) – mirrors the above allow-list
+const NAME_PATTERN = "^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$";
+
+function sanitizeName(value = "") {
+  // strip disallowed characters, then collapse multiple spaces and trim
+  return value.replace(NAME_DISALLOWED_RE, "").replace(/\s{2,}/g, " ").trimStart();
+}
+
+function slugify(s = "") {
   return s
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -38,9 +52,7 @@ function genPassword(first, last) {
 function syncCustomersToLocalStorage(users = []) {
   try {
     const customers = users
-      .filter(
-        (u) => String(u.role || "").toLowerCase() === "customer"
-      )
+      .filter((u) => String(u.role || "").toLowerCase() === "customer")
       .map((u) => ({
         _id: u._id,
         name: [u.firstName, u.lastName].filter(Boolean).join(" ").trim(),
@@ -401,7 +413,12 @@ export default function UserManagement() {
                   <label>First Name</label>
                   <input
                     value={newUser.firstName}
-                    onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, firstName: sanitizeName(e.target.value) })
+                    }
+                    inputMode="text"
+                    pattern={NAME_PATTERN}
+                    title="Only letters, spaces, apostrophes, periods and hyphens. Minimum 2 characters."
                     required
                   />
                 </div>
@@ -409,7 +426,12 @@ export default function UserManagement() {
                   <label>Last Name</label>
                   <input
                     value={newUser.lastName}
-                    onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, lastName: sanitizeName(e.target.value) })
+                    }
+                    inputMode="text"
+                    pattern={NAME_PATTERN}
+                    title="Only letters, spaces, apostrophes, periods and hyphens. Minimum 2 characters."
                     required
                   />
                 </div>
@@ -418,7 +440,10 @@ export default function UserManagement() {
                   <input
                     type="email"
                     value={newUser.email}
-                    onChange={(e) => { setNewUser({ ...newUser, email: e.target.value }); setEmailTouched(true); }}
+                    onChange={(e) => {
+                      setNewUser({ ...newUser, email: e.target.value });
+                      setEmailTouched(true);
+                    }}
                     onBlur={() => setEmailTouched(true)}
                     required
                   />
@@ -442,7 +467,10 @@ export default function UserManagement() {
                   <input
                     type="text"
                     value={newUser.password}
-                    onChange={(e) => { setNewUser({ ...newUser, password: e.target.value }); setPwdTouched(true); }}
+                    onChange={(e) => {
+                      setNewUser({ ...newUser, password: e.target.value });
+                      setPwdTouched(true);
+                    }}
                     onBlur={() => setPwdTouched(true)}
                     required
                   />
@@ -473,7 +501,12 @@ export default function UserManagement() {
                   <label>First Name</label>
                   <input
                     value={editing.firstName}
-                    onChange={(e) => setEditing({ ...editing, firstName: e.target.value })}
+                    onChange={(e) =>
+                      setEditing({ ...editing, firstName: sanitizeName(e.target.value) })
+                    }
+                    inputMode="text"
+                    pattern={NAME_PATTERN}
+                    title="Only letters, spaces, apostrophes, periods and hyphens. Minimum 2 characters."
                     required
                   />
                 </div>
@@ -481,7 +514,12 @@ export default function UserManagement() {
                   <label>Last Name</label>
                   <input
                     value={editing.lastName}
-                    onChange={(e) => setEditing({ ...editing, lastName: e.target.value })}
+                    onChange={(e) =>
+                      setEditing({ ...editing, lastName: sanitizeName(e.target.value) })
+                    }
+                    inputMode="text"
+                    pattern={NAME_PATTERN}
+                    title="Only letters, spaces, apostrophes, periods and hyphens. Minimum 2 characters."
                     required
                   />
                 </div>
