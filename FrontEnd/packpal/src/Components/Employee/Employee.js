@@ -123,7 +123,7 @@ export default function Employee() {
       {/* Page wrapper that respects the sidebar width */}
       <div className="page">
         <header className="topbar">
-          <h1 className="page-title">Inventory</h1>
+          <h1 className="page-title">Employee</h1>
           <div className="topbar-actions">
             <button className="btn btn-primary" onClick={downloadCSV}>
               <span className="icon">📄</span> Generate Report
