@@ -1,3 +1,4 @@
+// src/Components/HiruInventory/HiruInventory.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./HiruInventory.css";
 import Sidebarhiru from "../Sidebar/Sidebarhiru";
@@ -18,9 +19,7 @@ function HiruInventory() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("id-asc"); // id-asc | name-asc | qty-desc | qty-asc
   const [view, setView] = useState("table"); // table | cards
-
-  const LOW_STOCK = 180; // UI chip threshold
-  const MIN_STOCK = 20;  // hard rule: do not allow below this
+  const LOW_STOCK = 180;
 
   // 🔹 Minimum stock guard
   const MIN_STOCK = 20;
@@ -31,6 +30,7 @@ function HiruInventory() {
       setErr("");
       setLoading(true);
       const { data } = await axios.get(`${API_BASE}${INVENTORY_PATH}`);
+      // backend returns { items: [...] } with { id, name, quantity }
       const mapped = (data?.items || []).map((d) => ({
         id: d.id,
         name: d.name,
@@ -109,7 +109,7 @@ function HiruInventory() {
         list = list.sort((a, b) => a.qty - b.qty);
         break;
       default:
-        list = list.sort((a, b) => a.id.localeCompare(b.id));
+        list = list.sort((a, b) => a.id.localeCompare(b.id)); // id-asc
     }
     return list;
   }, [items, search, sortBy]);
@@ -119,7 +119,7 @@ function HiruInventory() {
     return { totalItems: items.length, lowStock };
   }, [items]);
 
-  // ---- form handlers (DEDUCT with MIN 20 rule) ----
+  // ---- form handlers (DEDUCT) ----
   const handleSubmit = async (e) => {
     e.preventDefault();
     const form = formRef.current;
@@ -164,7 +164,7 @@ function HiruInventory() {
         return;
       }
 
-      // 3) Compute new quantity with MIN_STOCK rule
+      // 3) Compute new quantity (no negatives allowed)
       if (qtyToDeduct > current.qty) {
         alert(
           `Insufficient stock.\nCurrent quantity: ${current.qty}\n` +
@@ -172,22 +172,8 @@ function HiruInventory() {
         );
         return;
       }
-
       const newQty = current.qty - qtyToDeduct;
 
-<<<<<<< HEAD
-      // Block if it would fall below 20
-      if (newQty < MIN_STOCK) {
-        alert(
-          `Minimum stock is ${MIN_STOCK}. ` +
-            `This action would reduce "${current.name}" (ID: ${current.id}) to ${newQty}. ` +
-            `No changes were made.`
-        );
-        return; // do not update
-      }
-
-      // 4) Update server
-=======
       // 🔹 Block if it would fall below minimum
       if (newQty < MIN_STOCK) {
         alert(
@@ -197,7 +183,6 @@ function HiruInventory() {
       }
 
       // 4) Update server: quantity
->>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
       const updated = await updateItemQty(id, newQty);
 
       // 4.1) ✅ Also raise dynamic Reorder Level by deducted amount
@@ -222,7 +207,7 @@ function HiruInventory() {
         e2?.response?.data?.message ||
         "Failed to deduct quantity. Please try again.";
       alert(`ERROR: ${msg}`);
-      await fetchItems();
+      await fetchItems(); // resync view on error
     } finally {
       setLoading(false);
     }
@@ -236,21 +221,10 @@ function HiruInventory() {
   const maxQty = Math.max(...items.map((i) => i.qty), 1);
 
   return (
-<<<<<<< HEAD
-    <div className="page-wrap inventory-page">
-      {/* LEFT: Sidebar */}
-      <div className="sidebar">
-        <Sidebarhiru />
-      </div>
-
-      {/* RIGHT: Content */}
-      <div className="content">
-=======
     <div className="hiru">{/* PAGE WRAP SCOPE */}
       <div className="inventory-page">
         <Sidebarhiru />
 
->>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
         <div className="container">
           <header className="title-row">
             <h1>
@@ -261,10 +235,6 @@ function HiruInventory() {
                 className="ghost-btn"
                 onClick={() => setView("table")}
                 aria-pressed={view === "table"}
-<<<<<<< HEAD
-                disabled={loading}
-=======
->>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
               >
                 Table
               </button>
@@ -272,10 +242,6 @@ function HiruInventory() {
                 className="ghost-btn"
                 onClick={() => setView("cards")}
                 aria-pressed={view === "cards"}
-<<<<<<< HEAD
-                disabled={loading}
-=======
->>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
               >
                 Cards
               </button>
@@ -439,11 +405,7 @@ function HiruInventory() {
 
                   <div className="form-group">
                     <label htmlFor="quantity">
-<<<<<<< HEAD
-                      Quantity <span className="required">*</span>
-=======
-                      Quantity to Deduct <span className="required">*</span>
->>>>>>> 47abf0a657bfc02048b10efd2d53bad648ce8808
+                      Quantity<span className="required">*</span>
                     </label>
                     <input
                       type="number"
