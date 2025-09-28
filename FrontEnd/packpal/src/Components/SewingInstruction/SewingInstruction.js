@@ -5,6 +5,14 @@ import { api } from "../../lib/api2";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable"; // <-- use function import
 
+// ---------- CONFIG: PackPal address lines shown under the logo in the PDF ----------
+const ADDRESS_LINES = [
+  "PackPal (Pvt) Ltd.",
+  "Makola North, Makola",
+  "Sri Lanka",
+  "Tel: +94 70 000 0000  |  Email: info@packpal.lk",
+];
+
 // Normalize date for <input type="date"> and display
 const toDateInput = (d) => {
   if (!d) return "";
@@ -20,6 +28,23 @@ const PERSON_RE = /^[A-Za-z ]+$/;
 const sanitizePerson = (v) =>
   v.replace(/[^A-Za-z ]+/g, "").replace(/\s{2,}/g, " ");
 
+// helper to load an image from /public and return a PNG data URL
+const loadImageAsDataURL = (src) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+
 export default function SewingInstruction() {
   // ---------- dialogs ----------
   const formRef = useRef(null);
@@ -28,7 +53,7 @@ export default function SewingInstruction() {
   // ---------- state ----------
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null); // { id } | null
+  const [editing, setEditing] = useState(null);
   const [viewItem, setViewItem] = useState(null);
 
   const [form, setForm] = useState({
@@ -41,6 +66,14 @@ export default function SewingInstruction() {
   });
 
   const [personError, setPersonError] = useState("");
+  const [logoData, setLogoData] = useState(null); // <-- holds data URL for public/logo.png
+
+  // preload logo once
+  useEffect(() => {
+    loadImageAsDataURL("/logo.png")
+      .then(setLogoData)
+      .catch(() => setLogoData(null));
+  }, []);
 
   // ---------- open/close dialogs ----------
   useEffect(() => {
@@ -70,7 +103,13 @@ export default function SewingInstruction() {
         status: i.status,
         createdAt: i.createdAt,
       }));
-      setItems(mapped);
+      // Keep newest items at the end so refresh doesn't move the last row to the top
+      const sorted = mapped.slice().sort((a, b) => {
+        const da = new Date(a.createdAt || 0).getTime();
+        const db = new Date(b.createdAt || 0).getTime();
+        return da - db; // ascending
+      });
+      setItems(sorted);
     } catch (e) {
       console.error(e);
       alert("Failed to load sewing instructions");
@@ -83,15 +122,11 @@ export default function SewingInstruction() {
     load();
   }, []);
 
-  // also refresh when other tabs/pages broadcast a change
+  // broadcast refresh hooks
   useEffect(() => {
     const onBcast = () => load();
-    const onStorage = (e) => {
-      if (e.key === "sewing:lastUpdate") load();
-    };
-    const onVis = () => {
-      if (document.visibilityState === "visible") load();
-    };
+    const onStorage = (e) => { if (e.key === "sewing:lastUpdate") load(); };
+    const onVis = () => { if (document.visibilityState === "visible") load(); };
     window.addEventListener("sewing:changed", onBcast);
     window.addEventListener("storage", onStorage);
     document.addEventListener("visibilitychange", onVis);
@@ -136,8 +171,6 @@ export default function SewingInstruction() {
     try {
       await api.delete(`/api/sewing-instructions/${id}`);
       setItems((prev) => prev.filter((x) => x.id !== id));
-
-      // 🔔 notify dashboard + other tabs
       window.dispatchEvent(new Event("sewing:changed"));
       localStorage.setItem("sewing:lastUpdate", String(Date.now()));
     } catch (e) {
@@ -192,13 +225,11 @@ export default function SewingInstruction() {
     e.preventDefault();
 
     if (!form.bag || !form.person || !form.deadline) {
-      alert("Bag, Person and Deadline are required");
-      return;
+      alert("Bag, Person and Deadline are required"); return;
     }
     if (!PERSON_RE.test(form.person)) {
       setPersonError("Letters and spaces only (no numbers or symbols).");
-      alert("Sewing Person must contain letters and spaces only.");
-      return;
+      alert("Sewing Person must contain letters and spaces only."); return;
     }
 
     const payload = {
@@ -209,76 +240,89 @@ export default function SewingInstruction() {
       priority: form.priority,
       status: form.status,
     };
-
     try {
       if (editing?.id) {
-        // update
-        const { data } = await api.put(
-          `/api/sewing-instructions/${editing.id}`,
-          payload
-        );
-        const updated = data.after;
+        const { data } = await api.put(`/api/sewing-instructions/${editing.id}`, payload);
+        const u = data.after;
         setItems((prev) =>
           prev.map((x) =>
             x.id === editing.id
-              ? {
-                  id: updated._id,
-                  bag: updated.bag,
-                  details: updated.details || "",
-                  person: updated.person,
-                  deadline: toDateInput(updated.deadline),
-                  priority: updated.priority,
-                  status: updated.status,
-                  createdAt: updated.createdAt,
-                }
+              ? { id: u._id, bag: u.bag, details: u.details || "", person: u.person,
+                  deadline: toDateInput(u.deadline), priority: u.priority,
+                  status: u.status, createdAt: u.createdAt }
               : x
           )
         );
+        window.dispatchEvent(new Event("sewing:changed"));
+        localStorage.setItem("sewing:lastUpdate", String(Date.now()));
       } else {
-        // create
         const { data } = await api.post("/api/sewing-instructions", payload);
-        const created = data.item;
-        setItems((prev) => [
-          {
-            id: created._id,
-            bag: created.bag,
-            details: created.details || "",
-            person: created.person,
-            deadline: toDateInput(created.deadline),
-            priority: created.priority,
-            status: created.status,
-            createdAt: created.createdAt,
-          },
-          ...prev,
-        ]);
+        const c = data.item;
+        const newItem = {
+          id: c._id,
+          bag: c.bag,
+          details: c.details || "",
+          person: c.person,
+          deadline: toDateInput(c.deadline),
+          priority: c.priority,
+          status: c.status,
+          createdAt: c.createdAt,
+        };
+        // Append to end
+        setItems((prev) => [...prev, newItem]);
       }
-
       setEditing(null);
-
-      // 🔔 notify dashboard + other tabs
-      window.dispatchEvent(new Event("sewing:changed"));
-      localStorage.setItem("sewing:lastUpdate", String(Date.now()));
     } catch (e) {
       console.error(e);
       alert("Save failed");
     }
   };
 
-  // ---------- PDF export (fixed: use autoTable(doc, ...)) ----------
+  // ---------- PDF export ----------
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
     const runDate = new Date().toLocaleString();
     const title = "Sewing Instructions Report";
 
-    // Header
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text(title, 40, 40);
-    doc.setFontSize(10);
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // LEFT: logo + PackPal address
+    let leftBlockBottomY = 0;
+    const logoW = 120; // adjust if you want bigger/smaller
+    const logoH = 40;
+    const topY = 24;
+
+    if (logoData) {
+      try {
+        doc.addImage(logoData, "PNG", margin, topY, logoW, logoH);
+      } catch (_) {
+        // ignore if image fails to render
+      }
+    }
+
+    let addrY = topY + (logoData ? logoH + 8 : 0);
     doc.setFont("helvetica", "normal");
-    doc.text(`Generated: ${runDate}`, 40, 58);
-    doc.text(`Total Records: ${items.length}`, 40, 72);
+    doc.setFontSize(10);
+    ADDRESS_LINES.forEach((line, idx) => {
+      doc.text(line, margin, addrY + idx * 14); // 14pt leading
+    });
+    leftBlockBottomY = addrY + ADDRESS_LINES.length * 14;
+
+    // RIGHT: title + meta (right-aligned)
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.text(title, pageWidth - margin, 42, { align: "right" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(`Generated: ${runDate}`, pageWidth - margin, 62, { align: "right" });
+    doc.text(`Total Records: ${items.length}`, pageWidth - margin, 78, { align: "right" });
+
+    // Compute safe start for the table (no overlap with either header block)
+    const rightBlockBottomY = 96; // where the table used to start
+    const tableStartY = Math.max(rightBlockBottomY, leftBlockBottomY + 12);
 
     const head = [["Bag Type", "Sewing Person", "Deadline", "Priority", "Status", "Details"]];
     const body = (items || []).map((i) => [
@@ -291,7 +335,7 @@ export default function SewingInstruction() {
     ]);
 
     autoTable(doc, {
-      startY: 88,
+      startY: tableStartY,
       head,
       body,
       styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
@@ -310,13 +354,9 @@ export default function SewingInstruction() {
           : doc.internal.getNumberOfPages();
         const str = `Page ${pageCount}`;
         doc.setFontSize(9);
-        doc.text(
-          str,
-          doc.internal.pageSize.getWidth() - 60,
-          doc.internal.pageSize.getHeight() - 20
-        );
+        doc.text(str, pageWidth - margin, doc.internal.pageSize.getHeight() - 20, { align: "right" });
       },
-      margin: { left: 40, right: 40 },
+      margin: { left: margin, right: margin },
     });
 
     doc.save("sewing_instructions_report.pdf");
@@ -413,35 +453,13 @@ export default function SewingInstruction() {
                       </td>
                       <td>{i.person}</td>
                       <td className="nowrap">{i.deadline}</td>
-                      <td>
-                        <BadgePriority p={i.priority} />
-                      </td>
-                      <td>
-                        <BadgeStatus s={i.status} />
-                      </td>
+                      <td><BadgePriority p={i.priority} /></td>
+                      <td><BadgeStatus s={i.status} /></td>
                       <td>
                         <div className="actions">
-                          <button
-                            className="icon-btn icon-view"
-                            title="View"
-                            onClick={() => setViewItem(i)}
-                          >
-                            <Eye />
-                          </button>
-                          <button
-                            className="icon-btn icon-edit"
-                            title="Edit"
-                            onClick={() => openEdit(i)}
-                          >
-                            <Pen />
-                          </button>
-                          <button
-                            className="icon-btn icon-del"
-                            title="Delete"
-                            onClick={() => handleDelete(i.id)}
-                          >
-                            <Trash />
-                          </button>
+                          <button className="icon-btn icon-view" title="View" onClick={() => setViewItem(i)}><Eye /></button>
+                          <button className="icon-btn icon-edit" title="Edit" onClick={() => openEdit(i)}><Pen /></button>
+                          <button className="icon-btn icon-del" title="Delete" onClick={() => handleDelete(i.id)}><Trash /></button>
                         </div>
                       </td>
                     </tr>
@@ -467,13 +485,7 @@ export default function SewingInstruction() {
           <div className="grid">
             <label>
               Bag Type
-              <input
-                id="f_bag"
-                type="text"
-                value={form.bag}
-                onChange={handleChange}
-                required
-              />
+              <input id="f_bag" type="text" value={form.bag} onChange={handleChange} required />
             </label>
             <label>
               Sewing Person
@@ -500,66 +512,30 @@ export default function SewingInstruction() {
             </label>
             <label>
               Deadline
-              <input
-                id="f_deadline"
-                type="date"
-                value={form.deadline}
-                onChange={handleChange}
-                required
-              />
+              <input id="f_deadline" type="date" value={form.deadline} onChange={handleChange} required />
             </label>
             <label>
               Priority
-              <select
-                id="f_priority"
-                value={form.priority}
-                onChange={handleChange}
-                required
-              >
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
+              <select id="f_priority" value={form.priority} onChange={handleChange} required>
+                <option>High</option><option>Medium</option><option>Low</option>
               </select>
             </label>
             <label className="span-2">
               Details
-              <textarea
-                id="f_details"
-                rows="3"
-                value={form.details}
-                onChange={handleChange}
-                placeholder="materials, size, notes"
-              />
+              <textarea id="f_details" rows="3" value={form.details} onChange={handleChange} placeholder="materials, size, notes" />
             </label>
             <label>
               Status
-              <select
-                id="f_status"
-                value={form.status}
-                onChange={handleChange}
-                required
-              >
-                <option>In Progress</option>
-                <option>Pending</option>
-                <option>Quality Check</option>
-                <option>Done</option>
+              <select id="f_status" value={form.status} onChange={handleChange} required>
+                <option>In Progress</option><option>Pending</option><option>Quality Check</option><option>Done</option>
               </select>
             </label>
           </div>
           <div className="modal-actions">
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                formRef.current?.close();
-                setEditing(null);
-              }}
-            >
+            <button type="button" className="btn" onClick={() => { formRef.current?.close(); setEditing(null); }}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              Save
-            </button>
+            <button type="submit" className="btn btn-primary">Save</button>
           </div>
         </form>
       </dialog>
@@ -570,34 +546,16 @@ export default function SewingInstruction() {
           <h3>Instruction</h3>
           {viewItem && (
             <div className="view-body">
-              <p>
-                <strong>Bag:</strong> {viewItem.bag}
-              </p>
-              <p>
-                <strong>Details:</strong> {viewItem.details || "-"}
-              </p>
-              <p>
-                <strong>Person:</strong> {viewItem.person}
-              </p>
-              <p>
-                <strong>Deadline:</strong> {viewItem.deadline}
-              </p>
-              <p>
-                <strong>Priority:</strong> {viewItem.priority}
-              </p>
-              <p>
-                <strong>Status:</strong> {viewItem.status}
-              </p>
+              <p><strong>Bag:</strong> {viewItem.bag}</p>
+              <p><strong>Details:</strong> {viewItem.details || "-"}</p>
+              <p><strong>Person:</strong> {viewItem.person}</p>
+              <p><strong>Deadline:</strong> {viewItem.deadline}</p>
+              <p><strong>Priority:</strong> {viewItem.priority}</p>
+              <p><strong>Status:</strong> {viewItem.status}</p>
             </div>
           )}
           <div className="modal-actions">
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                viewRef.current?.close();
-                setViewItem(null);
-              }}
-            >
+            <button className="btn btn-primary" onClick={() => { viewRef.current?.close(); setViewItem(null); }}>
               Close
             </button>
           </div>

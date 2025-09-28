@@ -16,8 +16,6 @@ router.get("/:id", getByBusinessId);
 router.post("/", createPurchase);
 router.put("/:id", updateByBusinessId);
 router.delete("/:id", removeByBusinessId);
-
-// Optional convenience to change only the status
 router.patch("/:id/status", updateStatus);
 
 module.exports = router;

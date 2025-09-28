@@ -31,6 +31,7 @@ export default function Sidebarhiru({
       "/quality": "quality",
       "/employee": "employee",
       "/reportshiru": "reports",
+      "/hiruinventory": "HiruInventory",
       "/settinghiru": "settings",
       "/login": "login",
     };
@@ -72,6 +73,7 @@ export default function Sidebarhiru({
     quality: "Quality Check",
     employee: "Employee",
     reports: "Reports",
+    hiruinventory: "Hiru Inventory",
     settings: "Settings",
     login: "Login",
   };
@@ -181,6 +183,16 @@ export default function Sidebarhiru({
           >
             <i className="fa-solid fa-file-lines" /> <span>Reports</span>
           </NavLink>
+
+          <NavLink
+                    to="/hiruinventory"
+                    className={({ isActive }) =>
+                      `nav-item ${isActive || active === "HiruInventory" ? "active" : ""}`
+                    }
+                    onClick={() => handleNavigate("HiruInventory")}
+                  >
+                    <i className="fa-solid fa-boxes-stacked" /> <span> Inventory</span>
+                  </NavLink>
 
           <div className="nav-divider" />
 
