@@ -1,3 +1,4 @@
+// src/Components/ProductInventory/ProductInventory.js
 import React, { useEffect, useRef } from "react";
 import "./ProductInventory.css";
 import Sidebarpul from "../Sidebar/Sidebarpul";
@@ -6,6 +7,15 @@ import axios from "axios";
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const INVENTORY_PATH = "/api/products";
 const READ_ONLY = true;
+
+/** ======= Branding used only in the PDF ======= */
+const LOGO_URL = "/new logo.png";
+const COMPANY = {
+  name: "PackPal (Pvt) Ltd",
+  address: "No. 42, Elm Street, Colombo",
+  email: "hello@packpal.lk",
+};
+/** ============================================ */
 
 function ProductInventory() {
   let products = [];
@@ -88,6 +98,7 @@ function ProductInventory() {
       rating: item.rating ?? null,
       discountType: item.discountType || "",
       discountValue: item.discountValue ?? null,
+      reorderLevel: item.reorderLevel ?? null, // used for Low Stock PDF table if present
       createdAt,
       updatedAt,
       createdAtTs,
@@ -261,9 +272,9 @@ function ProductInventory() {
   function openModal(id) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.style.display = "flex";                 // center using flex
+    el.style.display = "flex";
     el.setAttribute("aria-hidden", "false");
-    document.body.style.overflow = "hidden";   // lock background scroll
+    document.body.style.overflow = "hidden";
   }
   function closeModal(id) {
     const el = document.getElementById(id);
@@ -306,7 +317,6 @@ function ProductInventory() {
     const created = p.createdAt ? new Date(p.createdAt).toLocaleString() : "";
     const updated = p.updatedAt ? new Date(p.updatedAt).toLocaleString() : "";
 
-    // Keep title exactly like screenshot
     const titleEl = document.querySelector("#viewModal .modal-title");
     if (titleEl) titleEl.textContent = "📋 Product Details";
 
@@ -334,52 +344,238 @@ function ProductInventory() {
   function addProduct() {}
   function deleteProduct() {}
 
-  /* --------------- Export PDF --------------- */
+  /* --------------- Export PDF (custom layout that matches your screenshot) --------------- */
   async function exportPdf() {
     try {
       const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
       const autoTable = autoTableMod.default || autoTableMod;
 
       const doc = new jsPDF("p", "pt", "a4");
-      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const marginX = 36;
+      let cursorY = 24;
 
-      doc.setFontSize(18);
-      doc.text("PackPal — Product Inventory", pageWidth / 2, 40, { align: "center" });
+      // ---------- Header ----------
+      // left: logo + title
+      const logoSize = 26;
+      try {
+        // you can use a base64 here if your logo isn't publicly reachable
+        doc.addImage(LOGO_URL, "PNG", marginX, cursorY, logoSize, logoSize);
+      } catch (_) {
+        // ignore if image can't be loaded
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("Inventory Management Report", marginX + logoSize + 10, cursorY + 14);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(120);
+      doc.text(`Generated on ${new Date().toLocaleString()}`, marginX + logoSize + 10, cursorY + 30);
+
+      // right: company info
+      doc.setTextColor(0);
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
-      doc.text(new Date().toLocaleString(), pageWidth / 2, 58, { align: "center" });
+      const rightX = pageW - marginX;
+      doc.text(COMPANY.name, rightX, cursorY + 5, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(COMPANY.address, rightX, cursorY + 20, { align: "right" });
+      doc.setTextColor(37, 99, 235);
+      doc.text(COMPANY.email, rightX, cursorY + 35, { align: "right" });
+      doc.setTextColor(0);
 
+      cursorY += 48;
+      doc.setDrawColor(220);
+      doc.line(marginX, cursorY, pageW - marginX, cursorY);
+      cursorY += 14;
+
+      // ---------- KPI boxes (3 per row) ----------
       const totalProducts = products.length;
       const totalUnits = products.reduce((s, p) => s + p.stock, 0);
       const totalValue = products.reduce((s, p) => s + p.stock * discountedUnitPrice(p), 0);
-      doc.setFontSize(14);
-      doc.text(
-        `All items: ${totalProducts} • Units: ${totalUnits} • Total Value: ${money(totalValue)}`,
-        pageWidth / 2, 76, { align: "center" }
-      );
+      const lowStock = products.filter((p) => p.stock > 0 && p.stock <= 20).length;
+      const avgUnit = products.length
+        ? products.reduce((s, p) => s + discountedUnitPrice(p), 0) / products.length
+        : 0;
 
-      const data = getFilteredProducts();
-      const body = data.map((p) => {
-        const unitAfterDiscount = discountedUnitPrice(p);
-        const status = p.stock === 0 ? "Out of Stock" : p.stock <= 20 ? "Low Stock" : "In Stock";
-        return [p.name, p.category, `${p.stock} units`, money(unitAfterDiscount), money(p.stock * unitAfterDiscount), status];
+      const kpis = [
+        { label: "TOTAL ITEMS", value: String(totalProducts), color: [37, 99, 235] },
+        { label: "TOTAL QUANTITY", value: totalUnits.toLocaleString(), color: [37, 99, 235] },
+        { label: "TOTAL VALUE", value: money(totalValue), color: [37, 99, 235] },
+        { label: "LOW STOCK ITEMS", value: String(lowStock), color: [239, 68, 68], danger: true },
+        { label: "AVG UNIT PRICE", value: money(avgUnit.toFixed(2)), color: [37, 99, 235] },
+        { label: "SAFETY STOCK", value: "—", color: [37, 99, 235] }, // put your logic here if you track it
+      ];
+
+      const boxW = (pageW - marginX * 2 - 20) / 3; // 3 columns, 10px gaps each side
+      const boxH = 54;
+      const gap = 10;
+
+      doc.setFontSize(11);
+      const drawBox = (x, y, w, h, label, value, stroke, isDanger = false) => {
+        doc.setLineWidth(1.6);
+        doc.setDrawColor(...stroke);
+        doc.roundedRect(x, y, w, h, 8, 8);
+
+        // value
+        const valY = y + 20;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        if (isDanger) doc.setTextColor(239, 68, 68);
+        else doc.setTextColor(37, 99, 235);
+        doc.text(value, x + 12, valY + 4);
+
+        // label
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(110);
+        doc.text(label, x + 12, y + h - 12);
+        doc.setTextColor(0);
+      };
+
+      for (let i = 0; i < kpis.length; i++) {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
+        const x = marginX + col * (boxW + gap);
+        const y = cursorY + row * (boxH + gap);
+        drawBox(x, y, boxW, boxH, kpis[i].label, kpis[i].value, kpis[i].color, !!kpis[i].danger);
+      }
+      cursorY += 2 * (boxH + gap) + 6; // two rows + a little spacing
+
+      // ---------- Low Stock Alert ----------
+      const lowStocks = products.filter((p) => {
+        const rl = p.reorderLevel == null ? 20 : Number(p.reorderLevel);
+        return p.stock > 0 && p.stock <= rl;
+      });
+
+      // section header with alert icon
+      cursorY += 10;
+      doc.setDrawColor(255, 159, 10);
+      doc.setFillColor(255, 159, 10);
+      doc.circle(marginX + 6, cursorY - 2, 6, "F");
+      doc.setTextColor(255, 159, 10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Low Stock Alert", marginX + 20, cursorY);
+      doc.setTextColor(0);
+      doc.setDrawColor(230);
+      doc.line(marginX, cursorY + 8, pageW - marginX, cursorY + 8);
+      cursorY += 16;
+
+      const lowBody = lowStocks.map((p) => {
+        const rl = p.reorderLevel == null ? null : Number(p.reorderLevel);
+        const shortage = rl == null ? null : Math.max(0, rl - p.stock);
+        return [
+          p.sku || "—",
+          p.name,
+          p.stock,
+          rl == null ? "—" : rl,
+          shortage == null ? "—" : shortage,
+          money(discountedUnitPrice(p)),
+        ];
       });
 
       autoTable(doc, {
-        startY: 96,
-        head: [["Product", "Category", "Stock", "Unit Price", "Value", "Status"]],
-        body,
-        styles: { fontSize: 11, cellPadding: 6, overflow: "linebreak" },
-        headStyles: { fillColor: [33, 150, 243] },
-        columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 100 }, 2: { cellWidth: 80 }, 3: { cellWidth: 90 }, 4: { cellWidth: 90 }, 5: { cellWidth: 80 } },
-        didDrawPage: () => {
-          const str = `Page ${doc.internal.getNumberOfPages()}`;
-          doc.setFontSize(9);
-          doc.text(str, pageWidth - 40, doc.internal.pageSize.getHeight() - 10);
+        startY: cursorY,
+        head: [["ITEM ID", "ITEM NAME", "CURRENT QTY", "REORDER LEVEL", "SHORTAGE", "UNIT PRICE"]],
+        body: lowBody,
+        styles: { fontSize: 10, cellPadding: 6 },
+        headStyles: { fillColor: [244, 67, 54], halign: "center" },
+        columnStyles: {
+          0: { cellWidth: 70 },
+          1: { cellWidth: 170 },
+          2: { cellWidth: 80, halign: "right" },
+          3: { cellWidth: 90, halign: "right" },
+          4: { cellWidth: 70, halign: "right" },
+          5: { cellWidth: 90, halign: "right" },
         },
-        margin: { left: 32, right: 32 },
+        margin: { left: marginX, right: marginX },
+        didDrawPage: (data) => {
+          // footer
+          const page = doc.internal.getNumberOfPages();
+          doc.setFontSize(9);
+          doc.setTextColor(120);
+          doc.text(
+            `Page ${page}`,
+            pageW - marginX,
+            pageH - 10,
+            { align: "right" }
+          );
+        },
       });
 
-      const fileName = `inventory_${new Date().toISOString().split("T")[0]}.pdf`;
+      cursorY = doc.lastAutoTable.finalY + 16;
+
+      // ---------- Complete Inventory ----------
+      // section header
+      doc.setFillColor(255);
+      doc.setTextColor(33, 150, 243);
+      doc.setFont("helvetica", "bold");
+      doc.text("☑︎ Complete Inventory", marginX + 4, cursorY);
+      doc.setTextColor(0);
+      doc.setDrawColor(230);
+      doc.line(marginX, cursorY + 8, pageW - marginX, cursorY + 8);
+      cursorY += 16;
+
+      const body = getFilteredProducts().map((p) => {
+        const unitAfterDiscount = discountedUnitPrice(p);
+        const status = p.stock === 0 ? "Out of Stock" : p.stock <= 20 ? "Low Stock" : "In Stock";
+        return [
+          p.name,
+          p.category,
+          p.stock,
+          money(unitAfterDiscount),
+          money(p.stock * unitAfterDiscount),
+          status,
+        ];
+      });
+
+      autoTable(doc, {
+        startY: cursorY,
+        head: [["ITEM", "CATEGORY", "QUANTITY", "UNIT PRICE", "TOTAL VALUE", "STATUS"]],
+        body,
+        styles: { fontSize: 10, cellPadding: 6 },
+        headStyles: { fillColor: [33, 150, 243] },
+        columnStyles: {
+          0: { cellWidth: 160 },
+          1: { cellWidth: 110 },
+          2: { cellWidth: 70, halign: "right" },
+          3: { cellWidth: 90, halign: "right" },
+          4: { cellWidth: 100, halign: "right" },
+          5: { cellWidth: 70 },
+        },
+        margin: { left: marginX, right: marginX },
+        didDrawPage: (data) => {
+          // header (repeat on pages after the first)
+          if (data.pageNumber > 1) {
+            const yTop = 24;
+            try { doc.addImage(LOGO_URL, "PNG", marginX, yTop, 18, 18); } catch {}
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.text("Inventory Management Report", marginX + 24, yTop + 12);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(120);
+            doc.text(COMPANY.name, pageW - marginX, yTop + 8, { align: "right" });
+            doc.setTextColor(0);
+            doc.setDrawColor(220);
+            doc.line(marginX, yTop + 22, pageW - marginX, yTop + 22);
+          }
+          // footer
+          const page = doc.internal.getNumberOfPages();
+          doc.setFontSize(9);
+          doc.setTextColor(120);
+          doc.text(
+            `Page ${data.pageNumber} of ${page}`,
+            pageW - marginX,
+            pageH - 10,
+            { align: "right" }
+          );
+        },
+      });
+
+      const fileName = `product-inventory-${new Date().toISOString().split("T")[0]}.pdf`;
       doc.save(fileName);
       showNotification("PDF exported successfully!", "success");
     } catch (err) {
