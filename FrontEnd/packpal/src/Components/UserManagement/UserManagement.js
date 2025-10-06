@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import "./UserManagement.css";
 import Sidebar from "../Sidebar/Sidebaris";
 
-// ✅ jsPDF + autotable (function import)
+// ✅ jsPDF + autotable
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -12,14 +12,10 @@ const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 /* =========================
    Name helpers / validation
    ========================= */
-// Allow: letters (incl. many Latin accents), space, apostrophe, period, hyphen
-// Disallow: digits and other symbols
 const NAME_DISALLOWED_RE = /[^A-Za-zÀ-ÖØ-öø-ÿ' .-]/g;
-// For <input pattern> (min 2 chars) – mirrors the above allow-list
 const NAME_PATTERN = "^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$";
 
 function sanitizeName(value = "") {
-  // strip disallowed characters, then collapse multiple spaces and trim
   return value.replace(NAME_DISALLOWED_RE, "").replace(/\s{2,}/g, " ").trimStart();
 }
 
@@ -66,6 +62,24 @@ function syncCustomersToLocalStorage(users = []) {
   }
 }
 
+// ====== Company branding (used in PDF header) ======
+const COMPANY = {
+  name: "PackPal (Pvt) Ltd",
+  address: "No. 42, Elm Street, Colombo",
+  email: "hello@packpal.lk",
+};
+
+// Load an image from /public as data URL (works for jsPDF)
+async function fetchImageAsDataURL(src) {
+  const res = await fetch(src);
+  const blob = await res.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [q, setQ] = useState("");
@@ -73,6 +87,9 @@ export default function UserManagement() {
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // cache logo as data URL for PDF header
+  const [logoDataURL, setLogoDataURL] = useState(null);
 
   const [newUser, setNewUser] = useState({
     firstName: "",
@@ -106,11 +123,12 @@ export default function UserManagement() {
     loadUsers();
   }, []);
 
-  // 🔁 Whenever users change, also refresh localStorage copy of customers
+  // cache customers in localStorage for Orders
   useEffect(() => {
     syncCustomersToLocalStorage(users);
   }, [users]);
 
+  // generate email/password live while adding
   useEffect(() => {
     if (!adding) return;
     const { firstName, lastName } = newUser;
@@ -124,6 +142,14 @@ export default function UserManagement() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newUser.firstName, newUser.lastName, adding, emailTouched, pwdTouched]);
+
+  // preload logo once
+  useEffect(() => {
+    const src = `${process.env.PUBLIC_URL || ""}/logo.png`;
+    fetchImageAsDataURL(src)
+      .then((d) => setLogoDataURL(d))
+      .catch(() => setLogoDataURL(null));
+  }, []);
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -227,7 +253,7 @@ export default function UserManagement() {
     }
   }
 
-  // CSV export (kept)
+  // CSV export (unchanged)
   function exportCsv() {
     const cols = ["firstName", "lastName", "email", "role", "createdAt", "status"];
     const csv = [cols.join(",")]
@@ -248,18 +274,60 @@ export default function UserManagement() {
     a.remove();
   }
 
-  // ✅ PDF export using autoTable(doc, ...)
-  function exportPdf() {
+  // ✅ PDF export with branded header (logo + title + datetime + company block)
+  async function exportPdf() {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const marginX = 40;
 
-    // Title + meta
-    doc.setFontSize(20);
-    doc.text("Users", 40, 40);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Exported: ${new Date().toLocaleString()}`, 40, 60);
-    doc.text(`Total: ${filtered.length}`, 40, 76);
+    // --- Header ---
+    // Logo (left)
+    const logoW = 42; // pt
+    const logoH = 42;
+    const logoX = marginX;
+    const logoY = 28;
 
+    if (logoDataURL) {
+      try {
+        doc.addImage(logoDataURL, "PNG", logoX, logoY, logoW, logoH);
+      } catch {
+        // ignore if addImage fails
+      }
+    }
+
+    // Title + generated datetime (left, next to logo)
+    const textLeftX = logoX + logoW + 12;
+    const titleY = logoY + 18; // vertically aligned with logo
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.text("User Details Report", textLeftX, titleY);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.setTextColor(90);
+    const generated = `Generated on ${new Date().toLocaleString()}`;
+    doc.text(generated, textLeftX, titleY + 22);
+
+    // Company block (right)
+    const rightBlockX = pageW - marginX - 260; // width ~260
+    const rightY = logoY + 4;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(20);
+    doc.text(COMPANY.name, rightBlockX, rightY);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.setTextColor(90);
+    doc.text(COMPANY.address, rightBlockX, rightY + 20);
+    doc.text(COMPANY.email, rightBlockX, rightY + 40);
+
+    // subtle divider line
+    doc.setDrawColor(200);
+    doc.setLineWidth(1);
+    doc.line(marginX, logoY + 56, pageW - marginX, logoY + 56);
+
+    // --- Table ---
     const columns = [
       { header: "First Name", dataKey: "firstName" },
       { header: "Last Name", dataKey: "lastName" },
@@ -281,9 +349,9 @@ export default function UserManagement() {
     autoTable(doc, {
       columns,
       body: rows,
-      startY: 100,
+      startY: logoY + 70, // push table below header
       styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
-      headStyles: { fillColor: [53, 79, 197] },
+      headStyles: { fillColor: [53, 79, 197], textColor: 255 },
       didDrawPage: (data) => {
         const pageCount = doc.internal.getNumberOfPages();
         doc.setFontSize(9);
