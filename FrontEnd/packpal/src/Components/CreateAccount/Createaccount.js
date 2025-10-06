@@ -5,35 +5,36 @@ import "./Createaccount.css";
 export default function Createaccount() {
   // form state
   const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName]   = useState("");
-  const [email, setEmail]         = useState("");
-  const [password, setPassword]   = useState("");
-  const [confirm, setConfirm]     = useState("");
-  const [tos, setTos]             = useState(false);
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [tos, setTos] = useState(false);
 
   // UI state
-  const [showPwd, setShowPwd]     = useState(false);
-  const [status, setStatus]       = useState({ type: "", msg: "" });
-  const [submitting, setSubmitting]= useState(false);
-
-  // touch/submission state (controls when to *show* errors)
-  const [touched, setTouched] = useState({
-    firstName: false,
-    lastName:  false,
-    email:     false,
-    password:  false,
-    confirm:   false,
-    tos:       false,
-  });
+  const [showPwd, setShowPwd] = useState(false);
+  const [status, setStatus] = useState({ type: "", msg: "" });
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // validation states
+  const [touched, setTouched] = useState({
+    firstName: false,
+    lastName: false,
+    email: false,
+    password: false,
+    confirm: false,
+    tos: false,
+  });
+
   const navigate = useNavigate();
+  const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   // --- Validators ---
   const validEmail = /^\S+@\S+\.\S+$/.test(email);
   const pwdRules = {
     len: password.length >= 8,
-    up:  /[A-Z]/.test(password),
+    up: /[A-Z]/.test(password),
     low: /[a-z]/.test(password),
     num: /[0-9]/.test(password),
     sym: /[!@#$%^&*()[\]{};:'",.<>/?\\|`~\-_=+]/.test(password),
@@ -42,19 +43,15 @@ export default function Createaccount() {
 
   const errors = {
     firstName: firstName.trim().length >= 2 ? "" : "Please enter your first name.",
-    lastName:  lastName.trim().length  >= 2 ? "" : "Please enter your last name.",
-    email:     validEmail ? "" : "Enter a valid email address.",
-    password:  strongPwd ? "" : "Use 8+ chars, upper, lower, number, symbol.",
-    confirm:   confirm === password ? "" : "Passwords do not match.",
-    tos:       tos ? "" : "You must accept the Terms.",
+    lastName: lastName.trim().length >= 2 ? "" : "Please enter your last name.",
+    email: validEmail ? "" : "Enter a valid email address.",
+    password: strongPwd ? "" : "Use 8+ chars, upper, lower, number, symbol.",
+    confirm: confirm === password ? "" : "Passwords do not match.",
+    tos: tos ? "" : "You must accept the Terms.",
   };
 
   const formValid = Object.values(errors).every((e) => e === "");
-
-  // Only show an error if the field was touched OR the form was submitted
-  const shouldShow = (field) => (touched[field] || submitted) && errors[field];
-
-  const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const shouldShow = (f) => (touched[f] || submitted) && errors[f];
 
   // --- Submit Handler ---
   const submit = async (e) => {
@@ -75,19 +72,52 @@ export default function Createaccount() {
         body: JSON.stringify({ firstName, lastName, email, password }),
       });
 
+      // Try reading server response
+      let text = "";
       let data = {};
-      try { data = await res.json(); } catch (_) {}
-
-      if (!res.ok) {
-        throw new Error(data?.message || `Failed: ${res.status} ${res.statusText}`);
+      try {
+        text = await res.clone().text();
+        data = JSON.parse(text);
+      } catch {
+        data = {};
       }
 
+      const message =
+        data?.message ||
+        data?.error ||
+        text ||
+        `Failed: ${res.status} ${res.statusText}`;
+
+      // Detect invalid credentials even if status is 200
+      if (
+        /invalid email|invalid password/i.test(message) ||
+        res.status === 401 ||
+        res.status === 403
+      ) {
+        throw new Error("Invalid email or invalid password.");
+      }
+
+      if (!res.ok) {
+        throw new Error(message);
+      }
+
+      // success
       setStatus({ type: "good", msg: "Account created! Redirecting to login..." });
 
-      // reset + go to login
-      setFirstName(""); setLastName(""); setEmail("");
-      setPassword(""); setConfirm(""); setTos(false);
-      setTouched({ firstName:false,lastName:false,email:false,password:false,confirm:false,tos:false });
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPassword("");
+      setConfirm("");
+      setTos(false);
+      setTouched({
+        firstName: false,
+        lastName: false,
+        email: false,
+        password: false,
+        confirm: false,
+        tos: false,
+      });
       setSubmitted(false);
 
       navigate("/login");
@@ -113,7 +143,6 @@ export default function Createaccount() {
             <div className="brand-col">
               <div />
               <div className="brand-center">
-                {/* ✅ Use same logo class as Login; ensure public/logo.png exists */}
                 <img
                   src={`${process.env.PUBLIC_URL || ""}/new logo.png`}
                   alt="PackPal logo"
@@ -121,7 +150,8 @@ export default function Createaccount() {
                 />
                 <h1 className="brand-name">PackPal</h1>
                 <p className="brand-copy">
-                  Where fabric meets purpose, and style meets endurance — welcome to a new era of bags.
+                  Where fabric meets purpose, and style meets endurance — welcome
+                  to a new era of bags.
                 </p>
               </div>
               <div />
@@ -133,10 +163,30 @@ export default function Createaccount() {
             <div className="form-wrap">
               <h2 className="title" aria-label="Create Account">
                 {title.split("\n").map((t, i) => (
-                  <span key={i} className="line">{t}</span>
+                  <span key={i} className="line">
+                    {t}
+                  </span>
                 ))}
               </h2>
               <p className="subtitle">Sign up to your PackPal account</p>
+
+              {/* Error banner (clearly visible) */}
+              {status.msg && (
+                <div
+                  style={{
+                    backgroundColor:
+                      status.type === "bad" ? "#fdecea" : "#e9f8ee",
+                    color: status.type === "bad" ? "#b71c1c" : "#0b7a2a",
+                    borderRadius: "10px",
+                    padding: "10px 14px",
+                    textAlign: "center",
+                    marginBottom: "12px",
+                    fontWeight: "600",
+                  }}
+                >
+                  {status.msg}
+                </div>
+              )}
 
               <form onSubmit={submit} className="form" noValidate>
                 <div className="grid-2">
@@ -146,8 +196,10 @@ export default function Createaccount() {
                       <input
                         id="firstName"
                         value={firstName}
-                        onChange={(e)=>setFirstName(e.target.value)}
-                        onBlur={()=>setTouched((t)=>({ ...t, firstName:true }))}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        onBlur={() =>
+                          setTouched((t) => ({ ...t, firstName: true }))
+                        }
                         placeholder="Enter first name"
                         autoComplete="given-name"
                       />
@@ -163,8 +215,10 @@ export default function Createaccount() {
                       <input
                         id="lastName"
                         value={lastName}
-                        onChange={(e)=>setLastName(e.target.value)}
-                        onBlur={()=>setTouched((t)=>({ ...t, lastName:true }))}
+                        onChange={(e) => setLastName(e.target.value)}
+                        onBlur={() =>
+                          setTouched((t) => ({ ...t, lastName: true }))
+                        }
                         placeholder="Enter last name"
                         autoComplete="family-name"
                       />
@@ -182,12 +236,16 @@ export default function Createaccount() {
                       id="email"
                       type="email"
                       value={email}
-                      onChange={(e)=>setEmail(e.target.value)}
-                      onBlur={()=>setTouched((t)=>({ ...t, email:true }))}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() =>
+                        setTouched((t) => ({ ...t, email: true }))
+                      }
                       placeholder="Enter your email"
                       autoComplete="email"
                     />
-                    <span className="right-icon" aria-hidden>✉️</span>
+                    <span className="right-icon" aria-hidden>
+                      ✉️
+                    </span>
                   </div>
                   {shouldShow("email") && (
                     <small className="error">{errors.email}</small>
@@ -201,8 +259,10 @@ export default function Createaccount() {
                       id="password"
                       type={showPwd ? "text" : "password"}
                       value={password}
-                      onChange={(e)=>setPassword(e.target.value)}
-                      onBlur={()=>setTouched((t)=>({ ...t, password:true }))}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onBlur={() =>
+                        setTouched((t) => ({ ...t, password: true }))
+                      }
                       placeholder="Enter your password"
                       autoComplete="new-password"
                     />
@@ -210,8 +270,7 @@ export default function Createaccount() {
                       type="button"
                       className="eye-btn"
                       aria-label={showPwd ? "Hide password" : "Show password"}
-                      onClick={()=>setShowPwd((s)=>!s)}
-                      title={showPwd ? "Hide" : "Show"}
+                      onClick={() => setShowPwd((s) => !s)}
                     >
                       {showPwd ? "🙈" : "👁"}
                     </button>
@@ -231,8 +290,10 @@ export default function Createaccount() {
                       id="confirm"
                       type={showPwd ? "text" : "password"}
                       value={confirm}
-                      onChange={(e)=>setConfirm(e.target.value)}
-                      onBlur={()=>setTouched((t)=>({ ...t, confirm:true }))}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      onBlur={() =>
+                        setTouched((t) => ({ ...t, confirm: true }))
+                      }
                       placeholder="Re-enter your password"
                       autoComplete="new-password"
                     />
@@ -246,23 +307,29 @@ export default function Createaccount() {
                   <input
                     type="checkbox"
                     checked={tos}
-                    onChange={(e)=>setTos(e.target.checked)}
-                    onBlur={()=>setTouched((t)=>({ ...t, tos:true }))}
+                    onChange={(e) => setTos(e.target.checked)}
+                    onBlur={() =>
+                      setTouched((t) => ({ ...t, tos: true }))
+                    }
                   />
                   <span>
                     I agree to the{" "}
                     <button
                       type="button"
                       className="link link-button"
-                      onClick={() => alert("Terms of Service page coming soon")}
+                      onClick={() =>
+                        alert("Terms of Service page coming soon")
+                      }
                     >
                       Terms of Service
-                    </button>
-                    {" "}&&{" "}
+                    </button>{" "}
+                    &&{" "}
                     <button
                       type="button"
                       className="link link-button"
-                      onClick={() => alert("Privacy Policy page coming soon")}
+                      onClick={() =>
+                        alert("Privacy Policy page coming soon")
+                      }
                     >
                       Privacy Policy
                     </button>
@@ -277,7 +344,6 @@ export default function Createaccount() {
                     type="submit"
                     className="primary-btn"
                     disabled={submitting}
-                    aria-busy={submitting ? "true" : "false"}
                   >
                     {submitting ? "Creating..." : "Create Account"}
                   </button>

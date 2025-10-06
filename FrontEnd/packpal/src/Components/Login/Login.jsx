@@ -1,7 +1,12 @@
-// src/Components/Login/Login.jsx
+
+
+
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./Login.css";
+
+// OPTIONAL: if you already have an axios wrapper like other modules
+// import { api } from "../../lib/api"; // uncomment if using backend login
 
 export default function Login() {
   // ------- login state -------
@@ -30,8 +35,12 @@ export default function Login() {
   const containerRef = useRef(null);
   const navigate = useNavigate();
 
-  // 👉 routes
-  const DEFAULT_ROUTE = "/home"; // unknown/new users go here
+  // ====== CONFIG ======
+  // Set this to true if you want to verify against your backend/MongoDB.
+  // When true, we call POST /auth/login (adjust path to your API).
+  const USE_BACKEND = false;
+
+  // Only used when USE_BACKEND === false (front-end mock for staff only)
   const USER_ROUTES = {
     "pulmi.vihansa@packpal.com": { password: "Pulmi@1234", route: "/maindashboard" },
     "sanugi.silva@packpal.com":  { password: "Sanugi@1234", route: "/sanudashboard" },
@@ -39,6 +48,7 @@ export default function Login() {
     "sasangi.ranasingha@packpal.com": { password: "Sasangi@1234", route: "/dashboard" },
     "isumi.kumarasinghe@packpal.com": { password: "Isumi@1234", route: "/isudashboard" },
   };
+  // 🚫 NOTE: There is NO generic fallback login anymore.
 
   useEffect(() => {
     containerRef.current?.classList.add("mounted");
@@ -74,7 +84,7 @@ export default function Login() {
   const shouldShow = (field) => (touched[field] || submitted) && errors[field];
 
   /* ---------------- Login submit ---------------- */
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
 
@@ -87,27 +97,46 @@ export default function Login() {
     setErrMsg("");
     setStatus("loading");
 
-    // mock async
-    setTimeout(() => {
-      const inputEmail = email.trim().toLowerCase();
+    const inputEmail = email.trim().toLowerCase();
 
-      // exact matches go to specific dashboards (staff)
-      const userCfg = USER_ROUTES[inputEmail];
-      if (userCfg && password === userCfg.password) {
-        // mark staff auth
+    try {
+      if (USE_BACKEND) {
+        // ===== Backend (Mongo) verification path =====
+        // const { data } = await api.post("/auth/login", { email: inputEmail, password });
+        // Example expected: { token, role, route }
+        // localStorage.setItem("pp:token", data.token);
+        // localStorage.setItem("pp:role", data.role || "user");
+        // setStatus("success");
+        // setTimeout(() => navigate(data.route || "/"), 300);
+        // return;
+
+        // Remove this throw once your API call above is enabled:
+        throw new Error("Backend path enabled but API call is commented. Enable it to proceed.");
+      } else {
+        // ===== Front-end strict (no generic fallback) =====
+        const userCfg = USER_ROUTES[inputEmail];
+        if (!userCfg || password !== userCfg.password) {
+          // Unknown email OR wrong password
+          setStatus("error");
+          setErrMsg("Invalid email or password.");
+          return;
+        }
+
+        // success (staff only)
         localStorage.setItem("pp:token", "staff-" + Date.now());
         localStorage.setItem("pp:role", "staff");
         setStatus("success");
-        setTimeout(() => navigate(userCfg.route), 500);
-        return;
+        setTimeout(() => navigate(userCfg.route), 300);
       }
-
-      // otherwise: treat as CUSTOMER login (storefront)
-      localStorage.setItem("pp:token", "cust-" + Date.now());
-      localStorage.setItem("pp:role", "customer");
-      setStatus("success");
-      setTimeout(() => navigate(DEFAULT_ROUTE), 500);
-    }, 600);
+    } catch (err) {
+      // Handle backend errors (401/404/etc.) uniformly
+      setStatus("error");
+      setErrMsg(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Invalid email or password."
+      );
+    }
   };
 
   /* --------------- Forgot Password: Step 1 (send code) --------------- */
@@ -284,7 +313,7 @@ export default function Login() {
                         placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+                        onBlur={() => setTouched((t) => ({ ...t, password: true })) }
                         required
                         autoComplete="new-password"
                         aria-invalid={!!shouldShow("password")}
@@ -306,7 +335,8 @@ export default function Login() {
                     )}
                   </div>
 
-                  {status === "error" && errMsg && (
+                  {/* Banner for general auth errors (wrong credentials / unknown) */}
+                  {status === "error" && errMsg && !shouldShow("email") && !shouldShow("password") && (
                     <div className="helper-text error">{errMsg}</div>
                   )}
 
@@ -447,4 +477,4 @@ export default function Login() {
       </div>
     </div>
   );
-}
+} 
