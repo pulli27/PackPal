@@ -15,8 +15,9 @@ export default function Createaccount() {
   const [showPwd, setShowPwd]     = useState(false);
   const [status, setStatus]       = useState({ type: "", msg: "" });
   const [submitting, setSubmitting]= useState(false);
+  const [submitted, setSubmitted]  = useState(false);
 
-  // touch/submission state (controls when to *show* errors)
+  // validation state
   const [touched, setTouched] = useState({
     firstName: false,
     lastName:  false,
@@ -25,24 +26,21 @@ export default function Createaccount() {
     confirm:   false,
     tos:       false,
   });
-  const [submitted, setSubmitted] = useState(false);
 
   const navigate = useNavigate();
+  const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   // --- Validators ---
   const validEmail = /^\S+@\S+\.\S+$/.test(email);
-  const pwdRules = {
-    len: password.length >= 8,
-    up:  /[A-Z]/.test(password),
-    low: /[a-z]/.test(password),
-    num: /[0-9]/.test(password),
-    sym: /[!@#$%^&*()[\]{};:'",.<>/?\\|`~\-_=+]/.test(password),
-  };
-  const strongPwd = Object.values(pwdRules).every(Boolean);
+  const strongPwd = password.length >= 8 &&
+                    /[A-Z]/.test(password) &&
+                    /[a-z]/.test(password) &&
+                    /[0-9]/.test(password) &&
+                    /[!@#$%^&*]/.test(password);
 
   const errors = {
     firstName: firstName.trim().length >= 2 ? "" : "Please enter your first name.",
-    lastName:  lastName.trim().length  >= 2 ? "" : "Please enter your last name.",
+    lastName:  lastName.trim().length >= 2 ? "" : "Please enter your last name.",
     email:     validEmail ? "" : "Enter a valid email address.",
     password:  strongPwd ? "" : "Use 8+ chars, upper, lower, number, symbol.",
     confirm:   confirm === password ? "" : "Passwords do not match.",
@@ -50,16 +48,13 @@ export default function Createaccount() {
   };
 
   const formValid = Object.values(errors).every((e) => e === "");
-
-  // Only show an error if the field was touched OR the form was submitted
   const shouldShow = (field) => (touched[field] || submitted) && errors[field];
-
-  const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   // --- Submit Handler ---
   const submit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
+
     if (!formValid || submitting) {
       setStatus({ type: "bad", msg: "Please fix the highlighted fields." });
       return;
@@ -69,34 +64,28 @@ export default function Createaccount() {
       setSubmitting(true);
       setStatus({ type: "", msg: "" });
 
-      const res = await fetch(`${API_BASE}/users`, {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firstName, lastName, email, password }),
       });
 
-      let data = {};
-      try { data = await res.json(); } catch (_) {}
+      const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data?.message || `Failed: ${res.status} ${res.statusText}`);
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to register.");
       }
 
       setStatus({ type: "good", msg: "Account created! Redirecting to login..." });
-
-      // reset + go to login
-      setFirstName(""); setLastName(""); setEmail("");
-      setPassword(""); setConfirm(""); setTos(false);
-      setTouched({ firstName:false,lastName:false,email:false,password:false,confirm:false,tos:false });
-      setSubmitted(false);
-
-      navigate("/login");
+      setTimeout(() => navigate("/login"), 1200);
     } catch (err) {
-      const msg =
-        err.message === "Failed to fetch"
-          ? "Could not reach the server. Check backend and CORS settings."
-          : err.message;
-      setStatus({ type: "bad", msg });
+      setStatus({
+        type: "bad",
+        msg:
+          err.message === "Failed to fetch"
+            ? "Could not reach the server. Check backend and CORS."
+            : err.message,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -108,30 +97,25 @@ export default function Createaccount() {
     <div className="acc page-wrap account-page">
       <div className="auth-page">
         <div className="auth-card">
-          {/* Left brand panel */}
           <aside className="auth-left">
             <div className="brand-col">
-              <div />
               <div className="brand-center">
-                {/* ✅ Use same logo class as Login; ensure public/logo.png exists */}
                 <img
-                  src={`${process.env.PUBLIC_URL || ""}/new logo.png`}
+                  src={`${process.env.PUBLIC_URL}/new logo.png`}
                   alt="PackPal logo"
                   className="brand-logo"
                 />
                 <h1 className="brand-name">PackPal</h1>
                 <p className="brand-copy">
-                  Where fabric meets purpose, and style meets endurance — welcome to a new era of bags.
+                  Where fabric meets purpose, and style meets endurance.
                 </p>
               </div>
-              <div />
             </div>
           </aside>
 
-          {/* Right form */}
           <main className="auth-right">
             <div className="form-wrap">
-              <h2 className="title" aria-label="Create Account">
+              <h2 className="title">
                 {title.split("\n").map((t, i) => (
                   <span key={i} className="line">{t}</span>
                 ))}
@@ -142,104 +126,70 @@ export default function Createaccount() {
                 <div className="grid-2">
                   <label className="field">
                     <span className="label">First Name</span>
-                    <div className="input-shell">
-                      <input
-                        id="firstName"
-                        value={firstName}
-                        onChange={(e)=>setFirstName(e.target.value)}
-                        onBlur={()=>setTouched((t)=>({ ...t, firstName:true }))}
-                        placeholder="Enter first name"
-                        autoComplete="given-name"
-                      />
-                    </div>
-                    {shouldShow("firstName") && (
-                      <small className="error">{errors.firstName}</small>
-                    )}
+                    <input
+                      value={firstName}
+                      onChange={(e)=>setFirstName(e.target.value)}
+                      onBlur={()=>setTouched(t=>({...t, firstName:true}))}
+                      placeholder="Enter first name"
+                    />
+                    {shouldShow("firstName") && <small className="error">{errors.firstName}</small>}
                   </label>
 
                   <label className="field">
                     <span className="label">Last Name</span>
-                    <div className="input-shell">
-                      <input
-                        id="lastName"
-                        value={lastName}
-                        onChange={(e)=>setLastName(e.target.value)}
-                        onBlur={()=>setTouched((t)=>({ ...t, lastName:true }))}
-                        placeholder="Enter last name"
-                        autoComplete="family-name"
-                      />
-                    </div>
-                    {shouldShow("lastName") && (
-                      <small className="error">{errors.lastName}</small>
-                    )}
+                    <input
+                      value={lastName}
+                      onChange={(e)=>setLastName(e.target.value)}
+                      onBlur={()=>setTouched(t=>({...t, lastName:true}))}
+                      placeholder="Enter last name"
+                    />
+                    {shouldShow("lastName") && <small className="error">{errors.lastName}</small>}
                   </label>
                 </div>
 
                 <label className="field">
                   <span className="label">Email</span>
-                  <div className="input-shell">
-                    <input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e)=>setEmail(e.target.value)}
-                      onBlur={()=>setTouched((t)=>({ ...t, email:true }))}
-                      placeholder="Enter your email"
-                      autoComplete="email"
-                    />
-                    <span className="right-icon" aria-hidden>✉️</span>
-                  </div>
-                  {shouldShow("email") && (
-                    <small className="error">{errors.email}</small>
-                  )}
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e)=>setEmail(e.target.value)}
+                    onBlur={()=>setTouched(t=>({...t, email:true}))}
+                    placeholder="Enter your email"
+                  />
+                  {shouldShow("email") && <small className="error">{errors.email}</small>}
                 </label>
 
                 <label className="field">
                   <span className="label">Password</span>
                   <div className="input-shell">
                     <input
-                      id="password"
                       type={showPwd ? "text" : "password"}
                       value={password}
                       onChange={(e)=>setPassword(e.target.value)}
-                      onBlur={()=>setTouched((t)=>({ ...t, password:true }))}
+                      onBlur={()=>setTouched(t=>({...t, password:true}))}
                       placeholder="Enter your password"
-                      autoComplete="new-password"
                     />
                     <button
                       type="button"
                       className="eye-btn"
-                      aria-label={showPwd ? "Hide password" : "Show password"}
-                      onClick={()=>setShowPwd((s)=>!s)}
-                      title={showPwd ? "Hide" : "Show"}
+                      onClick={()=>setShowPwd(s=>!s)}
                     >
                       {showPwd ? "🙈" : "👁"}
                     </button>
                   </div>
-                  <small className="hint">
-                    Must include 8+ chars, upper, lower, number &amp; symbol.
-                  </small>
-                  {shouldShow("password") && (
-                    <small className="error">{errors.password}</small>
-                  )}
+                  {shouldShow("password") && <small className="error">{errors.password}</small>}
                 </label>
 
                 <label className="field">
                   <span className="label">Confirm Password</span>
-                  <div className="input-shell">
-                    <input
-                      id="confirm"
-                      type={showPwd ? "text" : "password"}
-                      value={confirm}
-                      onChange={(e)=>setConfirm(e.target.value)}
-                      onBlur={()=>setTouched((t)=>({ ...t, confirm:true }))}
-                      placeholder="Re-enter your password"
-                      autoComplete="new-password"
-                    />
-                  </div>
-                  {shouldShow("confirm") && (
-                    <small className="error">{errors.confirm}</small>
-                  )}
+                  <input
+                    type={showPwd ? "text" : "password"}
+                    value={confirm}
+                    onChange={(e)=>setConfirm(e.target.value)}
+                    onBlur={()=>setTouched(t=>({...t, confirm:true}))}
+                    placeholder="Re-enter your password"
+                  />
+                  {shouldShow("confirm") && <small className="error">{errors.confirm}</small>}
                 </label>
 
                 <label className="checkline">
@@ -247,43 +197,19 @@ export default function Createaccount() {
                     type="checkbox"
                     checked={tos}
                     onChange={(e)=>setTos(e.target.checked)}
-                    onBlur={()=>setTouched((t)=>({ ...t, tos:true }))}
+                    onBlur={()=>setTouched(t=>({...t, tos:true}))}
                   />
-                  <span>
-                    I agree to the{" "}
-                    <button
-                      type="button"
-                      className="link link-button"
-                      onClick={() => alert("Terms of Service page coming soon")}
-                    >
-                      Terms of Service
-                    </button>
-                    {" "}&&{" "}
-                    <button
-                      type="button"
-                      className="link link-button"
-                      onClick={() => alert("Privacy Policy page coming soon")}
-                    >
-                      Privacy Policy
-                    </button>
-                  </span>
+                  <span>I agree to the Terms & Privacy Policy</span>
                 </label>
-                {shouldShow("tos") && (
-                  <small className="error">{errors.tos}</small>
-                )}
+                {shouldShow("tos") && <small className="error">{errors.tos}</small>}
 
                 <div className="btn-row">
-                  <button
-                    type="submit"
-                    className="primary-btn"
-                    disabled={submitting}
-                    aria-busy={submitting ? "true" : "false"}
-                  >
+                  <button type="submit" className="primary-btn" disabled={submitting}>
                     {submitting ? "Creating..." : "Create Account"}
                   </button>
                 </div>
 
-                <div className={`status ${status.type}`}>{status.msg}</div>
+                {status.msg && <div className={`status ${status.type}`}>{status.msg}</div>}
               </form>
             </div>
           </main>
