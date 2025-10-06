@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Totebags.css";
-// If you have shared Header/Footer, uncomment these:
 import Header from "../Header/Header";
 import Footer from "../Footer/Footer";
 
@@ -20,9 +19,8 @@ const imgFallback = (e) => {
   e.currentTarget.src = svg;
 };
 
-/* ---------- constants (fixes no-undef) ---------- */
 const STORAGE_KEY = "packPalCart";
-const CART_PAGE = "/cart"; // change if your cart route is different
+// const CART_PAGE = "/cart";
 
 /* ---------- products ---------- */
 const PRODUCTS = [
@@ -45,7 +43,6 @@ const CATEGORIES = ["all", "canvas", "leather", "work", "beach", "foldable"];
 export default function Totebags() {
   const [currentCategory, setCurrentCategory] = useState("all");
   const [term, setTerm] = useState("");
-  const [cart, setCart] = useState([]); // used to show count in Header
   const [wishlist, setWishlist] = useState(() => new Set());
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsProduct, setDetailsProduct] = useState(null);
@@ -95,10 +92,10 @@ export default function Totebags() {
     } in ${scope}`;
   }, [visibleProducts, term, currentCategory]);
 
-  /* Add to Cart: persist + navigate to /cart */
+  /* Add to Cart (shared, NO navigate) */
   const addToCart = (product) => {
     const item = {
-      id: Date.now(), // unique line id
+      id: Date.now(),
       name: product.title,
       price: Number(product.price) || 0,
       quantity: 1,
@@ -106,19 +103,18 @@ export default function Totebags() {
       icon: "👜",
     };
 
-    // optional local count feedback
-    setCart((prev) => [...prev, { ...item }]);
-
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
       stored.push(item);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     } catch {}
 
-    navigate(CART_PAGE, { state: { justAdded: item } });
+    // notify header
+    window.dispatchEvent(new Event("cart:updated"));
+    setToast("Added to cart");
+    // no navigate
   };
 
-  /* Wishlist */
   const toggleWishlist = (id) => {
     setWishlist((prev) => {
       const next = new Set(prev);
@@ -129,7 +125,6 @@ export default function Totebags() {
     setToast(wishlist.has(id) ? "Removed from wishlist" : "Added to wishlist");
   };
 
-  /* Details modal */
   const openDetails = (product) => {
     setDetailsProduct(product);
     setDetailsOpen(true);
@@ -137,12 +132,12 @@ export default function Totebags() {
 
   return (
     <div className="page-wrap">
-      <Header cartCount={cart.length} />
+      {/* Header reads from localStorage itself */}
+      <Header />
 
       <div className="hb-page">
-        {/* ================= HERO ================= */}
+        {/* HERO */}
         <section className="hero">
-          {/* Floating dots */}
           <div className="dots" aria-hidden="true">
             {Array.from({ length: 36 }).map((_, i) => {
               const left = Math.random() * 100;
@@ -192,7 +187,7 @@ export default function Totebags() {
           </div>
         </section>
 
-        {/* ================= MAIN ================= */}
+        {/* MAIN */}
         <main className="main-content">
           {/* Filters */}
           <section className="filter-section">

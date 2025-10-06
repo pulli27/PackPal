@@ -1,5 +1,5 @@
 // src/Components/Header/Header.js
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   FaHome, FaLayerGroup, FaPuzzlePiece, FaTags, FaGift,
   FaChevronDown, FaUser, FaUserPlus, FaShoppingCart,
@@ -7,24 +7,47 @@ import {
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import "./Header.css";
 
+const STORAGE_KEY = "packPalCart";
+
 export default function Header({
-  cartCount = 0,
+  cartCount: cartCountProp,
   onCartClick = () => {},
   onDropdown = () => {},
 }) {
   const navigate = useNavigate();
+  const [cartCount, setCartCount] = useState(0);
 
-  // only switch for customers
+  const readCount = () => {
+    try {
+      const arr = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      return Array.isArray(arr) ? arr.length : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  useEffect(() => {
+    setCartCount(typeof cartCountProp === "number" ? cartCountProp : readCount());
+
+    const refresh = () => setCartCount(readCount());
+    window.addEventListener("storage", (e) => {
+      if (e.key === STORAGE_KEY) refresh();
+    });
+    window.addEventListener("cart:updated", refresh);
+
+    return () => {
+      window.removeEventListener("cart:updated", refresh);
+    };
+  }, [cartCountProp]);
+
   const isCustomer =
     !!localStorage.getItem("pp:token") &&
     localStorage.getItem("pp:role") === "customer";
 
   const handleLogout = () => {
-    // only for customers
     localStorage.removeItem("pp:token");
     localStorage.removeItem("pp:role");
     navigate("/home", { replace: true });
-    // or: window.location.reload();
   };
 
   return (
@@ -52,38 +75,19 @@ export default function Header({
                   </NavLink>
 
                   <div className="dropdown" role="menu" aria-label="Collections">
-                    <NavLink
-                      to="/kidsbag"
-                      className="dropdown-item"
-                      onClick={() => onDropdown("Kids Bag")}
-                    >
+                    <NavLink to="/kidsbag" className="dropdown-item" onClick={() => onDropdown("Kids Bag")}>
                       <div className="dropdown-title">Kids Bag</div>
                       <div className="dropdown-desc">Fun and colorful bags for children</div>
                     </NavLink>
-
-                    <NavLink
-                      to="/totebag"
-                      className="dropdown-item"
-                      onClick={() => onDropdown("Tote Bag")}
-                    >
+                    <NavLink to="/totebag" className="dropdown-item" onClick={() => onDropdown("Tote Bag")}>
                       <div className="dropdown-title">Tote Bag</div>
                       <div className="dropdown-desc">Spacious and versatile everyday bags</div>
                     </NavLink>
-
-                    <NavLink
-                      to="/handbag"
-                      className="dropdown-item"
-                      onClick={() => onDropdown("Handbag")}
-                    >
+                    <NavLink to="/handbag" className="dropdown-item" onClick={() => onDropdown("Handbag")}>
                       <div className="dropdown-title">Handbag</div>
                       <div className="dropdown-desc">Elegant bags for special occasions</div>
                     </NavLink>
-
-                    <NavLink
-                      to="/clutches"
-                      className="dropdown-item"
-                      onClick={() => onDropdown("Clutch")}
-                    >
+                    <NavLink to="/clutches" className="dropdown-item" onClick={() => onDropdown("Clutch")}>
                       <div className="dropdown-title">Clutch</div>
                       <div className="dropdown-desc">Compact and stylish evening bags</div>
                     </NavLink>
@@ -113,7 +117,6 @@ export default function Header({
             {/* Actions */}
             <div className="header-actions">
               {!isCustomer ? (
-                // guest / staff (no special header) -> show login/register
                 <>
                   <button className="btn" onClick={() => navigate("/login")}>
                     <FaUser /><span>Login</span>
@@ -123,19 +126,20 @@ export default function Header({
                   </button>
                 </>
               ) : (
-                // customer -> show logout
-                <button
-                  className="btn btn-primary"
-                  onClick={handleLogout}
-                  title="Sign out"
-                >
+                <button className="btn btn-primary" onClick={handleLogout} title="Sign out">
                   Logout
                 </button>
               )}
 
-              <button className="cart-btn" onClick={onCartClick} aria-label="Open cart">
+              <button
+                className="cart-btn"
+                onClick={() => { onCartClick(); navigate("/cart"); }}
+                aria-label="Open cart"
+              >
                 <FaShoppingCart />
-                <div className="cart-badge" aria-live="polite">{cartCount}</div>
+                <div className="cart-badge" aria-live="polite">
+                  {typeof cartCountProp === "number" ? cartCountProp : cartCount}
+                </div>
               </button>
             </div>
           </div>
