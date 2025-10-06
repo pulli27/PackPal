@@ -8,7 +8,7 @@ import Footer from "../Footer/Footer";
 const STORAGE_KEY = "packPalCart";
 const CART_PAGE = "/cart";
 
-/* -------- fallback images for bgClass (edit paths if you have real files) -------- */
+/* -------- fallback images for bgClass -------- */
 const BG_FALLBACKS = {
   "bag-satchel": "/images/fallback_satchel.png",
   "bag-bucket": "/images/fallback_bucket.png",
@@ -38,7 +38,6 @@ const imgFallback = (e) => {
 const parseLKR = (text = "") => {
   const m = (text.match(/[\d.,]+/g) || []).join("");
   if (!m) return 0;
-  // remove thousands commas but keep final dot
   const normalized = m.replace(/,/g, "");
   const n = parseFloat(normalized);
   return Number.isFinite(n) ? n : 0;
@@ -267,21 +266,18 @@ export default function Handbags() {
 
   const navigate = useNavigate();
 
-  /* Toast auto-hide */
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(""), 2600);
     return () => clearTimeout(t);
   }, [toast]);
 
-  /* Esc closes details modal */
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && setDetailsOpen(false);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  /* Filter + search */
   const visibleProducts = useMemo(() => {
     const byCat =
       currentCategory === "all"
@@ -303,24 +299,23 @@ export default function Handbags() {
     return `Showing ${visibleProducts.length} ${visibleProducts.length === 1 ? "product" : "products"} in ${scope}`;
   }, [visibleProducts.length, term, currentCategory]);
 
-  /* choose an img URL for cart (src, mapped bgClass, or SVG placeholder) */
   const getProductImage = (p) => {
     if (p?.image?.src) return p.image.src;
     if (p?.image?.bgClass && BG_FALLBACKS[p.image.bgClass]) return BG_FALLBACKS[p.image.bgClass];
     return svgPlaceholder(p?.title || "Bag");
   };
 
-  /* -------- Add to Cart: SAVE correct LKR price + ALWAYS set img, then go to /checkout -------- */
+  // -------- Add to Cart: shared storage + notify header (NO navigate) --------
   const addToCart = (product) => {
     const priceNumber = product.priceText ? parseLKR(product.priceText) : Number(product.price) || 0;
     const item = {
-      id: Date.now(),            // unique line id for cart row
+      id: Date.now(),
       name: product.title,
-      price: priceNumber,        // <- correct LKR numeric value
+      price: priceNumber,
       quantity: 1,
-      img: getProductImage(product), // <- guaranteed image or SVG data URL
+      img: getProductImage(product),
       icon: "👜",
-      description: product.descLong || "", // optional (Cart.js can show it)
+      description: product.descLong || "",
     };
 
     try {
@@ -329,7 +324,9 @@ export default function Handbags() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     } catch {}
 
-    navigate(CART_PAGE, { state: { justAdded: item } });
+    window.dispatchEvent(new Event("cart:updated"));
+    setToast("Added to cart");
+    // do not navigate here
   };
 
   const toggleWishlist = (id) => {

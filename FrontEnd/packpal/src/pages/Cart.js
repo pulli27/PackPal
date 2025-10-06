@@ -1,6 +1,6 @@
 // src/pages/Cart.js
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link  } from "react-router-dom";
 import axios from "axios";
 
 const STORAGE_KEY = "packPalCart";
@@ -10,16 +10,14 @@ const money = (n) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR" }).format(
     Number(n || 0)
   );
+const onlyDigits = (s = "") => (s || "").replace(/\D/g, "");
+const nowISO = () => new Date().toISOString().slice(0, 10);
 
-const nowISO = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
-// -------------------- VALIDATION HELPERS --------------------
+// validation helpers
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 const nameRe  = /^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$/;
 const cityRe  = /^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$/;
 const zipRe   = /^[A-Za-z0-9 -]{3,10}$/;
-
-const onlyDigits = (s = "") => (s || "").replace(/\D/g, "");
 
 const luhnCheck = (num) => {
   const s = onlyDigits(num);
@@ -41,21 +39,17 @@ const parseExpiry = (mmYY) => {
   if (month < 1 || month > 12) return null;
   return { month, year };
 };
-
 const expiryInFuture = (mmYY) => {
-  const parsed = parseExpiry(mmYY);
-  if (!parsed) return false;
-  const { month, year } = parsed;
-  const now = new Date();
-  const exp = new Date(year, month, 0, 23, 59, 59, 999); // end of month
-  return exp >= now;
+  const p = parseExpiry(mmYY);
+  if (!p) return false;
+  const exp = new Date(p.year, p.month, 0, 23, 59, 59, 999);
+  return exp >= new Date();
 };
-
 const normalizeSLPhonePretty = (raw) => {
   let digits = onlyDigits(raw);
   if (digits.startsWith("0")) digits = "94" + digits.slice(1);
   if (!digits.startsWith("94")) digits = "94" + digits;
-  digits = digits.slice(0, 11); // 94 + 9 locals
+  digits = digits.slice(0, 11);
   const local = digits.slice(2);
   let out = "+94";
   if (local.length > 0) out += " " + local.slice(0, 2);
@@ -63,7 +57,6 @@ const normalizeSLPhonePretty = (raw) => {
   if (local.length > 5) out += " " + local.slice(5, 9);
   return out.trim();
 };
-
 const phoneIsValidSL = (pretty) => {
   const digits = onlyDigits(pretty);
   return digits.length === 11 && digits.startsWith("94");
@@ -71,47 +64,22 @@ const phoneIsValidSL = (pretty) => {
 
 const validateForm = (form) => {
   const errors = {};
-
-  if (!form.email || !emailRe.test(form.email.trim()))
-    errors.email = "Enter a valid email (e.g., you@example.com).";
-
-  if (!form.phone || !phoneIsValidSL(form.phone))
-    errors.phone = "Enter a valid Sri Lankan number like +94 71 234 5678.";
-
-  if (!form.firstName || !nameRe.test(form.firstName.trim()))
-    errors.firstName = "First name should be at least 2 letters.";
-
-  if (!form.lastName || !nameRe.test(form.lastName.trim()))
-    errors.lastName = "Last name should be at least 2 letters.";
-
-  if (!form.address || form.address.trim().length < 5)
-    errors.address = "Address should be at least 5 characters.";
-
-  if (!form.city || !cityRe.test(form.city.trim()))
-    errors.city = "Enter a valid city or town.";
-
-  if (!form.zip || !zipRe.test(form.zip.trim()))
-    errors.zip = "Postal code should be 3–10 characters.";
-
+  if (!form.email || !emailRe.test(form.email.trim())) errors.email = "Enter a valid email.";
+  if (!form.phone || !phoneIsValidSL(form.phone)) errors.phone = "Use a valid Sri Lankan number like +94 71 234 5678.";
+  if (!form.firstName || !nameRe.test(form.firstName.trim())) errors.firstName = "First name should be at least 2 letters.";
+  if (!form.lastName || !nameRe.test(form.lastName.trim())) errors.lastName = "Last name should be at least 2 letters.";
+  if (!form.address || form.address.trim().length < 5) errors.address = "Address should be at least 5 characters.";
+  if (!form.city || !cityRe.test(form.city.trim())) errors.city = "Enter a valid city or town.";
+  if (!form.zip || !zipRe.test(form.zip.trim())) errors.zip = "Postal code should be 3–10 characters.";
   const rawPan = onlyDigits(form.cardNumber);
-  if (rawPan.length < 13 || rawPan.length > 19 || !luhnCheck(form.cardNumber))
-    errors.cardNumber = "Enter a valid card number.";
-
-  if (!form.expiryDate || !parseExpiry(form.expiryDate))
-    errors.expiryDate = "Use MM/YY format.";
-  else if (!expiryInFuture(form.expiryDate))
-    errors.expiryDate = "Card is expired.";
-
+  if (rawPan.length < 13 || rawPan.length > 19 || !luhnCheck(form.cardNumber)) errors.cardNumber = "Enter a valid card number.";
+  if (!form.expiryDate || !parseExpiry(form.expiryDate)) errors.expiryDate = "Use MM/YY format.";
+  else if (!expiryInFuture(form.expiryDate)) errors.expiryDate = "Card is expired.";
   const cv = onlyDigits(form.cvv);
-  if (!(cv.length === 3 || cv.length === 4))
-    errors.cvv = "CVV should be 3–4 digits.";
-
-  if (!form.cardName || form.cardName.trim().length < 3)
-    errors.cardName = "Enter the name shown on the card.";
-
+  if (!(cv.length === 3 || cv.length === 4)) errors.cvv = "CVV should be 3–4 digits.";
+  if (!form.cardName || form.cardName.trim().length < 3) errors.cardName = "Enter the name shown on the card.";
   return errors;
 };
-// ------------------------------------------------------------
 
 export default function Cart() {
   const [step, setStep] = useState("cart");
@@ -122,7 +90,7 @@ export default function Cart() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // --------- form state + validation state ---------
+  // form state
   const [form, setForm] = useState({
     email: "", phone: "", firstName: "", lastName: "",
     address: "", city: "", zip: "", cardNumber: "", expiryDate: "", cvv: "", cardName: "",
@@ -146,51 +114,71 @@ export default function Cart() {
   const onCVV = (e) => change("cvv", e.target.value.replace(/\D/g, "").slice(0, 4));
   const onPhone = (e) => change("phone", normalizeSLPhonePretty(e.target.value));
 
-  // live validation
   useEffect(() => { setErrors(validateForm(form)); }, [form]);
 
-  // remove left sidebar spacing (if your layout adds it)
   useEffect(() => {
     document.body.classList.add("sidebar-off");
     return () => document.body.classList.remove("sidebar-off");
   }, []);
 
-  // read cart helper
-  const readCart = () => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
-    catch { return []; }
+  // storage helpers
+  const readCartFromStorage = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      if (!Array.isArray(raw)) return [];
+      return raw.map((it) => ({
+        ...it,
+        price: Number(it.price || 0),
+        quantity: Math.max(1, parseInt(it.quantity || 1, 10) || 1),
+      }));
+    } catch {
+      return [];
+    }
+  };
+  const writeCartToStorage = (arr) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+      window.dispatchEvent(new Event("cart:updated"));
+    } catch {}
   };
 
-  // 1) load from localStorage
-  useEffect(() => {
-    setCart(readCart().map((it) => ({
-      ...it,
-      quantity: Math.max(1, parseInt(it.quantity || 1, 10) || 1),
-    })));
-  }, []);
+  // initial load (READ ONLY)
+  useEffect(() => { setCart(readCartFromStorage()); }, []);
 
-  // 2) merge just-added item from route state
+  // accept optional state (does nothing if you never pass it)
   useEffect(() => {
     const justAdded = location.state && location.state.justAdded;
     if (justAdded) {
       setCart((prev) => {
-        const exists = prev.some((x) => String(x.id) === String(justAdded.id));
-        const next = exists ? prev : [...prev, { ...justAdded, quantity: Math.max(1, justAdded.quantity || 1) }];
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+        const next = [...prev, {
+          ...justAdded,
+          price: Number(justAdded.price || 0),
+          quantity: Math.max(1, justAdded.quantity || 1),
+        }];
+        writeCartToStorage(next);
         return next;
       });
       navigate(".", { replace: true, state: null });
     }
   }, [location.state, navigate]);
 
-  // save cart
+  // listen for external updates
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cart)); } catch {}
-  }, [cart]);
+    const refresh = () => setCart(readCartFromStorage());
+    const onStorage = (e) => { if (e.key === STORAGE_KEY) refresh(); };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("cart:updated", refresh);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("cart:updated", refresh);
+    };
+  }, []);
+
+  // ❌ removed the "persist on any cart change" effect (it wiped storage on mount)
 
   const totals = useMemo(() => {
     const subtotal = cart.reduce(
-      (s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 1),
+      (s, it) => s + Number(it.price || 0) * Number(it.quantity || 1),
       0
     );
     const tax = subtotal * 0.08;
@@ -200,26 +188,35 @@ export default function Cart() {
   }, [cart]);
 
   const updateQty = (id, delta) =>
-    setCart((list) =>
-      list.map((it) =>
+    setCart((list) => {
+      const next = list.map((it) =>
         String(it.id) === String(id)
           ? { ...it, quantity: Math.max(1, (Number(it.quantity) || 1) + delta) }
           : it
-      )
-    );
+      );
+      writeCartToStorage(next);
+      return next;
+    });
 
   const removeItem = (id) =>
-    setCart((list) => list.filter((it) => String(it.id) !== String(id)));
-  const clearCart = () => setCart([]);
+    setCart((list) => {
+      const next = list.filter((it) => String(it.id) !== String(id));
+      writeCartToStorage(next);
+      return next;
+    });
 
-  // === SEND TO BACKEND on Complete Payment ===
+  const clearCart = () => {
+    writeCartToStorage([]);
+    setCart([]);
+  };
+
+  const formValid = !Object.keys(errors).length;
+
   const processPayment = async () => {
-    // quick cart checks
     if (!cart.length) { alert("Your cart is empty."); return; }
     const bad = cart.find((it) => !Number.isFinite(+it.quantity) || +it.quantity < 1);
     if (bad) { alert("Each cart item must have a quantity of at least 1."); return; }
 
-    // submit-time validation (mark all fields touched to show errors)
     const currentErrors = validateForm(form);
     setErrors(currentErrors);
     setTouched({
@@ -234,9 +231,7 @@ export default function Cart() {
       return;
     }
 
-    setProcessing(true);
-    setErr(""); setOk("");
-
+    setProcessing(true); setErr(""); setOk("");
     const customerName = `${form.firstName} ${form.lastName}`.trim();
     const method = "Card";
     const date = nowISO();
@@ -268,9 +263,7 @@ export default function Cart() {
         )
       );
 
-      window.dispatchEvent(new Event("tx:changed"));
-      setCart([]);
-      try { localStorage.setItem(STORAGE_KEY, "[]"); } catch {}
+      clearCart();
       setOk("Payment successful and transactions saved.");
       setStep("success");
     } catch (e) {
@@ -281,17 +274,18 @@ export default function Cart() {
     }
   };
 
-  const formValid = !Object.keys(errors).length;
-
   return (
     <div className="cart-page">
       <style>{css}</style>
 
       <div className="container">
         <div className="header">
-          <h1>📦 PackPal</h1>
-          <p>Smart Bag System - Intelligent Packing Solutions</p>
-        </div>
+  <h1 className="brand">
+    <img src="/new logo.png" alt="PackPal logo" className="logo-img" />
+    <span>PackPal</span>
+  </h1>
+  <p>Smart Bag System - Intelligent Packing Solutions</p>
+</div>
 
         {step === "cart" && (
           <section className="page active">
@@ -304,7 +298,7 @@ export default function Cart() {
               <div className="empty">
                 <p>Your cart is empty.</p>
                 <div style={{ marginTop: 12 }}>
-                  <button className="btn" onClick={() => navigate("/customer")}>
+                  <button className="btn" onClick={() => navigate("/home")}>
                     🛍️ Browse Products
                   </button>
                 </div>
@@ -572,7 +566,7 @@ export default function Cart() {
               </p>
               <div style={{ textAlign: "center", marginTop: 20 }}>
                 <button className="btn" onClick={() => navigate("/finance")}>📄 View Finance</button>
-                <button className="btn" onClick={() => navigate("/customer")}>🛍️ Continue Shopping</button>
+                <button className="btn" onClick={() => navigate("/home")}>🛍️ Continue Shopping</button>
               </div>
             </div>
           </section>
@@ -583,6 +577,7 @@ export default function Cart() {
 }
 
 const css = `
+/* (keep your CSS unchanged) */
 * { margin:0; padding:0; box-sizing:border-box; }
 body, .cart-page { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); min-height:100vh; color:#333; }
 .container{ max-width:1200px; margin:0 auto; padding:20px; }
@@ -627,6 +622,34 @@ body, .cart-page { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
 .btn-success{ background:linear-gradient(135deg,#48bb78,#38a169); box-shadow:0 8px 25px rgba(72,187,120,0.3); }
 .btn-success:hover{ box-shadow:0 15px 35px rgba(72,187,120,0.4); }
 .btn-secondary{ background:linear-gradient(135deg,#718096,#4a5568); box-shadow:0 8px 25px rgba(113,128,150,0.3); }
+/* Logo + title on one line */
+.brand{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;               /* space between logo and text */
+  margin-bottom:10px;
+}
+
+/* Size the logo nicely next to the title */
+.logo-img{
+  width:128px;
+  height:128px;
+  object-fit:contain;
+  display:block;
+}
+
+/* Keep your gradient title styling */
+.header h1{
+  color:#2d3748;
+  font-size:3rem;
+  font-weight:700;
+  background:linear-gradient(45deg,#667eea,#764ba2);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  margin:0;               /* remove extra spacing since we show brand as a row */
+}
+
 .success-message{ text-align:center; max-width:700px; margin:0 auto; }
 .success-icon{ width:150px; height:150px; background:linear-gradient(135deg,#48bb78,#38a169); border-radius:50%; margin:0 auto 35px; display:flex; align-items:center; justify-content:center; font-size:80px; color:#fff; animation:successPulse 2s infinite; box-shadow:0 15px 40px rgba(72,187,120,0.3); }
 @keyframes successPulse{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }

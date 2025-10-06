@@ -5,12 +5,12 @@ import Header from "../Header/Header";
 import Footer from "../Footer/Footer";
 
 const STORAGE_KEY = "packPalCart";
-const CART_PAGE = "/cart";
+// We will NOT auto-navigate to /cart from Add to Cart anymore
+// const CART_PAGE = "/cart";
 
 function Clutches() {
   const navigate = useNavigate();
 
-  // resolve image path exactly like you already do (no changes to images)
   const img = (nameOrPath) => {
     if (!nameOrPath) return "";
     if (
@@ -23,19 +23,17 @@ function Clutches() {
     return `${process.env.PUBLIC_URL}/images/${nameOrPath}`;
   };
 
-  // your data (unchanged)
   const PRODUCTS = [
-    { id: "c2",   title: "Elegant Style C2", price: 2500, img: "images/c2.jpg",        category: "Classic", isNew: true,  discountPct: 10, desc: "Soft pastel flap clutch with tassel accents—perfect for semi-formal events.", specs: { Color: "Blush", Strap: "Detachable", Material: "Vegan leather", Weight: "260g" }, rating: 4.6, reviews: 112 },
-    { id: "c8",   title: "Stylish C8",       price: 2850, img: "images/c8.jpg",        category: "Bold",    isNew: false, discountPct: 0,  desc: "Vibrant statement clutch with tassel closure that turns heads.",           specs: { Color: "Amber", Strap: "Wristlet",   Material: "PU",            Weight: "280g" }, rating: 4.2, reviews: 87  },
-    { id: "c23",  title: "Classic C23",      price: 2500, img: "images/c23.jpg",       category: "Classic", isNew: true,  discountPct: 15, desc: "Round emerald clutch for elegant evenings and weddings.",                 specs: { Color: "Emerald", Strap: "Chain",     Material: "Acrylic",       Weight: "300g" }, rating: 4.8, reviews: 154 },
-    { id: "c234", title: "Modern C234",      price: 3000, img: "images/c234.jpg",      category: "Modern",  isNew: false, discountPct: 0,  desc: "Jewel-tone beaded clutch with gold chain for modern glam.",                specs: { Color: "Purple",  Strap: "Chain",     Material: "Beads",         Weight: "320g" }, rating: 4.4, reviews: 63  },
-    { id: "cbx",  title: "Crystal Box",      price: 3200, img: "images/clutch04.jpg",  category: "Crystal", isNew: false, discountPct: 20, desc: "Black crystal box clutch with bead handle—compact & luxe.",                specs: { Color: "Black",   Strap: "Bead handle",Material: "Crystal/Metal", Weight: "350g" }, rating: 4.7, reviews: 201 },
-    { id: "tw1",  title: "Twin Style",       price: 2950, img: "images/clutches2.jpg", category: "Modern",  isNew: true,  discountPct: 0,  desc: "Sunny twin-panel clutch to brighten any outfit.",                          specs: { Color: "Sunflower",Strap: "Golden chain",Material: "PU",          Weight: "290g" }, rating: 4.3, reviews: 95  },
-    { id: "mesh", title: "Statement Mesh",   price: 3800, img: "images/clutchh1.jpg",  category: "Mesh",    isNew: false, discountPct: 12, desc: "Icy blue mesh pouch with soft silhouette and roomy interior.",             specs: { Color: "Ice Blue", Strap: "Drawstring", Material: "Mesh",          Weight: "260g" }, rating: 4.1, reviews: 72  },
-    { id: "gala", title: "Golden Gala",      price: 3500, img: "images/clutchh11.jpg", category: "Crystal", isNew: false, discountPct: 0,  desc: "Sparkly silver-white clutch for premium occasions.",                       specs: { Color: "Silver",  Strap: "Chain",      Material: "Sequins",       Weight: "300g" }, rating: 4.9, reviews: 319 },
+    { id: "c2", title: "Elegant Style C2", price: 2500, img: "images/c2.jpg", category: "Classic", isNew: true, discountPct: 10, desc: "Soft pastel flap clutch with tassel accents—perfect for semi-formal events.", specs: { Color: "Blush", Strap: "Detachable", Material: "Vegan leather", Weight: "260g" }, rating: 4.6, reviews: 112 },
+    { id: "c8", title: "Stylish C8", price: 2850, img: "images/c8.jpg", category: "Bold", isNew: false, discountPct: 0, desc: "Vibrant statement clutch with tassel closure that turns heads.", specs: { Color: "Amber", Strap: "Wristlet", Material: "PU", Weight: "280g" }, rating: 4.2, reviews: 87 },
+    { id: "c23", title: "Classic C23", price: 2500, img: "images/c23.jpg", category: "Classic", isNew: true, discountPct: 15, desc: "Round emerald clutch for elegant evenings and weddings.", specs: { Color: "Emerald", Strap: "Chain", Material: "Acrylic", Weight: "300g" }, rating: 4.8, reviews: 154 },
+    { id: "c234", title: "Modern C234", price: 3000, img: "images/c234.jpg", category: "Modern", isNew: false, discountPct: 0, desc: "Jewel-tone beaded clutch with gold chain for modern glam.", specs: { Color: "Purple", Strap: "Chain", Material: "Beads", Weight: "320g" }, rating: 4.4, reviews: 63 },
+    { id: "cbx", title: "Crystal Box", price: 3200, img: "images/clutch04.jpg", category: "Crystal", isNew: false, discountPct: 20, desc: "Black crystal box clutch with bead handle—compact & luxe.", specs: { Color: "Black", Strap: "Bead handle", Material: "Crystal/Metal", Weight: "350g" }, rating: 4.7, reviews: 201 },
+    { id: "tw1", title: "Twin Style", price: 2950, img: "images/clutches2.jpg", category: "Modern", isNew: true, discountPct: 0, desc: "Sunny twin-panel clutch to brighten any outfit.", specs: { Color: "Sunflower", Strap: "Golden chain", Material: "PU", Weight: "290g" }, rating: 4.3, reviews: 95 },
+    { id: "mesh", title: "Statement Mesh", price: 3800, img: "images/clutchh1.jpg", category: "Mesh", isNew: false, discountPct: 12, desc: "Icy blue mesh pouch with soft silhouette and roomy interior.", specs: { Color: "Ice Blue", Strap: "Drawstring", Material: "Mesh", Weight: "260g" }, rating: 4.1, reviews: 72 },
+    { id: "gala", title: "Golden Gala", price: 3500, img: "images/clutchh11.jpg", category: "Crystal", isNew: false, discountPct: 0, desc: "Sparkly silver-white clutch for premium occasions.", specs: { Color: "Silver", Strap: "Chain", Material: "Sequins", Weight: "300g" }, rating: 4.9, reviews: 319 },
   ];
 
-  // money helper (unchanged)
   const LKR = new Intl.NumberFormat("en-LK", {
     style: "currency",
     currency: "LKR",
@@ -44,32 +42,20 @@ function Clutches() {
     maximumFractionDigits: 2,
   });
   const money = (n) => LKR.format(n);
-
-  // apply discount if any (unchanged)
   const finalPrice = (p) =>
     p.discountPct && p.discountPct > 0 ? p.price * (1 - p.discountPct / 100) : p.price;
 
   const [filters, setFilters] = useState({ q: "", category: "All" });
-
-  // keep the drawer cart UI, but read/write from the same storage as Cart.js
-  const [cart, setCart] = useState(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      // adapt to drawer format (qty vs quantity; name vs title)
-      return stored.map((it) => ({
-        id: String(it.productId || it.id || Date.now()),
-        title: it.name || "",
-        price: Number(it.price) || 0,
-        img: it.img || "",
-        qty: Number(it.quantity) || 1,
-      }));
-    } catch {
-      return [];
-    }
-  });
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cart, setCart] = useState([]);       // UI mini-cart list (drawer)
+  const [drawerOpen, setDrawerOpen] = useState(false); // we won't auto-open it anymore
   const [modalId, setModalId] = useState(null);
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 2000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(PRODUCTS.map((p) => p.category)))],
@@ -87,29 +73,14 @@ function Clutches() {
 
   const cartTotal = cart.reduce((a, c) => a + c.qty * c.price, 0);
 
-  // keep drawer state mirrored to STORAGE_KEY so both pages are in sync
-  useEffect(() => {
-    try {
-      const forStorage = cart.map((it) => ({
-        id: Date.now() + Math.random(),  // unique line id for Cart.js
-        name: it.title,
-        price: Number(it.price) || 0,
-        quantity: Number(it.qty) || 1,
-        img: it.img,
-        icon: "👜",
-      }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(forStorage));
-    } catch {}
-  }, [cart]);
-
-  // ---- Add to Cart wired to Cart.js ----
+  // ---- Add to Cart: save to shared storage + signal header; DO NOT navigate or open drawer
   const addToCart = (id) => {
     const p = PRODUCTS.find((x) => x.id === id);
     if (!p) return;
-    const price = Number(finalPrice(p));       // numeric LKR price (same as displayed)
-    const imageUrl = img(p.img);               // same image path you display
+    const price = Number(finalPrice(p));
+    const imageUrl = img(p.img);
 
-    // 1) Update drawer UI (keeps your existing mini-cart UX)
+    // update local drawer state silently
     setCart((prev) => {
       const i = prev.findIndex((it) => it.id === id);
       if (i > -1) {
@@ -120,11 +91,10 @@ function Clutches() {
       return [...prev, { id: p.id, title: p.title, price, img: imageUrl, qty: 1 }];
     });
 
-    // 2) Save a line item exactly how Cart.js expects it
     const lineItem = {
-      id: Date.now(),             // unique row id for Cart.js
+      id: Date.now(),
       name: p.title,
-      price,                      // number (LKR)
+      price,
       quantity: 1,
       img: imageUrl,
       icon: "👜",
@@ -135,9 +105,9 @@ function Clutches() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     } catch {}
 
-    // 3) Go to /checkout so "Your PackPal Cart" shows it immediately
-    setDrawerOpen(false);
-    navigate(CART_PAGE, { state: { justAdded: lineItem } });
+    window.dispatchEvent(new Event("cart:updated"));
+    setToast("Added to cart");
+    // no navigate, no drawer open
   };
 
   const incItem = (id) =>
@@ -187,14 +157,10 @@ function Clutches() {
       <Header />
       {/* HERO */}
       <section className="hero" role="region" aria-label="Clutches hero">
-        <div className="dots" aria-hidden="true">
-          {dots}
-        </div>
-
+        <div className="dots" aria-hidden="true">{dots}</div>
         <div className="hero-content">
           <h1>Premium Clutch Collection</h1>
           <p>Explore our curated selection of elegant clutches—perfect for every occasion.</p>
-
           <div className="search-container">
             <input
               type="text"
@@ -277,7 +243,7 @@ function Clutches() {
         )}
       </main>
 
-      {/* CART DRAWER */}
+      {/* Drawer (kept, but never auto-opened) */}
       <aside
         className={`drawer${drawerOpen ? " open" : ""}`}
         aria-hidden={drawerOpen ? "false" : "true"}
@@ -287,9 +253,7 @@ function Clutches() {
       >
         <div className="drawer-header">
           <div className="drawer-title">Shopping Cart</div>
-          <button className="close-x" onClick={() => setDrawerOpen(false)}>
-            ✕
-          </button>
+          <button className="close-x" onClick={() => setDrawerOpen(false)}>✕</button>
         </div>
 
         <div className="drawer-list">
@@ -302,16 +266,10 @@ function Clutches() {
                 <div style={{ flex: 1 }}>
                   <div className="ci-title">{item.title}</div>
                   <div className="qty-wrap">
-                    <button className="qty-btn" onClick={() => decItem(item.id)} aria-label="Decrease">
-                      −
-                    </button>
+                    <button className="qty-btn" onClick={() => decItem(item.id)} aria-label="Decrease">−</button>
                     <span className="qty-num">{item.qty}</span>
-                    <button className="qty-btn" onClick={() => incItem(item.id)} aria-label="Increase">
-                      +
-                    </button>
-                    <button className="remove" onClick={() => removeAll(item.id)} title="Remove all">
-                      ✕
-                    </button>
+                    <button className="qty-btn" onClick={() => incItem(item.id)} aria-label="Increase">+</button>
+                    <button className="remove" onClick={() => removeAll(item.id)} title="Remove all">✕</button>
                   </div>
                 </div>
                 <div className="ci-price">{money(item.price * item.qty)}</div>
@@ -349,14 +307,11 @@ function Clutches() {
               <div className="modal-rating">
                 <span
                   className="stars"
-                  style={{
-                    ["--rating"]: (Math.round(modalProduct.rating * 10) / 10).toFixed(1),
-                  }}
+                  style={{ ["--rating"]: (Math.round(modalProduct.rating * 10) / 10).toFixed(1) }}
                   aria-hidden="true"
                 />
                 <span className="rating-num">
-                  {(Math.round(modalProduct.rating * 10) / 10).toFixed(1)} •{" "}
-                  {modalProduct.reviews.toLocaleString()} reviews
+                  {(Math.round(modalProduct.rating * 10) / 10).toFixed(1)} • {modalProduct.reviews.toLocaleString()} reviews
                 </span>
               </div>
               <div className="modal-price-row">
@@ -368,9 +323,7 @@ function Clutches() {
               <p className="modal-desc">{modalProduct.desc}</p>
               <div className="specs">
                 {Object.entries(modalProduct.specs || {}).map(([k, v]) => (
-                  <div className="spec" key={k}>
-                    {k}: {v}
-                  </div>
+                  <div className="spec" key={k}>{k}: {v}</div>
                 ))}
               </div>
               <div className="modal-actions">
@@ -383,14 +336,16 @@ function Clutches() {
                 >
                   Add to Cart
                 </button>
-                <button className="modal-close" onClick={closeModal}>
-                  Close
-                </button>
+                <button className="modal-close" onClick={closeModal}>Close</button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Toast */}
+      <div className={`toast ${toast ? "show" : ""}`}>{toast}</div>
+
       <Footer />
     </div>
   );

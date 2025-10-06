@@ -4,8 +4,8 @@ import "./KidsBag.css";
 import Header from "../Header/Header";
 import Footer from "../Footer/Footer";
 
-const CART_PAGE = "/cart"; // go to the React route
-const STORAGE_KEY = "packPalCart";
+const CART_PAGE = "/cart";              // shared cart route (opened only via header)
+const STORAGE_KEY = "packPalCart";      // shared storage key
 
 // ---------- Product Data (12 items; includes two Age 13–16) ----------
 const PRODUCTS = [
@@ -37,6 +37,9 @@ export default function KidsBags() {
   const [wishlist, setWishlist] = useState(new Set());
   const [details, setDetails] = useState(null);
 
+  // header badge: live count, passed to <Header />
+  const [cartCount, setCartCount] = useState(0);
+
   const navigate = useNavigate();
 
   const filtered = useMemo(() => {
@@ -65,10 +68,35 @@ export default function KidsBags() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // ---------- LINKED Add to Cart (persists + navigates with state) ----------
+  useEffect(() => {
+    const readCount = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        setCartCount(Array.isArray(stored) ? stored.length : 0);
+      } catch {
+        setCartCount(0);
+      }
+    };
+    readCount();
+
+    const onUpdated = () => readCount();
+    window.addEventListener("cart:updated", onUpdated);
+
+    const onStorage = (e) => {
+      if (e.key === STORAGE_KEY) readCount();
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener("cart:updated", onUpdated);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  // Add to Cart (NO navigate)
   const addToCart = (p) => {
     const item = {
-      id: Date.now(), // unique id for this cart line
+      id: Date.now(),
       name: p.title,
       price: parsePrice(p.priceText) || p.price || 0,
       quantity: 1,
@@ -76,15 +104,15 @@ export default function KidsBags() {
       img: p.img,
     };
 
-    // persist to localStorage (same key Cart.js expects)
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
       stored.push(item);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     } catch {}
 
-    // navigate to cart and pass the just-added item for Cart.js to merge
-    navigate(CART_PAGE, { state: { justAdded: item } });
+    setCartCount((n) => n + 1);
+    window.dispatchEvent(new Event("cart:updated"));
+    setToast("Added to cart");
   };
 
   const toggleWish = (p) => {
@@ -99,7 +127,6 @@ export default function KidsBags() {
     setWishlist(next);
   };
 
-  // Build floating dots like Accessories
   const dots = Array.from({ length: 36 }).map((_, i) => {
     const left = `${Math.random() * 100}%`;
     const delay = `${-Math.random() * 12}s`;
@@ -107,14 +134,21 @@ export default function KidsBags() {
     const drift = `${(Math.random() * 160 - 80).toFixed(0)}px`;
     const scale = (0.7 + Math.random() * 0.8).toFixed(2);
     const cls = Math.random() < 0.18 ? "lg" : Math.random() < 0.6 ? "sm" : "";
-    return <span key={i} className={`dot ${cls}`} style={{ left, ["--delay"]: delay, ["--dur"]: dur, ["--dx"]: drift, ["--scale"]: scale }} aria-hidden="true" />;
+    return (
+      <span
+        key={i}
+        className={`dot ${cls}`}
+        style={{ left, ["--delay"]: delay, ["--dur"]: dur, ["--dx"]: drift, ["--scale"]: scale }}
+        aria-hidden="true"
+      />
+    );
   });
 
   return (
     <div className="kidsbags-root">
-      <Header/>
+      <Header cartCount={cartCount} />
       <div className="kb-wrap">
-        {/* HERO (Accessories-style) */}
+        {/* HERO */}
         <section className="hero" id="home" role="region" aria-label="Kids bags hero">
           <div className="dots" aria-hidden="true">{dots}</div>
 
@@ -140,7 +174,7 @@ export default function KidsBags() {
           </div>
         </section>
 
-        {/* FILTERS (chips like Accessories) */}
+        {/* FILTERS */}
         <main className="main-content" id="bags">
           <section className="filter-wrap">
             <div className="filter-row" id="categoryFilters">
@@ -201,7 +235,6 @@ export default function KidsBags() {
                   <p className="desc">{p.desc}</p>
 
                   <div className="actions">
-                    {/* LINKED Add to Cart */}
                     <button className="btn btn-primary" onClick={() => addToCart(p)}>Add to Cart</button>
                     <button className="btn btn-secondary" onClick={() => setDetails(p)}>More</button>
                     <button className="btn btn-heart" title="Wishlist" onClick={() => toggleWish(p)}>
@@ -253,7 +286,6 @@ export default function KidsBags() {
             </div>
 
             <div className="detail-actions">
-              {/* LINKED Add to Cart from modal too */}
               <button className="btn btn-primary" onClick={() => addToCart(details)}>Add to Cart</button>
               <button className="btn btn-heart" title="Wishlist" onClick={() => toggleWish(details)}>
                 {wishlist.has(details.title) ? "♥" : "♡"}
