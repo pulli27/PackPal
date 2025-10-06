@@ -77,6 +77,7 @@ app.use("/api/advance", advanceRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/transfers", transferRoutes);
 app.use("/api/contributions", contributions);
+app.use("/api/finance", require("./Route/FinanceRoute"));
 
 //hiruni
 app.use("/api/sewing-instructions", sewing);
@@ -103,7 +104,7 @@ app.use((err, _req, res, _next) => {
     // Helpful once while stabilizing models
     console.log("[models]", mongoose.modelNames());
 
-    app.listen(PORT, () => console.log(🚀 Server http://localhost:${PORT}));
+    app.listen(PORT, () => console.log(`🚀 Server http://localhost:${PORT}`));
   } catch (e) {
     console.error("❌ Mongo connect error:", e);
     process.exit(1);

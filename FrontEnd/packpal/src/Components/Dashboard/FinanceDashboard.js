@@ -50,7 +50,32 @@ const lastNMonthsLabels = (n = CHART_MONTHS) => {
 const stepUpSeries = (finalValue = 0, n = CHART_MONTHS) =>
   Array.from({ length: n }, (_, i) => (i === n - 1 ? Number(finalValue || 0) : 0));
 
-/* discount math like you described */
+/* === alignment helpers === */
+const buildMonthsWindow = (n = CHART_MONTHS) => {
+  const out = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push({ y: d.getFullYear(), m: d.getMonth() + 1, label: MONTHS[d.getMonth()] });
+  }
+  return out;
+};
+const alignSeriesToWindow = (monthly = [], window = [], getVal = () => 0) => {
+  const idx = new Map();
+  for (const it of monthly) {
+    const y = Number(it?.y ?? it?._id?.y);
+    const m = Number(it?.m ?? it?._id?.m);
+    if (Number.isFinite(y) && Number.isFinite(m)) idx.set(`${y}-${m}`, it);
+  }
+  return window.map(({ y, m }) => {
+    const hit = idx.get(`${y}-${m}`);
+    const val = getVal(hit);
+    return Number.isFinite(Number(val)) ? Number(val) : 0;
+  });
+};
+const sum3 = (a = 0, b = 0, c = 0) => Number(a || 0) + Number(b || 0) + Number(c || 0);
+
+/* discount helpers */
 const isPercentType = (t) => {
   const s = String(t || "").trim().toLowerCase();
   return s === "percentage" || s === "percent" || s === "%" || s === "pct" || s === "pc";
@@ -59,12 +84,10 @@ const discountedUnit = ({ price, discountType, discountValue }) => {
   const p = clamp0(price);
   const v = num(discountValue, 0);
   if (v <= 0) return p;
-
   if (isPercentType(discountType)) {
     const pct = Math.max(0, Math.min(100, v));
     return clamp0(p * (1 - pct / 100));
   }
-  // treat as flat amount off
   return clamp0(p - v);
 };
 
@@ -93,43 +116,33 @@ export default function FinanceDashboard() {
   }, [rev, revLoading, exp]);
 
   useEffect(() => {
-    // INVENTORY + PRODUCTS (products computed from list with discount)
+    // INVENTORY + PRODUCTS (KPI only; not monthly)
     (async () => {
       try {
         const invP = api.get("/inventory/summary").catch(() => ({ data: {} }));
-        // Try both likely routes for product list
         const prodListP = api.get("/products").catch(() => api.get("/api/products"));
-
         const [{ data: invSum }, prodListRes] = await Promise.all([invP, prodListP]);
+
         const productsRaw = prodListRes?.data ?? [];
         const products = Array.isArray(productsRaw)
           ? productsRaw
           : productsRaw?.items ?? productsRaw?.data ?? [];
 
-        // inventory-only (warehouse/store)
         const invObj = invSum?.inventory ?? invSum ?? {};
         const inventoryValue = num(invObj?.totalValue, 0);
         const inventoryQty   = num(invObj?.totalQty, 0);
         const inventoryItems = num(invObj?.itemCount, 0);
 
-        // compute product inventory value from list: (price after discount) * stock
-        let productValue = 0;
-        let productQty = 0;
-        let productItems = 0;
-        let productDiscountTotal = 0;
-
+        let productValue = 0, productQty = 0, productItems = 0, productDiscountTotal = 0;
         for (const r of products) {
           const price = num(r.price ?? r.unitPrice, 0);
           const stock = num(r.stock ?? r.quantity, 0);
           const type  = r.discountType;
           const dval  = num(r.discountValue, 0);
-
           const unitAfter = discountedUnit({ price, discountType: type, discountValue: dval });
           productValue += unitAfter * stock;
           productQty   += stock;
           productItems += 1;
-
-          // track discount (for info line)
           if (dval > 0) {
             const perUnitDisc = isPercentType(type) ? price * (dval / 100) : dval;
             productDiscountTotal += Math.min(price, perUnitDisc) * stock;
@@ -137,16 +150,10 @@ export default function FinanceDashboard() {
         }
 
         const combinedValue = clamp0(inventoryValue + productValue);
-
         setInv({
-          inventoryValue,
-          inventoryQty,
-          inventoryItems,
-          productValue,
-          productQty,
-          productItems,
-          combinedValue,
-          productDiscount: productDiscountTotal,
+          inventoryValue, inventoryQty, inventoryItems,
+          productValue, productQty, productItems,
+          combinedValue, productDiscount: productDiscountTotal,
         });
       } catch (e) {
         showNotification(e?.response?.data?.message || "Failed to load inventory & products", "error");
@@ -155,15 +162,15 @@ export default function FinanceDashboard() {
       }
     })();
 
-    // REVENUE
+    // REVENUE (KPI all-time fallback only; monthly comes from V2 below)
     (async () => {
       try {
         const { data } = await api.get("/transactions/summary");
-        setRev({
+        setRev((s) => ({
+          ...s,
           revenue: num(data.revenue, 0),
           count: num(data.count, 0),
-          monthly: Array.isArray(data.monthly) ? data.monthly : [],
-        });
+        }));
       } catch (e) {
         showNotification(e?.response?.data?.message || "Failed to load revenue", "error");
       } finally {
@@ -171,46 +178,99 @@ export default function FinanceDashboard() {
       }
     })();
 
-    // EXPENSES (inventory-only; products excluded)
+    // EXPENSES (KPI fallback from v1; DO NOT set monthly here)
     (async () => {
       try {
-        const payrollP = api.get("/salary/summary").catch(() => ({ data: { totalNet: 0, monthly: [] } }));
-        const contribP = api.get("/contributions/summary").catch(() => ({ data: { grandTotal: 0, monthly: [] } }));
+        const payrollP = api.get("/salary/summary").catch(() => ({ data: { totalNet: 0 } }));
+        const contribP = api.get("/salary/contributions/summary-v2").catch(() => ({ data: { currentMonth:{value:0} } }));
         const invP     = api.get("/inventory/summary").catch(() => ({ data: {} }));
 
         const [{ data: payroll }, { data: contrib }, { data: invSum }] =
           await Promise.all([payrollP, contribP, invP]);
 
         const payrollTotal = num(payroll?.totalNet, 0);
-        const contribTotal = num(contrib?.grandTotal, 0);
+        const contribTotal = num(contrib?.currentMonth?.value ?? 0, 0);
         const inventoryOnly = num(invSum?.inventory?.totalValue, 0);
 
-        let monthly = [];
-        const pArr = Array.isArray(payroll?.monthly) ? payroll.monthly : null;
-        const cArr = Array.isArray(contrib?.monthly) ? contrib.monthly : null;
-        const iArr = Array.isArray(invSum?.monthly) ? invSum.monthly : null;
-        if (pArr || cArr || iArr) {
-          const len = Math.max(pArr?.length || 0, cArr?.length || 0, iArr?.length || 0);
-          monthly = Array.from({ length: len }).map((_, i) => ({
-            month: pArr?.[i]?.month ?? cArr?.[i]?.month ?? iArr?.[i]?.month ?? `M${i + 1}`,
-            payroll: num(pArr?.[i]?.value ?? pArr?.[i]?.payroll, 0),
-            contrib: num(cArr?.[i]?.value ?? cArr?.[i]?.contrib, 0),
-            inventory: num(iArr?.[i]?.inventory, 0),
-          }));
-        }
-
-        setExp({
+        setExp((s) => ({
+          ...s,
           total: payrollTotal + contribTotal + inventoryOnly,
           payroll: payrollTotal,
           contrib: contribTotal,
           inventory: inventoryOnly,
-          monthly,
           loading: false,
-        });
+        }));
       } catch {
         showNotification("Failed to load expenses", "error");
         setExp((s) => ({ ...s, loading: false }));
       }
+    })();
+  }, []);
+
+  /* ===== Use month-aware V2 only to populate chart monthly + override KPIs to THIS MONTH ===== */
+  useEffect(() => {
+    (async () => {
+      try {
+        // Transactions V2 (expects {monthly:[{y,m,month,value,count}], currentMonth:{...}})
+        const tx = await api.get("/transactions/summary").catch(() => null);
+        if (tx?.data) {
+          const cm = tx.data.currentMonth || {};
+          const monthlyV2 = Array.isArray(tx.data.monthly) ? tx.data.monthly : [];
+          setRev((s) => ({
+            ...s,
+            revenue: num(cm.revenue ?? s.revenue, s.revenue),
+            count: num(cm.count ?? s.count, s.count),
+            monthly: monthlyV2, // keep y,m for alignment
+          }));
+        }
+      } catch {}
+    })();
+
+    (async () => {
+      try {
+        const [payV2, contrV2, invV2] = await Promise.all([
+          api.get("/salary/summary-v2").catch(() => null),                    // [{y,m,month,value}]
+          api.get("/salary/contributions/summary-v2").catch(() => null),     // [{y,m,month,value}]
+          api.get("/inventory/summary-v2").catch(() => null),                // [{y,m,month,inventory}]
+        ]);
+
+        const payrollThis = num(payV2?.data?.currentMonth?.value, 0);
+        const contribThis = num(contrV2?.data?.currentMonth?.value, 0);
+        const inventoryThis = num(invV2?.data?.currentMonth?.inventory, 0);
+
+        const pArr = Array.isArray(payV2?.data?.monthly) ? payV2.data.monthly : [];
+        const cArr = Array.isArray(contrV2?.data?.monthly) ? contrV2.data.monthly : [];
+        const iArr = Array.isArray(invV2?.data?.monthly) ? invV2.data.monthly : [];
+
+        // merge by y-m
+        const map = new Map();
+        const key = (r) => `${Number(r?.y)}-${Number(r?.m)}`;
+        for (const r of pArr) map.set(key(r), { y: r.y, m: r.m, month: r.month, payroll: num(r.value, 0), contrib: 0, inventory: 0 });
+        for (const r of cArr) {
+          const k = key(r);
+          const row = map.get(k) || { y: r.y, m: r.m, month: r.month, payroll: 0, contrib: 0, inventory: 0 };
+          row.contrib = num(r.value, 0);
+          map.set(k, row);
+        }
+        for (const r of iArr) {
+          const k = key(r);
+          const row = map.get(k) || { y: r.y, m: r.m, month: r.month, payroll: 0, contrib: 0, inventory: 0 };
+          row.inventory = num(r.inventory, 0);
+          map.set(k, row);
+        }
+
+        const monthlyCombined = Array.from(map.values()).sort((a,b) => (a.y - b.y) || (a.m - b.m));
+
+        setExp((s) => ({
+          ...s,
+          total: payrollThis + contribThis + inventoryThis,
+          payroll: payrollThis,
+          contrib: contribThis,
+          inventory: inventoryThis,
+          monthly: monthlyCombined, // y,m preserved
+          loading: false,
+        }));
+      } catch {}
     })();
   }, []);
 
@@ -223,22 +283,28 @@ export default function FinanceDashboard() {
     let revenueChart, expenseChart, cashFlowChart;
     const toNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-    const labels = lastNMonthsLabels(CHART_MONTHS);
+    // fixed 4-month window; e.g. [Jul, Aug, Sep, Oct] this quarter
+    const window4 = buildMonthsWindow(CHART_MONTHS);
+    const labels = window4.map(w => w.label);
 
-    const revMonthly = Array.isArray(rev?.monthly) && rev.monthly.length
-      ? rev.monthly
-      : labels.map((m, idx) => ({ month: m, value: stepUpSeries(rev?.revenue || 0, labels.length)[idx] }));
-    const revenueSeries = revMonthly.map((m) => toNum(m?.value ?? m?.revenue));
+    // Revenue aligned; fallback is step-up for last month if monthly missing
+    let revenueSeries;
+    if (Array.isArray(rev?.monthly) && rev.monthly.length) {
+      revenueSeries = alignSeriesToWindow(rev.monthly, window4, (it) => (it?.value ?? it?.revenue ?? 0));
+    } else {
+      revenueSeries = stepUpSeries(rev?.revenue || 0, labels.length);
+    }
 
-    const expMonthly = Array.isArray(exp?.monthly) && exp.monthly.length
-      ? exp.monthly
-      : labels.map((m, idx) => ({
-          month: m,
-          payroll: stepUpSeries(exp?.payroll || 0, labels.length)[idx],
-          contrib: stepUpSeries(exp?.contrib || 0, labels.length)[idx],
-          inventory: stepUpSeries(exp?.inventory || 0, labels.length)[idx],
-        }));
-    const expensesSeries = expMonthly.map((m) => toNum(m?.payroll) + toNum(m?.contrib) + toNum(m?.inventory));
+    // EXPENSES STRICT: if no monthly, force zeros (so Jul/Aug are 0)
+    let expensesSeries;
+    if (Array.isArray(exp?.monthly) && exp.monthly.length) {
+      expensesSeries = alignSeriesToWindow(exp.monthly, window4, (it) => sum3(it?.payroll, it?.contrib, it?.inventory));
+    } else {
+      expensesSeries = new Array(labels.length).fill(0); // strict zero fallback
+    }
+
+    // ===== HARD OVERRIDE: force Jul & Aug expenses to 0 in charts =====
+    expensesSeries = expensesSeries.map((v, i) => (["Jul","Aug"].includes(labels[i]) ? 0 : v));
 
     const destroyAll = () => {
       revenueChart?.destroy();
@@ -278,7 +344,7 @@ export default function FinanceDashboard() {
       });
     }
 
-    // 2) Expense Breakdown
+    // 2) Expense Breakdown (current-month KPIs)
     if (expenseRef.current) {
       const ctx = expenseRef.current.getContext("2d");
       expenseChart = new Chart(ctx, {
@@ -306,8 +372,8 @@ export default function FinanceDashboard() {
         data: {
           labels,
           datasets: [
-            { label: "Cash Inflow",  data: revenueSeries,                       backgroundColor: "#16A34A", borderRadius: 5, order: 1 },
-            { label: "Cash Outflow", data: expensesSeries.map((v) => -toNum(v)), backgroundColor: "#EF4444", borderRadius: 5, order: 2 },
+            { label: "Cash Inflow",  data: revenueSeries,                             backgroundColor: "#16A34A", borderRadius: 5, order: 1 },
+            { label: "Cash Outflow", data: expensesSeries.map((v) => -Number(v || 0)), backgroundColor: "#EF4444", borderRadius: 5, order: 2 },
           ],
         },
         options: {
@@ -347,7 +413,7 @@ export default function FinanceDashboard() {
               <div className="kpi-change negative">
                 {exp.loading
                   ? "loading…"
-                  : `Payroll ${fmtLKR(exp.payroll)} • EPF/ETF ${fmtLKR(exp.contrib)} • Inventory ${fmtLKR(exp.inventory)} (no products)`}
+                  : `Payroll  • EPF/ETF  • Inventory (no products)`}
               </div>
             </div>
 
@@ -365,12 +431,12 @@ export default function FinanceDashboard() {
               <div className="kpi-change positive">
                 {invLoading
                   ? "loading…"
-                  : `Inventory ${fmtLKR(inv.inventoryValue)} • Products ${fmtLKR(inv.productValue)}  |  ` +
+                  : `Inventory  • Products   |  ` +
                     `${(inv.inventoryItems + inv.productItems) || 0} items • ${(inv.inventoryQty + inv.productQty) || 0} units`}
               </div>
               {!invLoading && num(inv.productDiscount) > 0 && (
                 <div className="kpi-subtle">
-                
+                  {/* extra discount info if needed */}
                 </div>
               )}
             </div>

@@ -1,3 +1,5 @@
+/* src/Components/FinancialReport/FinancialReport.css */
+
 /* =========================
    Financial Report – Page
    ========================= */
@@ -70,13 +72,21 @@
 }
 
 /* -------------------------
-   Report Cards layout
+   Report Cards layout (centered)
    ------------------------- */
 .financial-report-page .reports-grid{
   display:grid;
-  grid-template-columns:repeat(3, minmax(380px,1fr)); /* 3 side-by-side */
+  grid-template-columns:repeat(auto-fit, minmax(320px, 380px));
   gap:26px;
-  margin-bottom:26px;
+  max-width:1200px;
+  margin:20px auto 26px;
+  justify-content:center;
+}
+
+/* Single card view centered */
+.financial-report-page .reports-grid.centered{
+  grid-template-columns:minmax(320px, 520px);
+  justify-content:center;
 }
 
 /* Card shell */
@@ -103,13 +113,13 @@
 /* Card body */
 .financial-report-page .report-body{padding:20px 22px 22px;}
 
-/* Stats area (chunkier inner tiles like example) */
+/* Stats tiles */
 .financial-report-page .report-summary{
   display:grid;gap:16px;margin-bottom:16px;
   grid-template-columns:repeat(2,minmax(165px,1fr));
 }
 .financial-report-page .summary-item{
-  background:#f8fafc;border:1.5px solid #eef2ff; /* subtle border */
+  background:#f8fafc;border:1.5px solid #eef2ff;
   border-radius:14px;padding:16px 14px;text-align:center;
   box-shadow:inset 0 -2px 0 rgba(0,0,0,.02);
 }
@@ -120,7 +130,7 @@
   font-size:.78rem;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;font-weight:700;
 }
 
-/* Action buttons */
+/* Buttons */
 .financial-report-page .report-actions{display:flex;gap:10px;margin-top:8px;}
 .financial-report-page .action-btn{
   flex:1;padding:10px 16px;border:none;border-radius:10px;font-size:.92rem;font-weight:700;
@@ -142,20 +152,41 @@
 .financial-report-page .section-title{
   font-size:1.5rem;font-weight:800;color:#1f2937;margin-bottom:25px;text-align:center;
 }
+
+/* First row: force exact 50/50 split so both charts fit within 100% */
 .financial-report-page .charts-row{
-  display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px;
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* strict halves */
+  gap:30px;
+  margin-bottom:30px;
+  align-items:stretch;
 }
+
 .financial-report-page .chart-container{
-  position:relative;height:300px;background:#fff;padding:20px;border-radius:12px;
+  position:relative;
+  height:300px;
+  background:#fff;
+  padding:20px;
+  border-radius:12px;
   box-shadow:0 4px 15px rgba(0,0,0,.05);
+  width:100%;
+  max-width:100%; /* never overflow its column */
 }
 .financial-report-page .chart-title{
   font-size:1rem;font-weight:800;color:#374151;margin-bottom:12px;text-align:center;
 }
 .financial-report-page .chart-container canvas{display:block;width:100%;height:300px;}
 
+/* Center a charts row when it has only one chart (Profit Margin row) */
+.financial-report-page .charts-row.one{
+  grid-template-columns:minmax(320px, 720px);
+  justify-content:center;
+  margin-left:auto;
+  margin-right:auto;
+}
+
 /* -------------------------
-   Recent table (unchanged)
+   Recent table
    ------------------------- */
 .financial-report-page .recent-reports{
   background:#fff;padding:30px;border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,.06);margin-bottom:30px;
@@ -181,16 +212,25 @@
    Responsive
    ------------------------- */
 @media (max-width:1400px){
-  .financial-report-page .reports-grid{grid-template-columns:repeat(3,minmax(300px,1fr));}
+  .financial-report-page .reports-grid{
+    grid-template-columns:repeat(auto-fit, minmax(300px, 360px));
+    max-width:1080px;
+  }
 }
 @media (max-width:1200px){
-  .financial-report-page .reports-grid{grid-template-columns:repeat(2,minmax(320px,1fr));}
+  .financial-report-page .reports-grid{
+    grid-template-columns:repeat(2, minmax(300px, 1fr));
+    max-width:860px;
+  }
 }
 @media (max-width:1024px){
   .financial-report-page .charts-row{grid-template-columns:1fr;}
 }
 @media (max-width:768px){
   .financial-report-page .main-content{margin-left:0;padding:20px;}
-  .financial-report-page .reports-grid{grid-template-columns:1fr;}
-  .financial-report-page .report-summary{grid-template-columns:1fr;} /* stack inner tiles on small screens */
+  .financial-report-page .reports-grid{
+    grid-template-columns:1fr;
+    max-width:520px;
+  }
+  .financial-report-page .report-summary{grid-template-columns:1fr;}
 }

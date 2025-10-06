@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Customerview.css";
 
-const URL = "http://localhost:5000/carts";
+const URL = "http://localhost:5000/api/carts";
 const STORAGE_KEY = "packPalCart";
 const WISHLIST_KEY = "packPalWishlist";
 
