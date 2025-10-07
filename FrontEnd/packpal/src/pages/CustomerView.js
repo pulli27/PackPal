@@ -3,10 +3,17 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Customerview.css";
 
-const URL = "http://localhost:5000/api/carts";
+/* adjust paths/case to match your project */
+import Header from "../Components/Header/Header";
+import Footer from "../Components/Footer/Footer";
+
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const URL = `${API_BASE}/api/carts`;
+
 const STORAGE_KEY = "packPalCart";
 const WISHLIST_KEY = "packPalWishlist";
 
+/* -------- helpers -------- */
 const money = (n) =>
   "LKR" +
   Number(n || 0).toLocaleString(undefined, {
@@ -24,11 +31,11 @@ const effectivePrice = (p) => {
   return price;
 };
 
-/* discount helpers + compact summary text */
 const discountText = (p) => {
   if (!p || p.discountType === "none" || !Number(p.discountValue)) return "No discount";
   return p.discountType === "percentage" ? `${pct(p.discountValue)} off` : `${money(p.discountValue)} off`;
 };
+
 const summaryLine = (p) => {
   const now = money(effectivePrice(p));
   const was = p.discountType !== "none" && Number(p.discountValue) ? ` (was ${money(p.price)})` : "";
@@ -36,7 +43,6 @@ const summaryLine = (p) => {
   return `${p.name} · ${now}${was} · ${dsc}`;
 };
 
-/* default UI mapping */
 const toUI = (row) => ({
   id: String(row?.id ?? row?._id ?? row?.productId ?? Math.random().toString(36).slice(2, 10)),
   name: row?.name ?? "Unnamed",
@@ -52,7 +58,6 @@ const toUI = (row) => ({
     row?.description ??
     row?.shortDescription ??
     "Sunny twin-panel clutch to brighten any outfit. Satin lining and a detachable chain let you go handheld or shoulder, your choice.",
-  /* specs kept in data but not displayed anymore */
   color: row?.color ?? "Sunflower",
   strap: row?.strap ?? "Golden chain",
   material: row?.material ?? "PU",
@@ -61,26 +66,18 @@ const toUI = (row) => ({
 
 const imgSrc = (val) => {
   if (!val) return "https://via.placeholder.com/800x600?text=Bag";
-  if (val.startsWith("http")) return val;
+  if (/^https?:\/\//i.test(val)) return val;
   if (val.startsWith("/")) return val;
   if (val.startsWith("images/")) return "/" + val;
   return val;
 };
 
 const readJSON = (key, fallback) => {
-  try {
-    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
-  } catch {
-    return fallback;
-  }
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+  catch { return fallback; }
 };
-const writeJSON = (key, val) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch {}
-};
+const writeJSON = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} };
 
-/* render stars like 4.5 => ★★★★½ */
 const stars = (val = 0) => {
   const n = Math.max(0, Math.min(5, Number(val)));
   const full = "★".repeat(Math.floor(n));
@@ -89,6 +86,7 @@ const stars = (val = 0) => {
   return `${full}${half}${rest}`;
 };
 
+/* -------- component -------- */
 export default function CustomerView() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -116,9 +114,7 @@ export default function CustomerView() {
         if (mounted) setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const filtered = useMemo(() => {
@@ -143,7 +139,7 @@ export default function CustomerView() {
       icon: "🎒",
       img: imgSrc(p.img),
       category: p.category || "",
-      description: p.description || "Added from Kids Bags",
+      description: p.description || "Added from Customer View",
     };
     const list = readCart();
     const idx = list.findIndex((x) => String(x.id) === String(newItem.id));
@@ -167,24 +163,25 @@ export default function CustomerView() {
 
   return (
     <div className="page-wrap cv-page no-sidebar">
-      <main className="cv-main">
-        <header className="cv-hero">
-          <div className="cv-hero-inner">
-            <div className="cv-brand">PackPal</div>
-            <nav className="cv-top-nav">
-              <a className="active" href="#kids">Home</a>
-            </nav>
-          </div>
+      <Header />
 
+      <main className="cv-main">
+        {/* HERO */}
+        <header className="cv-hero">
           <div className="cv-hero-content">
-            <h1>Bright &amp; Bags</h1>
-            <p>Fun designs, durable materials, comfy straps – built for school, play and everything in between.</p>
+            <h1 className="cv-title">
+              <span className="cv-title-line">Bright &amp; Tough Bags</span>
+            </h1>
+
+            <p>Crafted for play, school, and beyond.</p>
 
             <div className="cv-hero-search">
               <input
                 placeholder="Search: unicorn, superhero, waterproof, trolley…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+                aria-label="Search products"
               />
               <button type="button" aria-label="Search">🔍</button>
             </div>
@@ -205,7 +202,7 @@ export default function CustomerView() {
               const isDiscount = p.discountType !== "none" && Number(p.discountValue) > 0;
               const newPrice = money(effectivePrice(p));
               const oldPrice = money(p.price);
-              const chip = p.discountType === "percentage" ? pct(p.discountValue) : `-${money(p.discountValue)}`;
+              const chip = p.discountType === "percentage" ? `${pct(p.discountValue)}` : `-${money(p.discountValue)}`;
               const wished = isWished(p.id);
 
               return (
@@ -270,11 +267,9 @@ export default function CustomerView() {
           )}
         </section>
 
-        {/* ===== BIG DETAILS MODAL (only one description; no spec grid; no add-all) ===== */}
         {show && active && (
           <div role="dialog" aria-modal="true" onClick={closeMore} className="cv-modal">
             <div className="cv-modal-card big" onClick={(e) => e.stopPropagation()}>
-              {/* Left: big image */}
               <div className="cv-modal-hero">
                 <img
                   src={imgSrc(active.img)}
@@ -284,9 +279,7 @@ export default function CustomerView() {
                 />
               </div>
 
-              {/* Right: details */}
               <div className="cv-modal-body">
-                {/* compact all-in-one line (name + price + discount) */}
                 <div className="muted" style={{ fontWeight: 700, marginBottom: 6 }}>
                   {summaryLine(active)}
                 </div>
@@ -300,13 +293,10 @@ export default function CustomerView() {
                   </div>
                   <div className="price-stack">
                     <div className="price-main">{money(effectivePrice(active))}</div>
-                    {active.discountType !== "none" && (
-                      <div className="price-was">{money(active.price)}</div>
-                    )}
+                    {active.discountType !== "none" && <div className="price-was">{money(active.price)}</div>}
                   </div>
                 </div>
 
-                {/* single short description */}
                 <p className="muted" style={{ marginTop: 10 }}>{active.description}</p>
 
                 <div className="mt-3">
@@ -332,6 +322,8 @@ export default function CustomerView() {
           </div>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }
