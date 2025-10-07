@@ -1,27 +1,17 @@
 // BackEnd/Route/InventoryRoute.js
 const express = require("express");
-const {
-  listInventory,
-  getByBusinessId,
-  createItem,
-  updateByBusinessId,
-  removeByBusinessId,
-  summary,
-  adjustReorder, // ✅
-} = require("../Controllers/InventoryController");
-
 const router = express.Router();
 
-/* IMPORTANT: put /summary before "/:id" */
-router.get("/summary", summary);
+const inv = require("../Controllers/InventoryController");
 
-router.get("/", listInventory);
-router.get("/:id", getByBusinessId);
-router.post("/", createItem);
-router.put("/:id", updateByBusinessId);
-router.delete("/:id", removeByBusinessId);
+router.get("/", inv.listInventory);
+router.get("/summary", inv.summary);          // ← now supports ?start&end
+router.get("/summary-v2", inv.summaryV2);     // month-aware createdAt buckets
 
-// ✅ atomic dynamic reorder adjustment
-router.post("/:id/reorder-adjust", adjustReorder);
+router.get("/:id", inv.getByBusinessId);
+router.post("/", inv.createItem);
+router.put("/:id", inv.updateByBusinessId);
+router.delete("/:id", inv.removeByBusinessId);
+router.post("/:id/reorder-adjust", inv.adjustReorder);
 
 module.exports = router;

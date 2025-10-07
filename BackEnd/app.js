@@ -91,6 +91,7 @@ app.use("/api/advance", advanceRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/transfers", transferRoutes);
 app.use("/api/contributions", contributions);
+app.use("/api/finance", require("./Route/FinanceRoute"));
 
 // Hiruni
 app.use("/api/sewing-instructions", sewing);

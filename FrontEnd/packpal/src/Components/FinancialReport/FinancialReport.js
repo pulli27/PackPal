@@ -5,28 +5,107 @@ import "./FinancialReport.css";
 import Sidebar from "../Sidebar/Sidebarsanu";
 import { api } from "../../lib/api";
 
-/* ========== helpers ========== */
+/* ───────── number/date helpers ───────── */
 const fmtLKRNum = (n) => Math.round(Number(n || 0)).toLocaleString("en-LK");
 const fmtLKR = (n) => `LKR ${fmtLKRNum(n)}`;
-const toNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const toNum = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const fmtDate = (d) => new Date(d).toISOString().split("T")[0];
 
-/* tolerant revenue calc for a transaction object */
+/* Date-only helpers that are timezone-safe (compare numbers, not strings) */
+const isoDateOnly = (iso) => (iso || "").slice(0, 10);
+const asUTCDateStart = (isoDate /* YYYY-MM-DD */) =>
+  new Date(`${isoDate}T00:00:00.000Z`).getTime();
+const asUTCDateEnd = (isoDate /* YYYY-MM-DD */) =>
+  new Date(`${isoDate}T23:59:59.999Z`).getTime();
+
+/* Inclusive range checker (by millis) */
+const inInclusiveRange = (ms, startMs, endMs) => ms >= startMs && ms <= endMs;
+
+/* === Canonical month key helpers (UTC to avoid timezone drift) === */
+const monthKeyUTC = (dLike) => {
+  const d = new Date(dLike);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+};
+const normalizeMonthKey = (v) => {
+  if (v == null) return null;
+  if (typeof v === "string" && /^\d{4}-\d{1,2}$/.test(v)) {
+    const [y, m] = v.split("-");
+    return `${y}-${String(m).padStart(2, "0")}`;
+  }
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) {
+    return v.slice(0, 7);
+  }
+  return monthKeyUTC(v);
+};
+
+const monthLabel = (key) => {
+  const [y, m] = key.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleString("en", { month: "short" });
+};
+
+const generateMonthRange = (fromISO, toISO, maxMonths = 12) => {
+  // Build an ascending list from start-of-from to start-of-to (inclusive), capped by maxMonths
+  const s = new Date(`${isoDateOnly(fromISO)}T00:00:00.000Z`);
+  const e = new Date(`${isoDateOnly(toISO)}T00:00:00.000Z`);
+  const start = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1);
+  const end = Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), 1);
+
+  const keys = [];
+  let cur = start;
+  for (let i = 0; i < maxMonths && cur <= end; i++) {
+    const d = new Date(cur);
+    keys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+    const next = new Date(cur);
+    next.setUTCMonth(next.getUTCMonth() + 1);
+    cur = Date.UTC(next.getUTCFullYear(), next.getUTCMonth(), 1);
+  }
+  return { keys, labels: keys.map(monthLabel) };
+};
+
+const titleCase = (s = "") => s.replace(/[_\-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+const mapFromArray = (arr, keyCandidates, valCandidates) => {
+  const m = {};
+  if (!Array.isArray(arr)) return m;
+  arr.forEach((it) => {
+    const rawK = keyCandidates.map((k) => it?.[k]).find(Boolean);
+    const k = normalizeMonthKey(rawK);
+    const v = valCandidates.map((v) => it?.[v]).find((v) => Number.isFinite(Number(v)));
+    if (k != null) m[k] = Number(v) || 0;
+  });
+  return m;
+};
+
+/* Transaction total helper */
 const lineTotal = (t) => {
   const q = toNum(t?.qty ?? t?.quantity ?? 0);
   const p = toNum(t?.unitPrice ?? t?.price ?? 0);
   const d = toNum(t?.discountPerUnit ?? t?.discount ?? 0);
-  const explicit = t?.total;
-  const calc = q * p - q * d;
-  const n = Number(explicit);
-  return Number.isFinite(n) ? n : calc;
+  const explicit = Number(t?.total);
+  return Number.isFinite(explicit) ? explicit : q * p - q * d;
 };
 
-/* toast */
+/* Resolve a transaction's date for filtering */
+const pickTxDate = (t) =>
+  t?.date ||
+  t?.createdAt ||
+  t?.created_on ||
+  t?.created_at ||
+  t?.invoiceDate ||
+  t?.paidAt ||
+  null;
+
+/* Notifications */
 const toast = (message, type = "info") => {
   document.querySelectorAll(".notification").forEach((n) => n.remove());
   const colors = { success: "#10B981", error: "#EF4444", warning: "#F59E0B", info: "#3B82F6" };
-  const icons  = { success:"fa-check-circle", error:"fa-exclamation-circle", warning:"fa-exclamation-triangle", info:"fa-info-circle" };
+  const icons = {
+    success: "fa-check-circle",
+    error: "fa-exclamation-circle",
+    warning: "fa-exclamation-triangle",
+    info: "fa-info-circle",
+  };
   const n = document.createElement("div");
   n.className = "notification";
   n.style.cssText = `
@@ -46,222 +125,435 @@ const toast = (message, type = "info") => {
     document.head.appendChild(style);
   }
   document.body.appendChild(n);
-  setTimeout(() => { n.style.animation = "slideOut .3s ease"; setTimeout(() => n.remove(), 300); }, 2600);
+  setTimeout(() => {
+    n.style.animation = "slideOut .3s ease";
+    setTimeout(() => n.remove(), 300);
+  }, 2600);
 };
 
-/* deep numeric getter */
-const getNum = (obj, paths = []) => {
-  for (const p of paths) {
-    try {
-      const val = p.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
-      const n = Number(val);
-      if (Number.isFinite(n)) return n;
-    } catch {}
+/* ───────── data access helpers ───────── */
+const safeGet = async (path, fallback = null) => {
+  try {
+    const { data } = await api.get(path);
+    return data ?? fallback;
+  } catch {
+    return fallback;
   }
+};
+const getFirstArray = async (paths) => {
+  for (const p of paths) {
+    const d = await safeGet(p, null);
+    if (Array.isArray(d)) return d;
+    if (Array.isArray(d?.items)) return d.items;
+    if (Array.isArray(d?.data)) return d.data;
+    if (Array.isArray(d?.contributions)) return d.contributions;
+  }
+  return [];
+};
+const getNetFromPayroll = (row) => {
+  const candidates = [row?.Net_Salary, row?.netSalary, row?.net, row?.totalNet, row?.amount, row?.total].map(Number);
+  return candidates.find(Number.isFinite) || 0;
+};
+
+/* Range object (normalized) */
+const getRange = (fromISO, toISO) => {
+  const from = isoDateOnly(fromISO);
+  const to = isoDateOnly(toISO);
+  return {
+    fromISO: from,
+    toISO: to,
+    fromMs: asUTCDateStart(from),
+    toMs: asUTCDateEnd(to),
+  };
+};
+
+/* === Exact Revenue === */
+const fetchExactRevenue = async (startISO, endISO) => {
+  const { fromISO, toISO, fromMs, toMs } = getRange(startISO, endISO);
+  const qs = `?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`;
+
+  const tryGet = async (path, fallback = null) => {
+    try {
+      const { data } = await api.get(path);
+      return data ?? fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  // sum monthly (same source as chart)
+  const monthly =
+    (await tryGet(`/analytics/revenue/monthly${qs}`)) ||
+    (await tryGet(`/transactions/revenue/monthly${qs}`)) ||
+    (await tryGet(`/reports/revenue/monthly${qs}`));
+
+  if (Array.isArray(monthly) && monthly.length) {
+    return monthly.reduce((acc, r) => acc + toNum(r?.revenue ?? r?.total ?? r?.value ?? 0, 0), 0);
+  }
+
+  // summary / total
+  const txSummary = await safeGet(`/transactions/summary${qs}`, null);
+  const fromSummary = toNum(txSummary?.revenue, NaN);
+  if (Number.isFinite(fromSummary)) return fromSummary;
+
+  const totalAnalytic = await safeGet(`/analytics/revenue/total${qs}`, null);
+  const fromAnalytic = toNum(totalAnalytic?.total ?? totalAnalytic?.revenue, NaN);
+  if (Number.isFinite(fromAnalytic)) return fromAnalytic;
+
+  // fallback: sum transactions (exclude refunds)
+  const tx = await safeGet(`/transactions${qs}&limit=5000`, []);
+  if (Array.isArray(tx) && tx.length) {
+    return tx
+      .filter((t) => {
+        const raw = pickTxDate(t);
+        if (!raw) return false;
+        const ms = new Date(isoDateOnly(raw) + "T12:00:00.000Z").getTime();
+        const isNotRefund = String(t?.status || "").toLowerCase() !== "refund";
+        return isNotRefund && inInclusiveRange(ms, fromMs, toMs);
+      })
+      .reduce((acc, t) => acc + lineTotal(t), 0);
+  }
+
   return 0;
 };
 
-/* month helpers */
-const monthKey = (d) => {
-  const dt = new Date(d);
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`;
-};
-const monthLabel = (key) => {
-  const [y,m] = key.split("-");
-  return new Date(Number(y), Number(m)-1, 1).toLocaleString("en", { month:"short" });
-};
-const generateMonthRange = (fromISO, toISO, maxMonths = 12) => {
-  const start = new Date(fromISO);
-  const end = new Date(toISO);
-  if (start > end) [fromISO, toISO] = [toISO, fromISO];
-  const s = new Date(fromISO);
-  const e = new Date(toISO);
-  s.setDate(1); e.setDate(1);
-  const keys = [];
-  const cur = new Date(e);
-  for (let i = 0; i < maxMonths; i++) {
-    keys.unshift(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,"0")}`);
-    cur.setMonth(cur.getMonth()-1);
-    if (cur < s) break;
+/* KPIs computed from createdAt-first sources, then we’ll override revenue with exact */
+const computeKPIsByCreatedAt = async (startISO, endISO) => {
+  const { fromISO, toISO, fromMs, toMs } = getRange(startISO, endISO);
+
+  const txList = await getFirstArray([
+    `/transactions?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
+    `/transactions`,
+  ]);
+  const revenue = txList
+    .filter((t) => {
+      const raw = pickTxDate(t);
+      if (!raw) return false;
+      const ms = new Date(isoDateOnly(raw) + "T12:00:00.000Z").getTime();
+      return inInclusiveRange(ms, fromMs, toMs) && String(t?.status || "").toLowerCase() !== "refund";
+    })
+    .reduce((acc, t) => acc + lineTotal(t), 0);
+
+  const payrollList = await getFirstArray([
+    `/salary/payruns?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
+    `/salary/payruns`,
+    `/salary?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
+    `/salary`,
+  ]);
+  let payrollTotal = payrollList.length
+    ? payrollList
+        .filter((r) => {
+          const d = isoDateOnly(r?.createdAt || r?.date || r?.created_on || "");
+          if (!d) return false;
+          const ms = new Date(d + "T12:00:00.000Z").getTime();
+          return inInclusiveRange(ms, fromMs, toMs);
+        })
+        .reduce((acc, r) => acc + getNetFromPayroll(r), 0)
+    : 0;
+
+  if (payrollTotal === 0) {
+    const payrollSummary = await safeGet(
+      `/salary/summary?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
+      null
+    );
+    payrollTotal = toNum(payrollSummary?.totalNet, 0);
   }
-  const labels = keys.map(monthLabel);
-  return { keys, labels };
+
+  const y1 = new Date(fromISO).getUTCFullYear();
+  const y2 = new Date(toISO).getUTCFullYear();
+  const years = [...new Set([y1, y2])];
+
+  let contribRows = [];
+  for (const y of years) {
+    const rows = await getFirstArray([`/contributions?year=${y}`]);
+    contribRows = contribRows.concat(rows);
+  }
+
+  let contribTotal = 0;
+  if (contribRows.length) {
+    contribTotal = contribRows
+      .filter((r) => {
+        const created = isoDateOnly(r?.createdAt || r?.created_on || r?.date || "");
+        const due = isoDateOnly(r?.due || "");
+        const perKey = r?.periodKey || r?.period;
+        const perFirst = perKey && /^\d{4}-\d{2}$/.test(perKey) ? `${perKey}-01` : null;
+
+        const createdMs = created ? new Date(created + "T12:00:00.000Z").getTime() : NaN;
+        const dueMs = due ? new Date(due + "T12:00:00.000Z").getTime() : NaN;
+        const perMs = perFirst ? new Date(perFirst + "T12:00:00.000Z").getTime() : NaN;
+
+        return (
+          (Number.isFinite(createdMs) && inInclusiveRange(createdMs, fromMs, toMs)) ||
+          (Number.isFinite(dueMs) && inInclusiveRange(dueMs, fromMs, toMs)) ||
+          (Number.isFinite(perMs) && inInclusiveRange(perMs, fromMs, toMs))
+        );
+      })
+      .reduce((acc, r) => acc + Number(r?.total || 0), 0);
+  }
+  if (contribTotal === 0) {
+    const contribSummary = await safeGet(
+      `/contributions/summary?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
+      null
+    );
+    contribTotal = toNum(contribSummary?.grandTotal, 0);
+  }
+
+  const invSummary = await safeGet(
+    `/inventory/summary?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
+    { inventory: { totalValue: 0 } }
+  );
+  const inventoryTotal = toNum(invSummary?.inventory?.totalValue, 0);
+
+  const expenses = payrollTotal + contribTotal + inventoryTotal;
+  const net = revenue - expenses;
+
+  return { revenue, expenses, net };
 };
 
-/* ========== component ========== */
+/* Month-end helpers for Balance Sheet */
+const endOfMonthISO = (dLike) => {
+  const d = new Date(dLike);
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth();
+  const last = new Date(Date.UTC(y, m + 1, 0));
+  return fmtDate(last);
+};
+const sameUTCMonth = (aISO, bISO) => normalizeMonthKey(aISO) === normalizeMonthKey(bISO);
+const monthEndOrToday = (iso) => {
+  const today = fmtDate(new Date());
+  return sameUTCMonth(iso, today) ? today : endOfMonthISO(iso);
+};
+const getTwoMonthAsOfs = (fromISO, toISO) => {
+  const leftAsOf = monthEndOrToday(fromISO);
+  const rightAsOf = monthEndOrToday(toISO);
+  return {
+    leftAsOf,
+    rightAsOf,
+    sameMonth: normalizeMonthKey(leftAsOf) === normalizeMonthKey(rightAsOf),
+  };
+};
+
+/* ───────── component ───────── */
 function FinancialReport() {
-  /* Refs for charts */
   const revenueRef = useRef(null);
   const expenseRef = useRef(null);
-  const profitRef  = useRef(null);
-  const budgetRef  = useRef(null);
+  const profitRef = useRef(null);
   const dateFromRef = useRef(null);
-  const dateToRef   = useRef(null);
+  const dateToRef = useRef(null);
 
-  /* UI state */
   const [reportType, setReportType] = useState("All Reports");
-  const [department, setDepartment] = useState("All Departments");
   const [generating, setGenerating] = useState(false);
 
-  /* Dashboard KPIs (cards) */
   const [dash, setDash] = useState({ revenue: 0, expenses: 0, net: 0 });
+  const [revenueExact, setRevenueExact] = useState(0);
 
-  /* Chart data state (from backend) */
+  const [balanceCard, setBalanceCard] = useState({
+    assets: 0,
+    liabilities: 0,
+    equity: 0,
+  });
+
   const [chartsData, setChartsData] = useState({
     revenueMonthly: { labels: [], values: [] },
     expenseByCategory: { labels: [], values: [] },
-    profitMarginMonthly: { labels: [], values: [] }, // percentage numbers
-    budgetVsActual: { labels: [], budget: [], actual: [] },
+    profitMarginMonthly: { labels: [], values: [] },
   });
 
-  /* ================= Fetch dashboard KPIs ================= */
+  const getWithRange = async (base, fromISO, toISO) => {
+    const qs =
+      fromISO && toISO ? `?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}` : "";
+    try {
+      const { data } = await api.get(`${base}${qs}`);
+      return data ?? null;
+    } catch {
+      try {
+        const { data } = await api.get(base);
+        return data ?? null;
+      } catch {
+        return null;
+      }
+    }
+  };
+
+  /* Initial mount: set dates, welcome toast, load KPIs + balance + charts */
   useEffect(() => {
     const today = new Date();
+    const todayISO = fmtDate(today);
     const first = new Date(today.getFullYear(), today.getMonth(), 1);
+
     if (dateFromRef.current) dateFromRef.current.valueAsDate = first;
-    if (dateToRef.current) dateToRef.current.valueAsDate = today;
+    if (dateToRef.current) {
+      dateToRef.current.valueAsDate = today;
+      dateToRef.current.min = fmtDate(first);
+      dateToRef.current.max = todayISO;
+    }
 
-    setTimeout(() => toast("Welcome to Financial Reports! Generate and download your reports here.", "success"), 300);
+    setTimeout(
+      () => toast("Welcome to Financial Reports! Generate and download your reports here.", "success"),
+      300
+    );
 
-    const loadKPIs = async () => {
-      const fromISO = dateFromRef.current?.value || fmtDate(new Date());
-      const toISO   = dateToRef.current?.value   || fmtDate(new Date());
-      const qs = `?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`;
+    const load = async () => {
+      const fromISO = dateFromRef.current?.value || fmtDate(first);
+      const toISO = dateToRef.current?.value || todayISO;
 
-      const attempts = await Promise.allSettled([
-        api.get("/dashboard/summary"),
-        api.get("/dashboard"),
-        api.get("/dashboard/kpis"),
-        api.get(`/transactions/revenue${qs}`),
-        api.get(`/transactions${qs}&limit=2000&sort=-date`),
-        api.get(`/finance/operating-expenses/summary${qs}`),
-        api.get(`/salary/summary${qs}`),
-        api.get(`/contributions/summary${qs}`),
-        api.get(`/finance/other-expenses${qs}`),
-      ]);
+      const exact = await fetchExactRevenue(fromISO, toISO);
+      setRevenueExact(exact);
 
-      const [sum, dashRoot, kpis, revAgg, txList, opexSum, salarySum, contribSum, otherExp] =
-        attempts.map(a => (a.status === "fulfilled" ? a.value?.data : null));
+      let kpis = await computeKPIsByCreatedAt(fromISO, toISO);
 
-      /* revenue */
-      let revenue =
-        getNum(sum,      ["revenue","sales","totals.revenue","kpis.revenue","cards.revenue.value","dashboard.revenue"]) ||
-        getNum(dashRoot, ["revenue","sales","totals.revenue","kpis.revenue","cards.revenue.value"]) ||
-        getNum(kpis,     ["revenue","sales","totals.revenue"]) ||
-        getNum(revAgg,   ["revenue","total","value"]);
+      if (kpis.revenue === 0 && kpis.expenses === 0) {
+        const txSummary = await getWithRange("/transactions/summary", fromISO, toISO);
+        const payroll = await getWithRange("/salary/summary", fromISO, toISO);
+        const contrib = await getWithRange("/contributions/summary", fromISO, toISO);
+        const invSum = await getWithRange("/inventory/summary", fromISO, toISO);
 
-      if (!revenue && Array.isArray(txList)) {
-        revenue = txList.reduce((acc, t) => (t?.status === "refund" ? acc : acc + lineTotal(t)), 0);
+        const revenue = toNum(txSummary?.revenue, 0);
+        const payrollTotal = toNum(payroll?.totalNet, 0);
+        const contribTotal = toNum(contrib?.grandTotal, 0);
+        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
+        const expenses = payrollTotal + contribTotal + inventoryOnly;
+
+        kpis = { revenue, expenses, net: revenue - expenses };
       }
 
-      /* expenses */
-      let expenses =
-        getNum(sum,      ["expenses","expense","totals.expenses","totals.expense","kpis.expenses","cards.expenses.value","dashboard.expenses"]) ||
-        getNum(dashRoot, ["expenses","expense","totals.expenses","kpis.expenses","cards.expenses.value"]) ||
-        getNum(kpis,     ["expenses","totals.expenses"]) ||
-        getNum(opexSum,  ["total"]);
+      const finalRevenue = Number.isFinite(Number(exact)) ? exact : kpis.revenue;
+      const finalNet = finalRevenue - toNum(kpis.expenses, 0);
+      setDash({ revenue: finalRevenue, expenses: toNum(kpis.expenses, 0), net: finalNet });
 
-      if (!expenses) {
-        const salaryNet = getNum(salarySum, ["totalNet","net","total"]);
-        const contrib   = getNum(contribSum, ["grandTotal","total"]);
-        const other     = getNum(otherExp,   ["total","sum","value"]);
-        const composed  = getNum(opexSum, ["total"]) + salaryNet + contrib + other;
-        expenses = composed || 0;
-      }
-
-      const net = revenue - expenses;
-      setDash({ revenue: revenue || 0, expenses: expenses || 0, net: net || 0 });
+      await refreshBalanceCard(toISO);
+      await fetchChartsData(); // charts after KPIs so range is in sync
     };
 
-    loadKPIs();
+    load();
   }, []);
 
-  /* ================= Fetch chart datasets (12 months + expenses from dashboard/same as dashboard page) ================= */
+  /* Build data for P&L (uses exact revenue) */
+  const fetchIncomeStatementData = async (startISO, endISO) => {
+    const revenueTotal = Number.isFinite(Number(revenueExact)) ? revenueExact : toNum(dash.revenue, 0);
+    const netIncomeCard = toNum(dash.net, 0);
+
+    const payroll = await getWithRange("/salary/summary", startISO, endISO);
+    const contrib = await getWithRange("/contributions/summary", startISO, endISO);
+    const invSum = await getWithRange("/inventory/summary", startISO, endISO);
+
+    const salaryNet = toNum(payroll?.totalNet, 0);
+    const epfEtf = toNum(contrib?.grandTotal, 0);
+    const cogsInventory = toNum(invSum?.inventory?.totalValue, 0);
+
+    const grossProfit = revenueTotal - cogsInventory;
+    const operatingTotal = Math.max(grossProfit - netIncomeCard, 0);
+
+    const website = Math.max(operatingTotal - (salaryNet + epfEtf), 0);
+    const internet = 0;
+
+    return {
+      revenue: { total: revenueTotal },
+      cogs: { inventory: cogsInventory, total: cogsInventory },
+      opex: { salary: salaryNet, epfEtf, website, internet, total: operatingTotal },
+      grossProfit,
+      netIncome: netIncomeCard,
+    };
+  };
+
+  /* Charts data (robust + same range logic) */
   const fetchChartsData = async () => {
-    const fromISO = dateFromRef.current?.value || fmtDate(new Date());
-    const toISO   = dateToRef.current?.value   || fmtDate(new Date());
+    const todayISO = fmtDate(new Date());
+    const fromISO = dateFromRef.current?.value || todayISO;
+    let toISO = dateToRef.current?.value || todayISO;
+
+    if (toISO > todayISO) {
+      toISO = todayISO;
+      if (dateToRef.current) dateToRef.current.value = todayISO;
+      toast("Date To adjusted to today (future dates are not allowed).", "warning");
+    }
+
+    const { fromMs, toMs } = getRange(fromISO, toISO);
     const { keys: monthKeys, labels: monthLabels } = generateMonthRange(fromISO, toISO, 12);
-    const qs = `?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`;
+    const qs = `?start=${encodeURIComponent(isoDateOnly(fromISO))}&end=${encodeURIComponent(isoDateOnly(toISO))}`;
 
     const tryGet = async (path, fallback = null) => {
-      try { const { data } = await api.get(path); return data ?? fallback; }
-      catch { return fallback; }
+      try {
+        const { data } = await api.get(path);
+        return data ?? fallback;
+      } catch {
+        return fallback;
+      }
     };
 
-    /* ---- Monthly Revenue ---- */
-    let revenueMonthly = await (async () => {
+    const revenueMonthly = await (async () => {
       const c1 = await tryGet(`/analytics/revenue/monthly${qs}`);
-      const c2 = c1 || await tryGet(`/transactions/revenue/monthly${qs}`);
-      const c3 = c2 || await tryGet(`/reports/revenue/monthly${qs}`);
+      const c2 = c1 || (await tryGet(`/transactions/revenue/monthly${qs}`));
+      const c3 = c2 || (await tryGet(`/reports/revenue/monthly${qs}`));
       let map = {};
-      if (Array.isArray(c3)) {
-        c3.forEach(r => {
-          const k = r?.key || r?.month || monthKey(r?.date || new Date());
-          map[String(k)] = toNum(r?.revenue ?? r?.total ?? r?.value);
+      if (Array.isArray(c3) && c3.length) {
+        c3.forEach((r) => {
+          const kRaw = r?.key ?? r?.month ?? r?.date ?? new Date();
+          const k = normalizeMonthKey(kRaw);
+          map[k] = (map[k] || 0) + toNum(r?.revenue ?? r?.total ?? r?.value);
         });
       } else {
-        const tx = await tryGet(`/transactions${qs}&limit=5000`);
-        if (Array.isArray(tx)) {
-          tx.forEach(t => {
-            if (t?.status === "refund") return;
-            const k = monthKey(t?.date || t?.createdAt || Date.now());
-            map[k] = (map[k] || 0) + lineTotal(t);
-          });
+        const tx = await tryGet(`/transactions${qs}&limit=5000`, []);
+        if (Array.isArray(tx) && tx.length) {
+          tx
+            .filter((t) => {
+              const raw = pickTxDate(t);
+              if (!raw) return false;
+              const ms = new Date(isoDateOnly(raw) + "T12:00:00.000Z").getTime();
+              return inInclusiveRange(ms, fromMs, toMs) && String(t?.status || "").toLowerCase() !== "refund";
+            })
+            .forEach((t) => {
+              const rawDate = pickTxDate(t) || Date.now();
+              const k = normalizeMonthKey(rawDate);
+              map[k] = (map[k] || 0) + lineTotal(t);
+            });
         }
       }
-      const values = monthKeys.map(k => map[k] || 0);
+      const values = monthKeys.map((k) => map[k] || 0);
       return { labels: monthLabels, values };
     })();
 
-    /* ---- Expense by Category (MIRROR THE DASHBOARD LOGIC) ---- */
-    let expenseByCategory = await (async () => {
-      // 1) If dashboard exposes a ready-made breakdown, use it.
+    const expenseByCategory = await (async () => {
       const d1 = await tryGet(`/dashboard/expenses/categories${qs}`);
       if (Array.isArray(d1) && d1.length) {
         return {
-          labels: d1.map(x => x?.category ?? x?.name ?? x?.label ?? "Other"),
-          values: d1.map(x => toNum(x?.amount ?? x?.total ?? x?.value ?? 0)),
+          labels: d1.map((x) => x?.category ?? x?.name ?? x?.label ?? "Other"),
+          values: d1.map((x) => toNum(x?.amount ?? x?.total ?? x?.value ?? 0)),
         };
       }
       const d2 = await tryGet(`/dashboard${qs}`);
       const list = d2?.expenses?.categories || d2?.cards?.expenses?.breakdown || d2?.categories;
       if (Array.isArray(list) && list.length) {
         return {
-          labels: list.map(x => x?.category ?? x?.name ?? x?.label ?? "Other"),
-          values: list.map(x => toNum(x?.amount ?? x?.total ?? x?.value ?? 0)),
+          labels: list.map((x) => x?.category ?? x?.name ?? x?.label ?? "Other"),
+          values: list.map((x) => toNum(x?.amount ?? x?.total ?? x?.value ?? 0)),
         };
       }
-
-      // 2) Otherwise compute the SAME 3 buckets your dashboard uses:
-      //    Payroll (net) + EPF/ETF + Inventory value (no products)
       const [payroll, contrib, invSum] = await Promise.all([
         tryGet(`/salary/summary${qs}`, { totalNet: 0 }),
         tryGet(`/contributions/summary${qs}`, { grandTotal: 0 }),
         tryGet(`/inventory/summary${qs}`, { inventory: { totalValue: 0 } }),
       ]);
-
-      const payrollTotal = toNum(payroll?.totalNet);
-      const contribTotal = toNum(contrib?.grandTotal);
-      const inventoryOnly = toNum(invSum?.inventory?.totalValue);
-
       return {
         labels: ["Payroll", "EPF/ETF", "Inventory"],
-        values: [payrollTotal, contribTotal, inventoryOnly],
+        values: [toNum(payroll?.totalNet), toNum(contrib?.grandTotal), toNum(invSum?.inventory?.totalValue)],
       };
     })();
 
-    /* ---- Profit Margin Monthly ---- */
     const profitMarginMonthly = await (async () => {
       const pm = await tryGet(`/analytics/profit-margin/monthly${qs}`);
       if (Array.isArray(pm) && pm.length) {
         const map = {};
-        pm.forEach(r => { map[String(r?.key || r?.month)] = toNum(r?.margin ?? r?.value ?? 0); });
-        return { labels: monthLabels, values: monthKeys.map(k => map[k] ?? 0) };
+        pm.forEach((r) => {
+          const k = normalizeMonthKey(r?.key || r?.month);
+          if (k) map[k] = toNum(r?.margin ?? r?.value ?? 0);
+        });
+        return { labels: monthLabels, values: monthKeys.map((k) => map[k] ?? 0) };
       }
       const cogsMonthly = await tryGet(`/finance/cogs/monthly${qs}`);
       const opexMonthly = await tryGet(`/finance/operating-expenses/monthly${qs}`);
-      const cogsMap = mapFromArray(cogsMonthly, ["month","key"], ["total","value"]);
-      const opexMap = mapFromArray(opexMonthly, ["month","key"], ["total","value"]);
+      const cogsMap = mapFromArray(cogsMonthly, ["month", "key", "date"], ["total", "value"]);
+      const opexMap = mapFromArray(opexMonthly, ["month", "key", "date"], ["total", "value"]);
       const values = monthKeys.map((k, i) => {
         const rev = revenueMonthly.values[i] || 0;
         const cogs = cogsMap[k] || 0;
@@ -271,542 +563,611 @@ function FinancialReport() {
       return { labels: monthLabels, values };
     })();
 
-    /* ---- Budget vs Actual ---- */
-    const budgetVsActual = await (async () => {
-      const budget = await tryGet(`/budget/summary${qs}`);
-      if (Array.isArray(budget) && budget.length) {
-        const labels = budget.map(b => b?.department ?? b?.label ?? "Dept");
-        const budgetVals = budget.map(b => toNum(b?.budget ?? b?.planned ?? 0));
-        const actuals = await tryGet(`/finance/expenses/by-department${qs}`);
-        let actualMap = {};
-        if (Array.isArray(actuals)) actuals.forEach(a => { actualMap[a?.department ?? a?.label] = toNum(a?.amount ?? a?.total ?? 0); });
-        const actualVals = labels.map(l => toNum(actualMap[l] ?? 0));
-        return { labels, budget: budgetVals, actual: actualVals };
-      }
-      // fallback: use expense categories as "departments"
-      const labels = expenseByCategory.labels.length ? expenseByCategory.labels : ["Payroll","EPF/ETF","Inventory"];
-      const actual = labels.map((_,i) => toNum(expenseByCategory.values[i] ?? 0));
-      const defaultBudgets = [150000,80000,60000,45000,35000];
-      const budgetVals = labels.map((_,i) => toNum(defaultBudgets[i % defaultBudgets.length]));
-      return { labels, budget: budgetVals, actual };
-    })();
-
-    setChartsData({ revenueMonthly, expenseByCategory, profitMarginMonthly, budgetVsActual });
+    setChartsData({ revenueMonthly, expenseByCategory, profitMarginMonthly });
   };
 
-  /* string & mapping helpers for charts */
-  const titleCase = (s="") => s.replace(/[_\-]+/g," ").replace(/\b\w/g, m => m.toUpperCase());
-  const mapFromArray = (arr, keyCandidates, valCandidates) => {
-    const m = {};
-    if (!Array.isArray(arr)) return m;
-    arr.forEach(it => {
-      const k = keyCandidates.map(k => it?.[k]).find(Boolean);
-      const v = valCandidates.map(v => it?.[v]).find(v => Number.isFinite(Number(v)));
-      if (k != null) m[String(k)] = Number(v) || 0;
-    });
-    return m;
-  };
+  /* ===== Chart mounting: destroy-before-create to avoid broken canvases ===== */
+  const chartInstances = useRef({}); // { revenue, expense, profit }
 
-  /* Trigger charts fetch on mount & when dates change via Generate */
-  useEffect(() => { fetchChartsData(); /* eslint-disable-next-line */ }, []);
-  const handleGenerate = async () => {
-    setGenerating(true);
-    await fetchChartsData();
-    setGenerating(false);
-    const from = dateFromRef.current?.value || fmtDate(new Date());
-    const to   = dateToRef.current?.value   || fmtDate(new Date());
-    toast(`${reportType} generated successfully for ${from} to ${to}`, "success");
-  };
+  const mountChart = (key, cfg) => {
+    const el =
+      {
+        revenue: revenueRef,
+        expense: expenseRef,
+        profit: profitRef,
+      }[key]?.current;
 
-  /* ================= Build/Update charts from state ================= */
-  const chartInstances = useRef({});
-  const buildOrUpdate = (key, configBuilder) => {
-    const el = ({
-      revenue: revenueRef,
-      expense: expenseRef,
-      profit:  profitRef,
-      budget:  budgetRef,
-    })[key]?.current;
     if (!el) return;
-
-    const existing = chartInstances.current[key];
-    const cfg = configBuilder(existing);
-
-    if (existing) {
-      existing.data.labels = cfg.data.labels;
-      existing.data.datasets = cfg.data.datasets;
-      existing.update();
-    } else {
-      chartInstances.current[key] = new Chart(el.getContext("2d"), cfg);
+    try {
+      // destroy old
+      if (chartInstances.current[key]) {
+        chartInstances.current[key].destroy();
+        chartInstances.current[key] = null;
+      }
+      // (re)create
+      const ctx = el.getContext("2d");
+      chartInstances.current[key] = new Chart(ctx, cfg);
+    } catch {
+      // ignore (canvas not in DOM yet etc.)
     }
   };
 
   useEffect(() => {
     const c = chartsData;
 
-    /* Revenue trend */
-    buildOrUpdate("revenue", () => ({
+    // Guard against empty labels (prevents Chart.js errors)
+    const safe = (arr) => (Array.isArray(arr) && arr.length ? arr : [""]);
+
+    mountChart("revenue", {
       type: "line",
       data: {
-        labels: c.revenueMonthly.labels,
-        datasets: [{
-          label: "Revenue",
-          data: c.revenueMonthly.values,
-          borderColor: "#667eea",
-          backgroundColor: "rgba(102,126,234,0.1)",
-          borderWidth: 3,
-          fill: true,
-          tension: 0.4
-        }]
+        labels: safe(c.revenueMonthly.labels),
+        datasets: [
+          {
+            label: "Revenue",
+            data: safe(c.revenueMonthly.values),
+            borderColor: "#1f7ed6",
+            backgroundColor: "rgba(31,126,214,0.12)",
+            borderWidth: 3,
+            fill: true,
+            tension: 0.35,
+          },
+        ],
       },
       options: {
-        responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { callback: (v) => "LKR " + (v/1000).toLocaleString("en-LK") + "K" } } }
-      }
-    }));
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => "LKR " + (v / 1000).toLocaleString("en-LK") + "K" },
+          },
+        },
+      },
+    });
 
-    /* Expense categories (from dashboard / mirrored calc) */
-    buildOrUpdate("expense", () => ({
+    mountChart("expense", {
       type: "doughnut",
       data: {
-        labels: c.expenseByCategory.labels.map(titleCase),
-        datasets: [{
-          data: c.expenseByCategory.values,
-          backgroundColor: ["#8B5CF6","#06D6A0","#FFB703","#FB8500","#8ECAE6","#94A3B8","#F472B6"],
-          borderWidth: 0,
-          hoverOffset: 10
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom", labels: { padding: 15, usePointStyle: true, font: { size: 10 } } } },
-        cutout: "62%",
-      }
-    }));
-
-    /* Profit margin */
-    buildOrUpdate("profit", () => ({
-      type: "bar",
-      data: {
-        labels: c.profitMarginMonthly.labels,
-        datasets: [{ label: "Profit Margin %", data: c.profitMarginMonthly.values, backgroundColor: "#10B981", borderRadius: 6 }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { callback: (v) => v + "%" } } }
-      }
-    }));
-
-    /* Budget vs Actual */
-    buildOrUpdate("budget", () => ({
-      type: "bar",
-      data: {
-        labels: c.budgetVsActual.labels,
+        labels: safe(c.expenseByCategory.labels.map(titleCase)),
         datasets: [
-          { label: "Budget", data: c.budgetVsActual.budget, backgroundColor: "#E5E7EB", borderRadius: 4 },
-          { label: "Actual", data: c.budgetVsActual.actual, backgroundColor: "#667eea", borderRadius: 4 }
-        ]
+          {
+            data: safe(c.expenseByCategory.values),
+            backgroundColor: ["#1f7ed6", "#79a7e3", "#a8c6f0", "#d7e6fb", "#6ec1c2", "#f7b267", "#ef5d60"],
+            borderWidth: 0,
+            hoverOffset: 10,
+          },
+        ],
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: "top", labels: { usePointStyle: true, padding: 15, font: { size: 11 } } } },
-        scales: { y: { beginAtZero: true, ticks: { callback: (v) => "LKR " + (v/1000).toLocaleString("en-LK") + "K" } } }
-      }
-    }));
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { padding: 15, usePointStyle: true, font: { size: 10 } } },
+        },
+        cutout: "62%",
+      },
+    });
 
-    return () => {}; // keep instances alive; they update in-place
+    mountChart("profit", {
+      type: "bar",
+      data: {
+        labels: safe(c.profitMarginMonthly.labels),
+        datasets: [
+          {
+            label: "Profit Margin %",
+            data: safe(c.profitMarginMonthly.values),
+            backgroundColor: "#16a34a",
+            borderRadius: 6,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { callback: (v) => v + "%" } } },
+      },
+    });
+
+    // Cleanup on unmount
+    return () => {
+      Object.values(chartInstances.current || {}).forEach((ch) => {
+        try {
+          ch?.destroy();
+        } catch {}
+      });
+      chartInstances.current = {};
+    };
   }, [chartsData]);
 
-  /* ========== Report utils (unchanged core) ========== */
   const inferType = (name) =>
-    /profit|loss/i.test(name) ? "Profit & Loss Statement" :
-    /balance/i.test(name) ? "Balance Sheet" :
-    /budget/i.test(name) ? "Budget Analysis" : "Report";
+    /profit|loss/i.test(name) ? "Profit & Loss Statement" : /balance/i.test(name) ? "Balance Sheet" : "Report";
 
-  const safeGet = async (path, fallback = {}) => {
-    try { const { data } = await api.get(path); return data || fallback; }
-    catch { return fallback; }
-  };
+  /* ===== Balance sheet helpers (NOW enforces A = L + E) ===== */
+  const fetchBalanceSnapshot = async (asOfISO) => {
+    const params = asOfISO ? `?end=${encodeURIComponent(asOfISO)}` : "";
 
-  /* ===== Balance Sheet / P&L builders (same as before) ===== */
-  const fetchBalanceSheetData = async (startISO, endISO) => {
-    const params = (startISO || endISO)
-      ? `?start=${encodeURIComponent(startISO || "")}&end=${encodeURIComponent(endISO || "")}`
-      : "";
-
-    const inv  = await safeGet("/inventory/summary", {});
-    const prod = await safeGet("/products/summary", {});
+    // Assets (current + non-current)
+    const inv = await safeGet(`/inventory/summary${params}`, {});
+    const prod = await safeGet(`/products/summary${params}`, {});
     const inventoryValue = toNum(inv?.inventory?.totalValue ?? inv?.totalValue ?? 0);
-    const productsValue  = toNum(prod?.totalValue ?? inv?.products?.totalValue ?? inv?.productValue ?? 0);
+    const productsValue = toNum(prod?.totalValue ?? 0);
 
     const cash = await safeGet(`/finance/cash-summary${params}`, { total: 0 });
-    const receivables = await safeGet(`/finance/receivables/summary${params}`, { total: 0 });
-    const payables    = await safeGet(`/finance/payables/summary${params}`,    { total: 0 });
 
-    const cashBank = toNum(cash?.total ?? 0);
-    const ar = toNum(receivables?.total ?? 0);
-    const ap = toNum(payables?.total ?? 0);
+    // Accounts Receivable (fallback to pending transactions <= asOf)
+    let receivables = await safeGet(`/finance/receivables/summary${params}`, null);
+    if (!receivables || !Number.isFinite(Number(receivables?.total))) {
+      const fromMin = "1970-01-01";
+      const txList = await safeGet(
+        `/transactions?start=${encodeURIComponent(fromMin)}&end=${encodeURIComponent(asOfISO)}`,
+        []
+      );
+      const totalPending = Array.isArray(txList)
+        ? txList
+            .filter((t) => {
+              const st = String(t?.status || "").toLowerCase();
+              const isPending = st === "pending";
+              const d = isoDateOnly(pickTxDate(t) || "");
+              const ms = d ? new Date(d + "T12:00:00.000Z").getTime() : NaN;
+              const asOfMs = new Date(isoDateOnly(asOfISO) + "T23:59:59.999Z").getTime();
+              return isPending && Number.isFinite(ms) && ms <= asOfMs;
+            })
+            .reduce((acc, t) => acc + lineTotal(t), 0)
+        : 0;
+      receivables = { total: totalPending, count: 0 };
+    }
 
     const fixed = await safeGet(`/finance/fixed-assets${params}`, { total: 0 });
-    const otherAssets = await safeGet(`/finance/other-assets${params}`, { total: 0 });
-    const fixedAssets = toNum(fixed?.total ?? 0);
-    const otherA = toNum(otherAssets?.total ?? 0);
 
+    // Liabilities
+    let payables = await safeGet(`/finance/payables/summary${params}`, null);
+    if (!payables || !Number.isFinite(Number(payables?.total))) {
+      const pur = await safeGet(`/purchases?status=approved`, { orders: [] });
+      const orders = Array.isArray(pur?.orders) ? pur.orders : [];
+      const invList = await safeGet(`/inventory`, { items: [] });
+      const items = Array.isArray(invList?.items) ? invList.items : [];
+
+      const unitById = new Map();
+      items.forEach((it) =>
+        unitById.set(String(it?.id || "").trim(), toNum(it?.unitPrice ?? it?.costPrice ?? it?.price, 0))
+      );
+
+      const totalAP = orders
+        .filter((o) => {
+          const d = isoDateOnly(o?.orderDate || o?.createdAt || "");
+          const ms = d ? new Date(d + "T12:00:00.000Z").getTime() : NaN;
+          const asOfMs = new Date(isoDateOnly(asOfISO) + "T23:59:59.999Z").getTime();
+          return Number.isFinite(ms) && ms <= asOfMs && String(o?.status).toLowerCase() === "approved";
+        })
+        .reduce((acc, o) => {
+          const unit = unitById.get(String(o?.itemId || "").trim()) || 0;
+          const qty = toNum(o?.quantity, 0);
+          return acc + unit * qty;
+        }, 0);
+
+      payables = { total: totalAP, count: 0 };
+    }
+
+    let otherLiab = await safeGet(`/finance/other-liabilities${params}`, null);
+
+    // P&L inputs (for retained earnings proxy)
+    const revenue = await safeGet(`/transactions/revenue${params}`, { revenue: 0 });
+    const cogs = await safeGet(`/finance/cogs${params}`, { total: 0 });
+    const payroll = await safeGet(`/salary/summary${params}`, { totalNet: 0 });
     const contrib = await safeGet(`/contributions/summary${params}`, { grandTotal: 0 });
-    const epfEtfPayable = toNum(contrib?.grandTotal ?? 0);
+    const opex = await safeGet(`/finance/other-expenses${params}`, { website: 0, total: 0 });
 
-    const salarySummary = await safeGet(`/salary/summary${params}`, { payable: 0, totalNet: 0 });
-    const salaryPayable = toNum(salarySummary?.payable ?? 0);
+    // Build components
+    const cashBank = toNum(cash?.total);
+    const ar = toNum(receivables?.total);
+    const invBags = inventoryValue + productsValue;
+    const websiteTools = toNum(fixed?.total);
 
-    const otherLiab = await safeGet(`/finance/other-liabilities${params}`, { total: 0 });
-    const otherLiabilities = toNum(otherLiab?.total ?? 0);
+    const ap = toNum(payables?.total);
+    let accrued = toNum(otherLiab?.total, NaN);
+    if (!Number.isFinite(accrued)) {
+      // conservative fallback
+      accrued = Math.max(0, toNum(payroll?.totalNet, 0) + toNum(contrib?.grandTotal, 0));
+    }
 
-    const revenue = await safeGet(`/transactions/revenue${params}`, { revenue: 0, count: 0 });
-    const cogs    = await safeGet(`/finance/cogs${params}`, { total: 0 });
-    const otherExp= await safeGet(`/finance/other-expenses${params}`, { total: 0 });
-
-    const salesRevenue = toNum(revenue?.revenue ?? 0);
-    const costOfGoods  = toNum(cogs?.total ?? 0);
-
-    const payrollNet = toNum(salarySummary?.totalNet ?? 0);
-    const epfEtf     = toNum(contrib?.grandTotal ?? 0);
-    const websiteOps = toNum(otherExp?.website ?? otherExp?.total ?? 0);
-    const otherOps   = toNum(otherExp?.other ?? 0);
-
-    const operatingExpenses = payrollNet + epfEtf + websiteOps + otherOps;
-    const totalExpenses = costOfGoods + operatingExpenses;
-    const grossProfit = salesRevenue - costOfGoods;
+    const salesRevenue = toNum(revenue?.revenue);
+    const costOfGoods = toNum(cogs?.total);
+    const salaryNet = toNum(payroll?.totalNet);
+    const epfEtf = toNum(contrib?.grandTotal);
+    const websiteExp = toNum(opex?.website ?? opex?.total ?? 0);
+    const totalExpenses = costOfGoods + salaryNet + epfEtf + websiteExp;
     const netProfit = salesRevenue - totalExpenses;
 
-    const ownerCapital = toNum((await safeGet(`/finance/equity/capital${params}`, { total: 0 }))?.total ?? 0);
-    const retainedEarnings = netProfit;
+    const ownerCapitalRaw = await safeGet(`/finance/equity/capital${params}`, { total: 0 });
+    const ownerCapital = toNum(ownerCapitalRaw?.total, 0);
 
-    const totalAssets = cashBank + ar + (inventoryValue + productsValue) + fixedAssets + otherA;
-    const totalLiabilities = ap + epfEtfPayable + salaryPayable + otherLiabilities;
-    const totalEquity = ownerCapital + retainedEarnings;
-    const totalLiaEq = totalLiabilities + totalEquity;
+    // Totals
+    const totalCurrentAssets = cashBank + ar + invBags;
+    const totalNonCurrentAssets = websiteTools;
+    const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
+
+    const totalCurrentLiabilities = ap + accrued;
+    const totalLiabilities = totalCurrentLiabilities;
+
+    // Equity: prefer provided capital + retained; fall back to equation
+    let retainedEarnings = toNum(netProfit, 0);
+    let equityFromParts = ownerCapital + retainedEarnings;
+    const equityByEquation = totalAssets - totalLiabilities;
+
+    // If parts are missing or don’t balance, force equation and back-solve retained
+    if (!Number.isFinite(equityFromParts) || Math.abs(equityFromParts - equityByEquation) > 1) {
+      retainedEarnings = equityByEquation - ownerCapital;
+      equityFromParts = equityByEquation;
+    }
+
+    const totalShareholdersEquity = equityFromParts;
+    const totalLiaPlusEq = totalLiabilities + totalShareholdersEquity;
 
     return {
-      asOf: endISO || fmtDate(new Date()),
-      assets: { cashBank, accountsReceivable: ar, inventoryBags: inventoryValue + productsValue, fixedAssets, otherAssets: otherA, totalAssets },
-      liabilities: { accountsPayable: ap, epfEtfPayable, salaryPayable, otherLiabilities, totalLiabilities },
-      equity: { ownerCapital, retainedEarnings, totalEquity, totalLiaEq },
-      pl: {
-        salesRevenue, costOfGoods, grossProfit,
-        payroll: payrollNet, epfEtf, website: websiteOps, other: otherOps,
-        operatingExpenses, totalExpenses, netProfit,
+      asOf: asOfISO || fmtDate(new Date()),
+      assets: {
+        cashBank,
+        ar,
+        invBags,
+        totalCurrentAssets,
+        totalNonCurrentAssets,
+        totalAssets,
+        websiteTools,
+      },
+      liabilities: {
+        ap,
+        accrued,
+        totalCurrentLiabilities,
+        totalLiabilities,
+      },
+      equity: {
+        ownerCapital,
+        retainedEarnings,
+        totalShareholdersEquity,
+        totalLiaPlusEq,
       },
     };
   };
 
-  const buildBalanceSheetHTML = (companyName, data) => {
+  const refreshBalanceCard = async (asOfISO) => {
+    try {
+      const snap = await fetchBalanceSnapshot(asOfISO || fmtDate(new Date()));
+      const a = toNum(snap?.assets?.totalAssets, 0);
+      const l = toNum(snap?.liabilities?.totalLiabilities, 0);
+      // Card equity is computed to guarantee A = L + E
+      const e = a - l;
+      setBalanceCard({ assets: a, liabilities: l, equity: e });
+    } catch {
+      /* keep previous */
+    }
+  };
+
+  const getTwoMonthData = async (fromISO, toISO) => {
+    const { leftAsOf, rightAsOf } = getTwoMonthAsOfs(fromISO, toISO);
+    const left = await fetchBalanceSnapshot(leftAsOf);
+    const right = await fetchBalanceSnapshot(rightAsOf);
+    return { left, right };
+  };
+
+  /* ===== HTML builders ===== */
+  const formatHeaderDate = (iso) => {
+    const d = new Date(iso);
+    const month = d.toLocaleString("en-US", { month: "long" });
+    const day = String(d.getDate()).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${month} ${day}, ${year}`;
+  };
+
+  const buildBalanceSheetHTML = (companyName, left, right) => {
     const v = (n) => fmtLKRNum(n);
+    const leftDate = formatHeaderDate(left.asOf);
+    const rightDate = formatHeaderDate(right.asOf);
+    const logoUrl = `${window.location.origin}/new logo.png`;
     return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>${companyName} – Balance Sheet</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
 <style>
-body{background:#f6f7fb;margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial}
-.sheet{max-width:900px;margin:0 auto}.header{background:#fff;border-radius:16px;padding:18px 22px;box-shadow:0 10px 24px rgba(0,0,0,.06);text-align:center;margin-bottom:14px}
-.brand{font-size:28px;font-weight:800;color:#4F46E5;margin-bottom:6px}.subtitle{font-size:15px;color:#374151;margin-bottom:8px}
-.asof{display:inline-block;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;font-size:13px;color:#374151}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.card{background:#fff;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.06);padding:14px 14px 10px}
-.card h3{margin:0 0 10px 0;font-size:12px;color:#6b7280;letter-spacing:.8px}.row{display:flex;align-items:center;justify-content:space-between;margin:8px 0}
-.row .lbl{font-size:13px;color:#374151}.row .val{min-width:120px;text-align:right;background:#f3f4f6;border-radius:8px;padding:6px 10px;font-weight:700;color:#111827}
-.total{margin-top:10px;padding-top:8px;border-top:2px solid #e5e7eb}.total .val{background:#4F46E5;color:#fff}.footer-card{grid-column:1 / -1;background:#fff;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.06);padding:14px}
-.btnbar{text-align:center;margin-top:14px}.btn{display:inline-block;background:#4F46E5;color:#fff;border-radius:999px;padding:10px 16px;text-decoration:none;font-weight:700}
-@media print {.btnbar{display:none}}
-</style></head>
-<body><div class="sheet">
-  <div class="header"><div class="brand">${companyName}</div><div class="subtitle">Balance Sheet</div><div class="asof">As of ${data.asOf}</div></div>
-  <div class="grid">
-    <div class="card">
-      <h3>ASSETS</h3>
-      <div class="row"><div class="lbl">Cash & Bank</div><div class="val">${v(data.assets.cashBank)}</div></div>
-      <div class="row"><div class="lbl">Accounts Receivable</div><div class="val">${v(data.assets.accountsReceivable)}</div></div>
-      <div class="row"><div class="lbl">Inventory (Bags)</div><div class="val">${v(data.assets.inventoryBags)}</div></div>
-      <div class="row"><div class="lbl">Website & Equipment</div><div class="val">${v(data.assets.fixedAssets)}</div></div>
-      <div class="row"><div class="lbl">Other Assets</div><div class="val">${v(data.assets.otherAssets)}</div></div>
-      <div class="row total"><div class="lbl"><strong>TOTAL ASSETS</strong></div><div class="val">${v(data.assets.totalAssets)}</div></div>
+  :root{--ink:#1f2937;--muted:#475569;--line:#d9b24d;}
+  body{background:#f6f7fb;margin:0;padding:22px;font-family:Georgia,'Times New Roman',serif;}
+  .page{max-width:900px;margin:0 auto;background:#fff;padding:26px 26px 32px;border:1px solid #eee;}
+  .brand{display:flex;justify-content:space-between;align-items:center}
+  .logo{width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid #e6e6e6}
+  .title{font-size:22px;font-weight:800;color:#2c2c2c}
+  .meta{font-size:12px;color:#666;margin-top:2px}
+  .rule{height:3px;background:var(--line);margin:16px 0 24px 0}
+  h2.sheet{font-size:18px;text-align:center;margin:0 0 8px 0;letter-spacing:.4px}
+  .date-row{display:flex;justify-content:flex-end;gap:40px;color:#333;font-weight:700;margin:10px 0 6px 0}
+  table{width:100%;border-collapse:collapse;}
+  td{padding:6px 8px;font-size:14px;color:#222;vertical-align:top}
+  .section{font-weight:700}
+  .sub{padding-left:14px}
+  .right{text-align:right;min-width:140px}
+  .total{border-top:1px solid #bbb;font-weight:700}
+  .divider{height:1px;background:#bbb;margin:10px 0}
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="brand">
+      <img src="${logoUrl}" alt="PackPal Logo" class="logo" />
+      <div style="text-align:right">
+        <div class="title">${companyName}</div>
+        <div class="meta">No. 42, Elm Street, Colombo • +94 11 234 5678 • hello@packpal.lk</div>
+      </div>
     </div>
-    <div class="card">
-      <h3>LIABILITIES & EQUITY</h3>
-      <div class="row"><div class="lbl"><em>Liabilities:</em></div><div></div></div>
-      <div class="row"><div class="lbl">Accounts Payable</div><div class="val">${v(data.liabilities.accountsPayable)}</div></div>
-      <div class="row"><div class="lbl">EPF/ETF Payable</div><div class="val">${v(data.liabilities.epfEtfPayable)}</div></div>
-      <div class="row"><div class="lbl">Salary Payable</div><div class="val">${v(data.liabilities.salaryPayable)}</div></div>
-      <div class="row"><div class="lbl">Other Liabilities</div><div class="val">${v(data.liabilities.otherLiabilities)}</div></div>
-      <div class="row"><div class="lbl">Total Liabilities</div><div class="val">${v(data.liabilities.totalLiabilities)}</div></div>
-      <div class="row" style="margin-top:10px"><div class="lbl"><em>Equity:</em></div><div></div></div>
-      <div class="row"><div class="lbl">Owner’s Capital</div><div class="val">${v(data.equity.ownerCapital)}</div></div>
-      <div class="row"><div class="lbl">Retained Earnings</div><div class="val">${v(data.equity.retainedEarnings)}</div></div>
-      <div class="row"><div class="lbl">Total Equity</div><div class="val">${v(data.equity.totalEquity)}</div></div>
-      <div class="row total"><div class="lbl"><strong>TOTAL LIAB. & EQUITY</strong></div><div class="val">${v(data.equity.totalLiaEq)}</div></div>
+    <div class="rule"></div>
+    <h2 class="sheet">BALANCE SHEET</h2>
+    <div class="date-row">
+      <div>${leftDate}</div>
+      <div>${rightDate}</div>
     </div>
-    <div class="footer-card">
-      <h3>PROFIT & LOSS SUMMARY</h3>
-      <div class="row"><div class="lbl">Sales Revenue (Bags)</div><div class="val">${v(data.pl.salesRevenue)}</div></div>
-      <div class="row"><div class="lbl">Cost of Goods Sold</div><div class="val">${v(data.pl.costOfGoods)}</div></div>
-      <div class="row"><div class="lbl"><strong>Gross Profit</strong></div><div class="val">${v(data.pl.grossProfit)}</div></div>
-      <div class="row" style="margin-top:10px"><div class="lbl"><em>Operating Expenses:</em></div><div></div></div>
-      <div class="row"><div class="lbl">Employee Salaries</div><div class="val">${v(data.pl.payroll)}</div></div>
-      <div class="row"><div class="lbl">EPF/ETF Contributions</div><div class="val">${v(data.pl.epfEtf)}</div></div>
-      <div class="row"><div class="lbl">Website Expenses</div><div class="val">${v(data.pl.website)}</div></div>
-      <div class="row"><div class="lbl">Other Expenses</div><div class="val">${v(data.pl.other)}</div></div>
-      <div class="row"><div class="lbl"><strong>Total Expenses</strong></div><div class="val">${v(data.pl.totalExpenses)}</div></div>
-      <div class="row total"><div class="lbl"><strong>NET PROFIT/LOSS</strong></div><div class="val">${v(data.pl.netProfit)}</div></div>
-    </div>
+    <div class="divider"></div>
+
+    <table>
+      <tbody>
+        <tr><td class="section">ASSETS:</td><td></td><td></td></tr>
+        <tr><td class="section sub">Current assets:</td><td></td><td></td></tr>
+        <tr><td class="sub">Cash &amp; Bank</td><td class="right">LKR ${v(left.assets.cashBank)}</td><td class="right">LKR ${v(right.assets.cashBank)}</td></tr>
+        <tr><td class="sub">Accounts Receivable</td><td class="right">${left.assets.ar ? "LKR "+v(left.assets.ar) : "-"}</td><td class="right">${right.assets.ar ? "LKR "+v(right.assets.ar) : "-"}</td></tr>
+        <tr><td class="sub">Inventory (Bags in stock)</td><td class="right">LKR ${v(left.assets.invBags)}</td><td class="right">LKR ${v(right.assets.invBags)}</td></tr>
+        <tr><td class="sub section">Total current assets</td><td class="right section">LKR ${v(left.assets.totalCurrentAssets)}</td><td class="right section">LKR ${v(right.assets.totalCurrentAssets)}</td></tr>
+
+        <tr><td class="section sub" style="padding-top:10px">Non-current assets:</td><td></td><td></td></tr>
+        <tr><td class="sub">Website Software &amp; Tools</td><td class="right">${left.assets.websiteTools ? "LKR "+v(left.assets.websiteTools) : "-"}</td><td class="right">${right.assets.websiteTools ? "LKR "+v(right.assets.websiteTools) : "-"}</td></tr>
+        <tr><td class="sub section">Total non-current assets</td><td class="right section">${left.assets.totalNonCurrentAssets ? "LKR "+v(left.assets.totalNonCurrentAssets) : "-"}</td><td class="right section">${right.assets.totalNonCurrentAssets ? "LKR "+v(right.assets.totalNonCurrentAssets) : "-"}</td></tr>
+
+        <tr><td class="section total" style="padding-top:8px"><strong>Total assets</strong></td><td class="right total"><strong>LKR ${v(left.assets.totalAssets)}</strong></td><td class="right total"><strong>LKR ${v(right.assets.totalAssets)}</strong></td></tr>
+      </tbody>
+    </table>
+
+    <div class="divider" style="margin:16px 0"></div>
+
+    <table>
+      <tbody>
+        <tr><td class="section">LIABILITIES AND SHAREHOLDERS' EQUITY:</td><td></td><td></td></tr>
+
+        <tr><td class="section sub">Current liabilities:</td><td></td><td></td></tr>
+        <tr><td class="sub">Accounts Payable (suppliers)</td><td class="right">LKR ${v(left.liabilities.ap)}</td><td class="right">LKR ${v(right.liabilities.ap)}</td></tr>
+        <tr><td class="sub">Accrued Expenses (ads, hosting)</td><td class="right">LKR ${v(left.liabilities.accrued)}</td><td class="right">LKR ${v(right.liabilities.accrued)}</td></tr>
+        <tr><td class="sub section">Total current liabilities</td><td class="right section">LKR ${v(left.liabilities.totalCurrentLiabilities)}</td><td class="right section">LKR ${v(right.liabilities.totalCurrentLiabilities)}</td></tr>
+
+        <tr><td class="section">Total liabilities</td><td class="right">LKR ${v(left.liabilities.totalLiabilities)}</td><td class="right">LKR ${v(right.liabilities.totalLiabilities)}</td></tr>
+
+        <tr><td class="section sub" style="padding-top:10px">Shareholders' equity:</td><td></td><td></td></tr>
+        <tr><td class="sub">Owner's Capital</td><td class="right">LKR ${v(left.equity.ownerCapital)}</td><td class="right">LKR ${v(right.equity.ownerCapital)}</td></tr>
+        <tr><td class="sub">Retained Earnings</td><td class="right">LKR ${v(left.equity.retainedEarnings)}</td><td class="right">LKR ${v(right.equity.retainedEarnings)}</td></tr>
+        <tr><td class="sub section">Total shareholders' equity</td><td class="right section">LKR ${v(left.equity.totalShareholdersEquity)}</td><td class="right section">LKR ${v(right.equity.totalShareholdersEquity)}</td></tr>
+
+        <tr><td class="section total" style="padding-top:8px"><strong>Total liabilities and shareholders' equity</strong></td><td class="right total"><strong>LKR ${v(left.equity.totalLiaPlusEq)}</strong></td><td class="right total"><strong>LKR ${v(right.equity.totalLiaPlusEq)}</strong></td></tr>
+      </tbody>
+    </table>
   </div>
-  <div class="btnbar"><a class="btn" href="javascript:window.print()">🖨️  Print / Save as PDF</a></div>
-</div></body></html>`;
-  };
-
-  /* ===== P&L (kept) ===== */
-  const fetchIncomeStatementData = async (startISO, endISO) => {
-    const qs = (startISO || endISO)
-      ? `?start=${encodeURIComponent(startISO || "")}&end=${encodeURIComponent(endISO || "")}`
-      : "";
-
-    // Revenue
-    let revenueTotal = 0;
-    let revenueBreak = { online: 0, wholesale: 0, custom: 0, other: 0 };
-    const revSummary = await safeGet(`/transactions/revenue${qs}`, null);
-
-    if (revSummary && typeof revSummary === "object" && Number.isFinite(Number(revSummary?.revenue))) {
-      revenueTotal = Number(revSummary.revenue || 0);
-    } else {
-      const list = await safeGet(`/transactions${qs}&limit=2000&sort=-date`, []);
-      (Array.isArray(list) ? list : []).forEach((t) => {
-        if (t?.status === "refund") return;
-        const val = lineTotal(t);
-        const ch  = (t?.method || "").toLowerCase();
-        const pn  = (t?.productName || "").toLowerCase();
-
-        if (ch.includes("wholesale")) revenueBreak.wholesale += val;
-        else if (pn.includes("custom")) revenueBreak.custom += val;
-        else if (ch.includes("online") || ch.includes("retail")) revenueBreak.online += val;
-        else revenueBreak.other += val;
-      });
-      revenueTotal =
-        revenueBreak.online + revenueBreak.wholesale + revenueBreak.custom + revenueBreak.other;
-    }
-
-    // COGS & OPEX
-    const cogs = await safeGet(`/finance/cogs${qs}`, {});
-    const materials     = toNum(cogs?.materials ?? cogs?.rawMaterials ?? 0);
-    const manufacturing = toNum(cogs?.manufacturing ?? 0);
-    const packaging     = toNum(cogs?.packaging ?? 0);
-    const shipping      = toNum(cogs?.shipping ?? cogs?.logistics ?? 0);
-    const totalCOGS     = toNum(cogs?.total ?? (materials + manufacturing + packaging + shipping));
-
-    const payroll   = await safeGet(`/salary/summary${qs}`, { totalNet: 0 });
-    const contrib   = await safeGet(`/contributions/summary${qs}`, { grandTotal: 0 });
-    const opex      = await safeGet(`/finance/operating-expenses${qs}`, {});
-    const epfTotal  = toNum(opex?.epf ?? contrib?.epf ?? Math.round((contrib?.grandTotal || 0) * 0.8));
-    const etfTotal  = toNum(opex?.etf ?? contrib?.etf ?? ((contrib?.grandTotal || 0) - epfTotal));
-    const website   = toNum(opex?.website ?? opex?.hosting ?? 0);
-    const marketing = toNum(opex?.marketing ?? opex?.ads ?? 0);
-    const gateway   = toNum(opex?.gateway ?? opex?.paymentFees ?? 0);
-    const office    = toNum(opex?.office ?? opex?.rentUtilities ?? 0);
-    const insurance = toNum(opex?.insurance ?? 0);
-    const professional = toNum(opex?.professional ?? 0);
-    const otherOp   = toNum(opex?.other ?? 0);
-
-    const salaryNet = toNum(payroll?.totalNet ?? 0);
-    const operatingTotal =
-      salaryNet + epfTotal + etfTotal + website + marketing + gateway + office + insurance + professional + otherOp;
-
-    const grossProfit = revenueTotal - totalCOGS;
-    const netIncome   = grossProfit - operatingTotal;
-
-    return {
-      period: { from: startISO, to: endISO },
-      revenue: {
-        online: toNum(revenueBreak.online || 0),
-        wholesale: toNum(revenueBreak.wholesale || 0),
-        custom: toNum(revenueBreak.custom || 0),
-        other: toNum(revenueBreak.other || 0),
-        total: revenueTotal,
-      },
-      cogs: { materials, manufacturing, packaging, shipping, total: totalCOGS },
-      opex: {
-        salary: salaryNet, epf12: epfTotal, etf3: etfTotal, website,
-        marketing, gateway, office, insurance, professional, other: otherOp,
-        total: operatingTotal
-      },
-      grossProfit,
-      netIncome,
-    };
+</body>
+</html>`;
   };
 
   const buildIncomeStatementHTML = (companyName, asOf, pl) => {
     const v = (n) => fmtLKRNum(n);
+    const periodText = new Date(asOf).toLocaleString("en-US", { month: "long", year: "numeric" });
+    const logoUrl = `${window.location.origin}/new logo.png`;
     return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>${companyName} – Profit & Loss</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
 <style>
-body{background:#f6f7fb;margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial}
-.sheet{max-width:820px;margin:0 auto}.header{background:#fff;border-radius:16px;padding:18px 22px;box-shadow:0 10px 24px rgba(0,0,0,.06);text-align:center;margin-bottom:16px}
-.brand{font-size:26px;font-weight:800;color:#4F46E5;margin-bottom:6px}.subtitle{font-size:15px;color:#374151;margin-bottom:8px}
-.period{display:inline-block;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;font-size:13px;color:#374151}
-.section{background:#fff;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.06);padding:14px;margin-bottom:14px}
-.sec-head{display:flex;align-items:center;gap:8px;font-weight:800;color:#374151;margin-bottom:10px}
-.row{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
-.lab{font-size:13px;color:#374151}.val{min-width:120px;text-align:right;background:#f3f4f6;border-radius:8px;padding:6px 10px;font-weight:700;color:#111827}
-.totalRow{margin-top:10px;padding-top:8px;border-top:2px solid #e5e7eb}.totalRow .val{background:#4F46E5;color:#fff}
-.highlight{background:#4338CA;color:#fff}.btnbar{text-align:center;margin-top:14px}
-.btn{display:inline-block;background:#4F46E5;color:#fff;border-radius:999px;padding:10px 16px;text-decoration:none;font-weight:700}
-@media print {.btnbar{display:none}}
-</style></head>
-<body><div class="sheet">
-  <div class="header"><div class="brand">${companyName}</div><div class="subtitle">Profit & Loss Statement</div><div class="period">As of ${asOf}</div></div>
-  <div class="section">
-    <div class="sec-head">🟦 REVENUE</div>
-    <div class="row"><div class="lab">Online Bag Sales</div><div class="val">${v(pl.revenue.online)}</div></div>
-    <div class="row"><div class="lab">Wholesale Bag Sales</div><div class="val">${v(pl.revenue.wholesale)}</div></div>
-    <div class="row"><div class="lab">Custom Orders</div><div class="val">${v(pl.revenue.custom)}</div></div>
-    <div class="row"><div class="lab">Other Revenue</div><div class="val">${v(pl.revenue.other)}</div></div>
-    <div class="row totalRow"><div class="lab"><strong>TOTAL REVENUE</strong></div><div class="val">${v(pl.revenue.total)}</div></div>
+:root{ --ink:#222; --muted:#6b7280; --grid:#e6eef9; --brand:#1f7ed6; --band:#eaf2fd; }
+*{box-sizing:border-box}
+body{background:#ffffff;margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial}
+.page{max-width:820px;margin:0 auto;border:1px solid var(--grid)}
+.header{display:flex;align-items:center;gap:16px;padding:18px;border-bottom:6px solid var(--grid)}
+.logo{width:54px;height:54px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 4px #f2f6ff inset}
+.head-right{flex:1}
+.company{margin:0;font-size:26px;font-weight:800;color:#111;text-align:right}
+.meta{margin-top:4px;text-align:right;color:#475569;font-size:13px}
+.section-title{background:var(--band);border:1px solid var(--grid);border-left:0;border-right:0;padding:10px 16px;font-weight:800}
+.tbl{width:100%;border-collapse:separate;border-spacing:0 0;border-top:1px solid var(--grid)}
+.tbl th,.tbl td{padding:10px 16px;border-bottom:1px solid #eef2f7;font-size:14px}
+.tbl th{color:#111;background:#f6f9ff;font-weight:800}
+.right{text-align:right}
+.total{font-weight:800}
+.note{color:#64748b;font-size:12px;padding:16px}
+@media print{body{padding:0}.page{border:none}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <img class="logo" src="${logoUrl}" alt="logo" onerror="this.style.display='none'"/>
+    <div class="head-right">
+      <h1 class="company">${companyName}</h1>
+      <div class="meta">No. 42, Elm Street, Colombo • +94 11 234 5678 • hello@packpal.lk</div>
+    </div>
   </div>
-  <div class="section">
-    <div class="sec-head">🟩 COST OF GOODS SOLD</div>
-    <div class="row"><div class="lab">Raw Materials (Fabric, Leather, etc.)</div><div class="val">${v(pl.cogs.materials)}</div></div>
-    <div class="row"><div class="lab">Manufacturing Costs</div><div class="val">${v(pl.cogs.manufacturing)}</div></div>
-    <div class="row"><div class="lab">Packaging Materials</div><div class="val">${v(pl.cogs.packaging)}</div></div>
-    <div class="row"><div class="lab">Shipping & Delivery</div><div class="val">${v(pl.cogs.shipping)}</div></div>
-    <div class="row totalRow"><div class="lab"><strong>TOTAL COGS</strong></div><div class="val">${v(pl.cogs.total)}</div></div>
-    <div class="row totalRow"><div class="lab"><div class="highlight" style="padding:6px 10px;border-radius:8px"><strong>GROSS PROFIT</strong></div></div><div class="val">${v(pl.grossProfit)}</div></div>
-  </div>
-  <div class="section">
-    <div class="sec-head">🟨 OPERATING EXPENSES</div>
-    <div class="row"><div class="lab">Employee Salaries</div><div class="val">${v(pl.opex.salary)}</div></div>
-    <div class="row"><div class="lab">EPF Contributions (12%)</div><div class="val">${v(pl.opex.epf12)}</div></div>
-    <div className="row"><div className="lab">ETF Contributions (3%)</div><div className="val">${v(pl.opex.etf3)}</div></div>
-    <div className="row"><div className="lab">Website Maintenance & Hosting</div><div className="val">${v(pl.opex.website)}</div></div>
-    <div className="row"><div className="lab">Online Marketing & Advertising</div><div className="val">${v(pl.opex.marketing)}</div></div>
-    <div className="row"><div className="lab">Payment Gateway Fees</div><div className="val">${v(pl.opex.gateway)}</div></div>
-    <div className="row"><div className="lab">Office Rent & Utilities</div><div className="val">${v(pl.opex.office)}</div></div>
-    <div className="row"><div className="lab">Insurance</div><div className="val">${v(pl.opex.insurance)}</div></div>
-    <div className="row"><div className="lab">Professional Services</div><div className="val">${v(pl.opex.professional)}</div></div>
-    <div className="row"><div className="lab">Other Operating Expenses</div><div className="val">${v(pl.opex.other)}</div></div>
-    <div className="row totalRow"><div className="lab"><strong>TOTAL OPERATING EXPENSES</strong></div><div className="val">${v(pl.opex.total)}</div></div>
-  </div>
-  <div className="section">
-    <div className="sec-head">🟪 NET INCOME</div>
-    <div className="row totalRow"><div className="lab"><div className="highlight" style="padding:6px 10px;border-radius:8px"><strong>NET PROFIT / (LOSS)</strong></div></div><div className="val">${v(pl.netIncome)}</div></div>
-  </div>
-  <div className="btnbar"><a className="btn" href="javascript:window.print()">🖨️  Print / Save as PDF</a></div>
-</div></body></html>`;
+
+  <div class="section-title">Profit &amp; Loss Statement — ${periodText}</div>
+
+  <div class="section-title" style="margin-top:12px">Revenue</div>
+  <table class="tbl"><tbody>
+    <tr><td>Sales Revenue</td><td class="right total">LKR ${v(pl.revenue.total)}</td></tr>
+  </tbody></table>
+
+  <div class="section-title" style="margin-top:12px">Cost of Goods Sold (COGS)</div>
+  <table class="tbl"><tbody>
+    <tr><td>Cost of Goods Sold</td><td class="right">LKR ${v(pl.cogs.inventory)}</td></tr>
+    <tr><td class="total">Total COGS</td><td class="right total">LKR ${v(pl.cogs.total)}</td></tr>
+  </tbody></table>
+
+  <table class="tbl"><tbody>
+    <tr><td class="total">Gross Profit</td><td class="right total">LKR ${v(pl.grossProfit)}</td></tr>
+  </tbody></table>
+
+  <div class="section-title" style="margin-top:12px">Operating Expenses</div>
+  <table class="tbl"><tbody>
+    <tr><td>Employee Salaries</td><td class="right">LKR ${v(pl.opex.salary)}</td></tr>
+    <tr><td>EPF & ETF</td><td class="right">LKR ${v(pl.opex.epfEtf)}</td></tr>
+    <tr><td>Website</td><td class="right">LKR ${v(pl.opex.website)}</td></tr>
+    <tr><td>Internet & Utilities</td><td class="right">LKR ${v(pl.opex.internet)}</td></tr>
+    <tr><td class="total">Total Operating Expenses</td><td class="right total">LKR ${v(pl.opex.total)}</td></tr>
+  </tbody></table>
+
+  <table class="tbl"><tbody>
+    <tr><td class="total">Net Profit / (Loss)</td><td class="right total">LKR ${v(pl.netIncome)}</td></tr>
+  </tbody></table>
+
+  <div class="note">Note: Revenue, charts, and cards all use the same inclusive date range with timezone-safe comparisons.</div>
+</div>
+</body>
+</html>`;
   };
 
-  /* ====== Open/Download helpers ====== */
   const openHTML = (html, filename) => {
     const w = window.open("", "_blank");
-    if (w && !w.closed) { w.document.write(html); w.document.close(); return; }
+    if (w && !w.closed) {
+      w.document.write(html);
+      w.document.close();
+      return;
+    }
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
-    a.remove(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
-  /* ====== Handlers ====== */
-  const handleView = async (name, periodOverride) => {
+  const handleView = async (name) => {
     const type = inferType(name);
     const from = dateFromRef.current?.value || fmtDate(new Date());
-    const to   = dateToRef.current?.value   || fmtDate(new Date());
-    const period = periodOverride || `${from} to ${to}`;
+    const to = dateToRef.current?.value || fmtDate(new Date());
 
     if (type === "Balance Sheet") {
-      const data = await fetchBalanceSheetData(from, to);
-      const html = buildBalanceSheetHTML("Bag Business Co.", { ...data, asOf: to });
-      openHTML(html, `Balance_Sheet_${to}.html`);
+      const { left, right } = await getTwoMonthData(from, to);
+      const html = buildBalanceSheetHTML("PackPal (Pvt) Ltd", left, right);
+      openHTML(html, `Balance_Sheet_${right.asOf}.html`);
       return;
     }
 
     if (type === "Profit & Loss Statement") {
       const pl = await fetchIncomeStatementData(from, to);
-      const html = buildIncomeStatementHTML("Bag Business Co.", to, pl);
-      openHTML(html, `Profit_and_Loss_${from}_to_${to}.html`);
+      const html = buildIncomeStatementHTML("PackPal (Pvt) Ltd", to, pl);
+      openHTML(html, `Profit_and_Loss_${to}.html`);
       return;
     }
 
-    const html = `
-      <html><body><h2>${name}</h2><p>Period: ${period}</p><p>Generated: ${fmtDate(new Date())}</p></body></html>
-    `;
+    const html = `<html><body><h2>${name}</h2><p>Period: ${from} to ${to}</p></body></html>`;
     openHTML(html, `${name.replace(/\s+/g, "_")}.html`);
   };
 
-  const handleDownload = async (name, periodOverride) => {
+  const handleDownload = async (name) => {
     const type = inferType(name);
     const from = dateFromRef.current?.value || fmtDate(new Date());
-    const to   = dateToRef.current?.value   || fmtDate(new Date());
+    const to = dateToRef.current?.value || fmtDate(new Date());
 
     if (type === "Balance Sheet") {
-      const data = await fetchBalanceSheetData(from, to);
-      const html = buildBalanceSheetHTML("Bag Business Co.", { ...data, asOf: to });
-      openHTML(html, `Balance_Sheet_${to}.html`);
-      toast("Balance Sheet generated. Use the Print button to save as PDF.", "success");
+      const { left, right } = await getTwoMonthData(from, to);
+      const html = buildBalanceSheetHTML("PackPal (Pvt) Ltd", left, right);
+      openHTML(html, `Balance_Sheet_${right.asOf}.html`);
+      toast("Balance Sheet generated. Use the browser’s Print to save as PDF.", "success");
       return;
     }
 
     if (type === "Profit & Loss Statement") {
       const pl = await fetchIncomeStatementData(from, to);
-      const html = buildIncomeStatementHTML("Bag Business Co.", to, pl);
-      openHTML(html, `Profit_and_Loss_${from}_to_${to}.html`);
-      toast("Profit & Loss Statement generated. Use the Print button to save as PDF.", "success");
+      const html = buildIncomeStatementHTML("PackPal (Pvt) Ltd", to, pl);
+      openHTML(html, `Profit_and_Loss_${to}.html`);
+      toast("Profit & Loss generated. Use the browser’s Print to save as PDF.", "success");
       return;
     }
 
     toast("Report ready.", "success");
   };
 
-  //const onLogout = () => {
-   // if (window.confirm("Are you sure you want to logout?")) {
-    //  toast("Logging out...", "info");
-    //  setTimeout(() => { alert("You have been logged out successfully!"); }, 600);
-    //}
-  //};
+  /* Cards use exact revenue + identity for equity */
+  const quickCards = useMemo(
+    () => [
+      {
+        title: "Profit & Loss Statement",
+        subtitle: "Period performance snapshot",
+        stats: [
+          { label: "Revenue", value: fmtLKR(revenueExact || dash.revenue) },
+          { label: "Expenses", value: fmtLKR(dash.expenses) },
+          { label: "Net Profit", value: fmtLKR((revenueExact || dash.revenue) - toNum(dash.expenses, 0)) },
+        ],
+      },
+      {
+        title: "Balance Sheet",
+        subtitle: "Assets & Liabilities",
+        stats: [
+          { label: "Assets", value: fmtLKR(balanceCard.assets) },
+          { label: "Liabilities", value: fmtLKR(balanceCard.liabilities) },
+          // equity always matches A - L here
+          { label: "Equity", value: fmtLKR(balanceCard.assets - balanceCard.liabilities) },
+        ],
+      },
+    ],
+    [dash, balanceCard, revenueExact]
+  );
 
-  /* ---------- Quick Cards ---------- */
-  const quickCards = useMemo(() => ([
-    {
-      title: "Profit & Loss Statement",
-      subtitle: "Period performance snapshot",
-      stats: [
-        { label:"Revenue",     value: fmtLKR(dash.revenue) },
-        { label:"Expenses",    value: fmtLKR(dash.expenses) },
-        { label:"Net Profit",  value: fmtLKR(dash.net) }
-      ]
-    },
-    {
-      title: "Balance Sheet",
-      subtitle: "Assets & Liabilities",
-      stats: [
-        { label:"Assets",      value: fmtLKR(1200000) },
-        { label:"Liabilities", value: fmtLKR(380000) },
-        { label:"Equity",      value: fmtLKR(820000) }
-      ]
-    },
-    {
-      title: "Budget Analysis",
-      subtitle: "Budget vs Actual (Expenses)",
-      stats: [
-        { label:"Budget", value: fmtLKR((chartsData.budgetVsActual.budget || []).reduce((a,b)=>a+b,0)) || fmtLKR(750000) },
-        { label:"Actual", value: fmtLKR((chartsData.budgetVsActual.actual || []).reduce((a,b)=>a+b,0) || dash.expenses) },
-        { label:"Variance", value: (() => {
-            const b = (chartsData.budgetVsActual.budget || []).reduce((a,b)=>a+b,0) || 750000;
-            const a = (chartsData.budgetVsActual.actual || []).reduce((a,b)=>a+b,0) || dash.expenses;
-            const variance = b ? Math.round(((b - a) / b) * 100) : 0;
-            return (variance >= 0 ? "+" : "") + variance + "%";
-          })()
-        }
-      ]
+  const handleGenerate = async () => {
+    const todayISO = fmtDate(new Date());
+    const from = dateFromRef.current?.value || todayISO;
+    let to = dateToRef.current?.value || todayISO;
+
+    if (to > todayISO) {
+      to = todayISO;
+      if (dateToRef.current) dateToRef.current.value = todayISO;
+      toast("Date To adjusted to today (future dates are not allowed).", "warning");
     }
-  ]), [dash, chartsData]);
+    if (from && to && to < from) {
+      to = from;
+      if (dateToRef.current) dateToRef.current.value = from;
+      dateToRef.current.min = from;
+      toast("Adjusted Date To to match Date From (cannot be earlier).", "warning");
+    }
 
-  /* ---------- UI ---------- */
+    const reload = async () => {
+      const exact = await fetchExactRevenue(from, to);
+      setRevenueExact(exact);
+
+      let kpis = await computeKPIsByCreatedAt(from, to);
+      if (kpis.revenue === 0 && kpis.expenses === 0) {
+        const txSummary = await getWithRange("/transactions/summary", from, to);
+        const payroll = await getWithRange("/salary/summary", from, to);
+        const contrib = await getWithRange("/contributions/summary", from, to);
+        const invSum = await getWithRange("/inventory/summary", from, to);
+
+        const revenue = toNum(txSummary?.revenue, 0);
+        const payrollTotal = toNum(payroll?.totalNet, 0);
+        const contribTotal = toNum(contrib?.grandTotal, 0);
+        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
+        const expenses = payrollTotal + contribTotal + inventoryOnly;
+
+        kpis = { revenue, expenses, net: revenue - expenses };
+      }
+      const finalRevenue = Number.isFinite(Number(exact)) ? exact : kpis.revenue;
+      const finalNet = finalRevenue - toNum(kpis.expenses, 0);
+      setDash({ revenue: finalRevenue, expenses: toNum(kpis.expenses, 0), net: finalNet });
+    };
+
+    setGenerating(true);
+    await Promise.all([reload(), fetchChartsData(), refreshBalanceCard(to)]);
+    setGenerating(false);
+    toast(
+      `${reportType} generated successfully for ${dateFromRef.current?.value || from} to ${
+        dateToRef.current?.value || to
+      }`,
+      "success"
+    );
+  };
+
+  const todayISO = fmtDate(new Date());
   return (
     <div className="financial-report-page">
       <Sidebar />
@@ -817,96 +1178,132 @@ body{background:#f6f7fb;margin:0;padding:24px;font-family:-apple-system,BlinkMac
           <p>Comprehensive financial analysis and reporting</p>
         </div>
 
-        {/* Filters */}
         <section className="filters-section">
           <div className="filters-grid">
             <div className="filter-group">
               <label className="filter-label">Report Type</label>
-              <select className="filter-input" value={reportType} onChange={(e)=>setReportType(e.target.value)}>
+              <select className="filter-input" value={reportType} onChange={(e) => setReportType(e.target.value)}>
                 <option>All Reports</option>
                 <option>Profit & Loss Statement</option>
                 <option>Balance Sheet</option>
-                <option>Budget Analysis</option>
               </select>
             </div>
+
             <div className="filter-group">
               <label className="filter-label">Date From</label>
-              <input type="date" className="filter-input" ref={dateFromRef}/>
+              <input
+                type="date"
+                className="filter-input"
+                ref={dateFromRef}
+                max={todayISO}
+                onChange={(e) => {
+                  const fromDate = e.target.value;
+                  if (dateToRef.current) {
+                    dateToRef.current.min = fromDate;
+                    dateToRef.current.max = todayISO;
+                    if (dateToRef.current.value && dateToRef.current.value < fromDate) {
+                      dateToRef.current.value = fromDate;
+                    }
+                    if (dateToRef.current.value && dateToRef.current.value > todayISO) {
+                      dateToRef.current.value = todayISO;
+                      toast("Date To adjusted to today (future dates are not allowed).", "warning");
+                    }
+                  }
+                }}
+              />
             </div>
+
             <div className="filter-group">
               <label className="filter-label">Date To</label>
-              <input type="date" className="filter-input" ref={dateToRef}/>
+              <input
+                type="date"
+                className="filter-input"
+                ref={dateToRef}
+                max={todayISO}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const max = todayISO;
+                  const min = dateFromRef.current?.value || "";
+                  if (min && v < min) {
+                    e.target.value = min;
+                    toast("Date To cannot be earlier than Date From. Adjusted.", "warning");
+                  } else if (v > max) {
+                    e.target.value = max;
+                    toast("Date To adjusted to today (future dates are not allowed).", "warning");
+                  }
+                }}
+              />
             </div>
-            <div className="filter-group">
-              <label className="filter-label">Department</label>
-              <select className="filter-input" value={department} onChange={(e)=>setDepartment(e.target.value)}>
-                <option>All Departments</option>
-                <option>Sales</option>
-                <option>Marketing</option>
-                <option>Operations</option>
-                <option>HR</option>
-              </select>
-            </div>
+
             <div className="filter-group">
               <button className="generate-btn" onClick={handleGenerate} disabled={generating}>
-                {generating ? (<><i className="fas fa-spinner fa-spin"/> Generating...</>) : (<><i className="fas fa-chart-bar"/> Generate Reports</>)}
+                {generating ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin" /> Generating...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-chart-bar" /> Generate Reports
+                  </>
+                )}
               </button>
             </div>
           </div>
         </section>
 
-        {/* Quick Cards */}
-        <section className="reports-grid">
-          {quickCards.map((card) => (
-            <article className="report-card" key={card.title}>
-              <div className="report-header">
-                <div className="report-title">
-                  {card.title.includes("Profit")  && <i className="fas fa-file-invoice-dollar" />}
-                  {card.title.includes("Balance") && <i className="fas fa-balance-scale" />}
-                  {card.title.includes("Budget")  && <i className="fas fa-chart-pie" />}
-                  {card.title}
+        {/* Cards filtered by reportType */}
+        <section className={`reports-grid ${reportType !== "All Reports" ? "centered" : ""}`}>
+          {quickCards
+            .filter((card) => reportType === "All Reports" || card.title === reportType)
+            .map((card) => (
+              <article className="report-card" key={card.title}>
+                <div className="report-header">
+                  <div className="report-title">
+                    {card.title.includes("Profit") && <i className="fas fa-file-invoice-dollar" />}
+                    {card.title.includes("Balance") && <i className="fas fa-balance-scale" />}
+                    {card.title}
+                  </div>
+                  <div className="report-subtitle">{card.subtitle}</div>
                 </div>
-                <div className="report-subtitle">{card.subtitle}</div>
-              </div>
-              <div className="report-body">
-                <div className="report-summary">
-                  {card.stats.map((s)=>(
-                    <div className="summary-item" key={s.label}>
-                      <div className="summary-value">{s.value}</div>
-                      <div className="summary-label">{s.label}</div>
-                    </div>
-                  ))}
+                <div className="report-body">
+                  <div className="report-summary">
+                    {card.stats.map((s) => (
+                      <div className="summary-item" key={s.label}>
+                        <div className="summary-value">{s.value}</div>
+                        <div className="summary-label">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="report-actions">
+                    <button className="action-btn btn-primary" onClick={() => handleView(card.title)}>
+                      <i className="fas fa-eye" /> View
+                    </button>
+                    <button className="action-btn btn-secondary" onClick={() => handleDownload(card.title)}>
+                      <i className="fas fa-download" /> Download
+                    </button>
+                  </div>
                 </div>
-                <div className="report-actions">
-                  <button className="action-btn btn-primary" onClick={()=>handleView(card.title)}><i className="fas fa-eye"/> View</button>
-                  <button className="action-btn btn-secondary" onClick={()=>handleDownload(card.title)}><i className="fas fa-download"/> Download</button>
-                </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            ))}
         </section>
 
-        {/* Charts */}
         <section className="chart-section">
           <h2 className="section-title">📈 Financial Performance Analytics</h2>
           <div className="charts-row">
             <div className="chart-container">
               <div className="chart-title">Monthly Revenue Trend</div>
-              <canvas ref={revenueRef}/>
+              <canvas ref={revenueRef} />
             </div>
             <div className="chart-container">
               <div className="chart-title">Expense Categories</div>
-              <canvas ref={expenseRef}/>
+              <canvas ref={expenseRef} />
             </div>
           </div>
-          <div className="charts-row">
+
+          <div className="charts-row one">
             <div className="chart-container">
               <div className="chart-title">Profit Margin Analysis</div>
-              <canvas ref={profitRef}/>
-            </div>
-            <div className="chart-container">
-              <div className="chart-title">Budget vs Actual</div>
-              <canvas ref={budgetRef}/>
+              <canvas ref={profitRef} />
             </div>
           </div>
         </section>
