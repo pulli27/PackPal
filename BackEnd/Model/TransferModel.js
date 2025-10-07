@@ -1,25 +1,17 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-const txSchema = new Schema({
-  id: { type: String }, // optional human-readable id
-  date: { type: String, required: true }, // "YYYY-MM-DD"
-  customer: { type: String, default: "" },
-  customerId: { type: String, default: "" },
-  fmc: { type: Boolean, default: false },
-
-  productId: { type: String, required: true },
-  productName: { type: String, required: true },
-
-  qty: { type: Number, required: true, min: 1 },
-  unitPrice: { type: Number, required: true, min: 0 },
-  discountPerUnit: { type: Number, default: 0, min: 0 },
-  total: { type: Number, required: true, min: 0 },
-
-  method: { type: String, default: "Card" },
-  status: { type: String, default: "Paid" }, // match your UI capitalization
-  notes: { type: String, default: "" },
+const transferSchema = new Schema({
+  empId:   { type: String, required: true },
+  month:   { type: String, required: true }, // e.g. "September 2025"
+  date:    { type: String, required: true }, // "YYYY-MM-DD"
+  empName: { type: String, required: true },
+  amount:  { type: Number, required: true, min: 0 },
+  // keep "Paid" to match UI wording
+  status:  { type: String, default: "Pending", enum: ["Pending", "Paid", "Failed"] },
 }, { timestamps: true, versionKey: false });
 
-module.exports = mongoose.models.Transaction
-  || mongoose.model("Transaction", txSchema, "transactions");
+transferSchema.index({ empId: 1, month: 1 }, { unique: true });
+
+module.exports = mongoose.models.Transfer
+  || mongoose.model("Transfer", transferSchema, "transfers");

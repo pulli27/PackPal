@@ -1,3 +1,4 @@
+// src/pages/CustomerView.js
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -6,6 +7,11 @@ import "./Customerview.css";
 const URL = "http://localhost:5000/api/carts";
 const STORAGE_KEY = "packPalCart";
 const WISHLIST_KEY = "packPalWishlist";
+
+/* -------- temporary stubs (replace with real components or import) -------- */
+const Header = () => null;
+const Footer = () => null;
+/* ------------------------------------------------------------------------ */
 
 /* -------- helpers -------- */
 const money = (n) =>
