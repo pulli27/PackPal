@@ -13,6 +13,9 @@ const numStr = (n) => Math.round(Number(n || 0)).toLocaleString("en-LK");
 const toNum = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+// Use /public/logo.png (place logo.png in the public folder)
+const INVOICE_LOGO = `${process.env.PUBLIC_URL || ""}/new logo.png`;
+
 // Local YYYY-MM-DD (no timezone shifting)
 const pad2 = (n) => String(n).padStart(2, "0");
 const localISODate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -468,7 +471,7 @@ function Revenue() {
       .wrap { max-width: 900px; margin: 24px auto; padding: 24px; }
       .head { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; padding-bottom:12px; }
       .brand { display:flex; align-items:center; gap:12px; }
-      .logo { width:40px; height:40px; border-radius:8px; background:#6d28d9; }
+      .logo { width:48px; height:48px; object-fit:contain; border-radius:8px; }
       h1 { margin:0; font-size: 22px; }
       .muted { color:#6b7280; }
       .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top:16px; }
@@ -514,7 +517,7 @@ function Revenue() {
       <div class="wrap">
         <div class="head">
           <div class="brand">
-            <div class="logo"></div>
+            <img src="${INVOICE_LOGO}" alt="Company Logo" class="logo" onerror="this.style.display='none'"/>
             <div>
               <h1>Invoice</h1>
               <div class="muted">Invoice No: INV-${id}</div>
@@ -530,7 +533,7 @@ function Revenue() {
         <div class="grid">
           <div class="card">
             <strong>From</strong>
-            <div>BagCo Ltd.</div>
+            <div>Packpal Ltd.</div>
             <div>123 Main Street</div>
             <div>Colombo</div>
           </div>
@@ -579,7 +582,7 @@ function Revenue() {
       <div class="wrap">
         <div class="head">
           <div class="brand">
-            <div class="logo"></div>
+            <img src="${INVOICE_LOGO}" alt="Company Logo" class="logo" onerror="this.style.display='none'"/>
             <div>
               <h1>Order Summary</h1>
               <div class="muted">Order #${id}</div>
