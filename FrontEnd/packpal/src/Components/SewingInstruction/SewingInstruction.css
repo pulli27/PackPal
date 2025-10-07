@@ -2,13 +2,9 @@
    Sewing Instructions — fully scoped + wrapper
    ========================================== */
 .sew{
-  /* Adjust to your actual sidebar width */
   --sidebar-w: 280px;
-
   --bg:#f6f7fb; --card:#fff; --text:#0f172a; --muted:#6b7280; --border:#e5e7eb;
-  --brand:#2563eb; --brand-600:#1d4ed8;
-  --success:#22c55e; --danger:#ef4444; --warning:#f59e0b; --info:#3b82f6;
-
+  --brand:#2563eb; --brand-600:#1d4ed8; --success:#22c55e; --danger:#ef4444; --warning:#f59e0b; --info:#3b82f6;
   font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
   color: var(--text);
   background: var(--bg);
@@ -86,14 +82,51 @@
 .sew .icon-edit{ color: #16a34a }
 .sew .icon-del{ color: #ef4444 }
 
-/* Modals (native <dialog>) */
-.sew .modal{ border: none; padding: 0; background: transparent }
-.sew .modal::backdrop{ background: rgba(0,0,0,.25) }
-.sew .modal-card{
-  background: #fff; border: 1px solid var(--border); border-radius: 12px;
-  padding: 16px; min-width: 340px;
+/* =========================
+   Modal dialogs — center perfectly
+   ========================= */
+.sew .modal{
+  border: none;
+  padding: 0;
+  margin: 0;                /* kill UA margins */
+  background: transparent;
+  z-index: 1000;
 }
-.sew .grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px }
+
+/* Full-viewport overlay */
+.sew .modal[open]{
+  position: fixed;
+  inset: 0;
+  /* no flex/grid needed; we center the card itself */
+  padding: 0;
+  height: 100dvh;
+}
+
+/* Dim background */
+.sew .modal::backdrop{ background: rgba(0,0,0,.35) }
+
+/* Center the card itself with transform */
+.sew .modal-card{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  width: min(980px, 100% - 48px); /* 24px gutter on both sides */
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  margin: 0;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+
+.sew .grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px; margin-top: 6px;
+}
 .sew .grid .span-2{ grid-column: span 2 }
 .sew label{ display: flex; flex-direction: column; gap: 6px; font-size: 14px }
 .sew input, .sew select, .sew textarea{
@@ -104,12 +137,12 @@
 .sew .view-body{ font-size: 14px; color: #111 }
 .sew .view-body p{ margin: 6px 0 }
 
-/* Responsive: collapse sidebar on small screens */
+/* Prevent background scroll while modal is open */
+body:has(.sew .modal[open]){ overflow: hidden; }
+
+/* Responsive */
 @media (max-width:1024px){
   .sew{ --sidebar-w: 0px; }
-  .sew .page{
-    margin-left: 0;
-    width: 100vw;
-  }
+  .sew .page{ margin-left: 0; width: 100vw; }
   .sew .grid{ grid-template-columns: 1fr; }
 }

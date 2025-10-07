@@ -1,21 +1,21 @@
+// BackEnd/Routes/TransactionsRoutes.js
 const express = require("express");
 const router = express.Router();
+const tx = require("../Controllers/Transactioncontrollers");
 
-const {
-  getTransactions,
-  addTransaction,
-  updateTransaction,
-  deleteTransaction,
-  getSummary,
-} = require("../controllers/Transactioncontrollers");
+// v1 (kept) — supports ?start&end
+router.get("/summary-v1", tx.getSummary);
 
-// Summary route
-router.get("/summary", getSummary);
+// v2 month-aware (createdAt buckets)
+router.get("/summary", tx.getSummaryV2);
 
-// CRUD routes
-router.get("/", getTransactions);
-router.post("/", addTransaction);
-router.put("/:id", updateTransaction);
-router.delete("/:id", deleteTransaction);
+// NEW: monthly revenue buckets (supports ?start&end, else last N months)
+router.get("/revenue/monthly", tx.getRevenueMonthly);
+
+// CRUD (put static routes before dynamic)
+router.get("/", tx.getTransactions);
+router.post("/", tx.addTransaction);
+router.put("/:id", tx.updateTransaction);
+router.delete("/:id", tx.deleteTransaction);
 
 module.exports = router;

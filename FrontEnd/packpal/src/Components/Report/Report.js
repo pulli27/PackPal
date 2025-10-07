@@ -1,5 +1,5 @@
 // src/Components/Report/Report.js
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Sidebarpul from "../Sidebar/Sidebarpul";
 import "./Report.css";
 
@@ -12,13 +12,18 @@ const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const PRODUCTS_PATH = "/api/products";
 const ITEMS_PATH = "/api/inventory";
 
-/* ====== Branding / Assets ====== */
-const SYSTEM_NAME = "PackPal — Inventory & Analytics";
-const LOGO_PATH = "/logo.png";           // <-- put logo here (public/logo.png)
-const SIGNATURE_PATH = "/signature.png"; // <-- optional (public/signature.png)
+/** ======= Branding used only in the PDF ======= */
+const LOGO_URL = "/new logo.png"; // local/public path or absolute URL
+const COMPANY = {
+  name: "PackPal (Pvt) Ltd",
+  address: "No. 42, Elm Street, Colombo",
+  email: "hello@packpal.lk",
+};
+/** ============================================ */
 
 /* ---------------- Helpers ---------------- */
 const money = (n) => "LKR " + Number(n || 0).toLocaleString();
+const iso = (d) => new Date(d).toISOString().split("T")[0];
 
 function discountedUnitPrice(p) {
   const base = Number(p.unitPrice || 0);
@@ -116,6 +121,10 @@ async function loadImageAsDataURL(path) {
 /* ======================================== */
 
 export default function Report() {
+  // UI date controls (unchanged UI)
+  const [startDate, setStartDate] = useState("2025-06-01");
+  const [endDate, setEndDate] = useState("2025-09-30");
+
   const invRef = useRef(null);
   const orderTrendRef = useRef(null);
   const valueRef = useRef(null);
@@ -126,9 +135,7 @@ export default function Report() {
   const chartsRef = useRef([]);
 
   useEffect(() => {
-    const start = document.getElementById("startDate")?.value || "";
-    const end = document.getElementById("endDate")?.value || "";
-    loadAndRender({ start, end });
+    loadAndRender({ start: startDate, end: endDate });
     updateReportDate();
     return () => {
       chartsRef.current.forEach((c) => c && c.destroy());
@@ -136,6 +143,14 @@ export default function Report() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // refresh data if range becomes valid
+  useEffect(() => {
+    if (endDate >= startDate) {
+      loadAndRender({ start: startDate, end: endDate });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate]);
 
   function updateReportDate() {
     const now = new Date();
@@ -150,7 +165,7 @@ export default function Report() {
     return getComputedStyle(el).getPropertyValue(name).trim();
   }
 
-  /* ------------- Data loading + datasets (date-range aware) ------------- */
+  /* ------------- Data loading + datasets ------------- */
   async function loadAndRender({ start, end } = {}) {
     try {
       const [prodRes, itemRes, poRes] = await Promise.allSettled([
@@ -197,10 +212,10 @@ export default function Report() {
       safeText("#kpiInventoryValue", money(totalInventoryValue));
       safeText("#kpiLowStock", String(lowStockProducts));
 
-      // ---------- Month range ----------
+      // Month range
       const valueMonths = monthsBetween(start, end);
 
-      // ---------- Values per month ----------
+      // Values per month
       const prodValByMonth = new Map(valueMonths.map((m) => [m, 0]));
       const itemValByMonth = new Map(valueMonths.map((m) => [m, 0]));
 
@@ -255,7 +270,7 @@ export default function Report() {
       const catLow = catLabels.map((c) => catMap.get(c).low);
       const catOut = catLabels.map((c) => catMap.get(c).out);
 
-      // Purchase order trends within range
+      // PO trends
       const trendMap = new Map(valueMonths.map((m) => [m, { pending: 0, completed: 0, cancelled: 0 }]));
       rawOrders.forEach((o) => {
         const stamp = o.orderDate || o.createdAt || start || new Date();
@@ -317,7 +332,7 @@ export default function Report() {
     const commonOpts = {
       responsive: true,
       maintainAspectRatio: false,
-      animation: false, // ensure canvas is ready for PDF snapshot
+      animation: false,
     };
 
     // Inventory by Category (stacked)
@@ -332,10 +347,7 @@ export default function Report() {
             { label: "Out of Stock", data: data.invByCat.out, backgroundColor: cssVar("--red") || "#EF4444" },
           ],
         },
-        options: {
-          ...commonOpts,
-          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-        },
+        options: { ...commonOpts, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } },
       });
       chartsRef.current.push(c);
     }
@@ -347,30 +359,9 @@ export default function Report() {
         data: {
           labels: data.orderTrends.labels,
           datasets: [
-            {
-              label: "Pending",
-              data: data.orderTrends.pending,
-              borderColor: "#F59E0B",
-              backgroundColor: "rgba(245,158,11,.12)",
-              tension: 0.15,
-              fill: true,
-            },
-            {
-              label: "Completed",
-              data: data.orderTrends.completed,
-              borderColor: "#10B981",
-              backgroundColor: "rgba(16,185,129,.12)",
-              tension: 0.15,
-              fill: true,
-            },
-            {
-              label: "Cancelled",
-              data: data.orderTrends.cancelled,
-              borderColor: "#EF4444",
-              backgroundColor: "rgba(239,68,68,.12)",
-              tension: 0.15,
-              fill: true,
-            },
+            { label: "Pending", data: data.orderTrends.pending, borderColor: "#F59E0B", backgroundColor: "rgba(245,158,11,.12)", tension: 0.15, fill: true },
+            { label: "Completed", data: data.orderTrends.completed, borderColor: "#10B981", backgroundColor: "rgba(16,185,129,.12)", tension: 0.15, fill: true },
+            { label: "Cancelled", data: data.orderTrends.cancelled, borderColor: "#EF4444", backgroundColor: "rgba(239,68,68,.12)", tension: 0.15, fill: true },
           ],
         },
         options: { ...commonOpts, scales: { y: { beginAtZero: true } } },
@@ -385,52 +376,15 @@ export default function Report() {
         data: {
           labels: data.monthlyValue.labels,
           datasets: [
-            {
-              label: "Inventory Value (LKR)",
-              data: data.monthlyValue.combined,
-              borderColor: "#6366F1",
-              backgroundColor: "rgba(99,102,241,.20)",
-              fill: true,
-              tension: 0.18,
-              borderWidth: 2,
-              order: 1,
-            },
-            {
-              label: "Products Value (LKR)",
-              data: data.monthlyValue.products,
-              borderColor: "#10B981",
-              backgroundColor: "transparent",
-              fill: false,
-              tension: 0.18,
-              borderWidth: 3,
-              order: 2,
-            },
-            {
-              label: "Items Value (LKR)",
-              data: data.monthlyValue.items,
-              borderColor: "#F59E0B",
-              backgroundColor: "transparent",
-              fill: false,
-              tension: 0.18,
-              borderWidth: 3,
-              order: 3,
-            },
+            { label: "Inventory Value (LKR)", data: data.monthlyValue.combined, borderColor: "#6366F1", backgroundColor: "rgba(99,102,241,.20)", fill: true, tension: 0.18, borderWidth: 2, order: 1 },
+            { label: "Products Value (LKR)", data: data.monthlyValue.products, borderColor: "#10B981", backgroundColor: "transparent", fill: false, tension: 0.18, borderWidth: 3, order: 2 },
+            { label: "Items Value (LKR)", data: data.monthlyValue.items, borderColor: "#F59E0B", backgroundColor: "transparent", fill: false, tension: 0.18, borderWidth: 3, order: 3 },
           ],
         },
         options: {
           ...commonOpts,
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: { callback: (v) => "LKR " + Number(v).toLocaleString() },
-            },
-          },
-          plugins: {
-            tooltip: {
-              callbacks: { label: (ctx) => `${ctx.dataset.label}: LKR ${Number(ctx.parsed.y).toLocaleString()}` },
-            },
-            legend: { position: "top" },
-          },
+          scales: { y: { beginAtZero: true, ticks: { callback: (v) => "LKR " + Number(v).toLocaleString() } } },
+          plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: LKR ${Number(ctx.parsed.y).toLocaleString()}` } }, legend: { position: "top" } },
         },
       });
       chartsRef.current.push(c);
@@ -456,206 +410,151 @@ export default function Report() {
         type: "doughnut",
         data: {
           labels: data.itemsPie.labels,
-          datasets: [
-            {
-              data: data.itemsPie.values,
-              backgroundColor: ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#3B82F6", "#8B5CF6", "#22C55E"],
-              borderWidth: 0,
-            },
-          ],
+          datasets: [{ data: data.itemsPie.values, backgroundColor: ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#3B82F6", "#8B5CF6", "#22C55E"], borderWidth: 0 }],
         },
-        options: {
-          ...commonOpts,
-          cutout: "55%",
-          plugins: {
-            legend: { position: "right" },
-            tooltip: {
-              callbacks: {
-                label: (ctx) =>
-                  `${ctx.label}: ${ctx.parsed.toLocaleString()} (${((ctx.parsed / totalQty) * 100).toFixed(1)}%)`,
-              },
-            },
-          },
-        },
+        options: { ...commonOpts, cutout: "55%", plugins: { legend: { position: "right" }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed.toLocaleString()} (${((ctx.parsed / totalQty) * 100).toFixed(1)}%)` } } } },
       });
       chartsRef.current.push(c);
     }
   }
 
-  /* ---------------- PDF generator with LOGO + SIGNATURE ---------------- */
+  /* ---------------- PDF generator (custom look; UI unchanged) ---------------- */
   async function generateReport() {
-    const startDate = document.getElementById("startDate")?.value || "";
-    const endDate = document.getElementById("endDate")?.value || "";
+    if (endDate < startDate) {
+      alert("End date cannot be before the start date.");
+      return;
+    }
 
-    // Refresh charts and wait a frame so canvases are painted
+    // refresh canvases
     await loadAndRender({ start: startDate, end: endDate });
     await rafDelay();
 
-    const reportParts = Array.from((mainRef.current || document).querySelectorAll(".report-part"));
     const pdfRoot = document.createElement("div");
     pdfRoot.id = "pdfRoot";
 
-    // copy CSS vars for consistent colors
+    // copy theme CSS vars so colors match
     ["--ink","--text","--muted","--bg","--card","--line","--brand","--brand-600","--green","--amber","--red","--violet","--indigo"]
       .forEach(v => pdfRoot.style.setProperty(v, cssVar(v)));
 
-    const today = new Date();
+    // PDF-only CSS (boxed KPIs + layout)
+    const style = document.createElement("style");
+    style.textContent = `
+      .pdf-head { padding:12px 16px 4px 16px; }
+      .pdf-rule { height:10px; border-bottom:1px solid #e5e7eb; margin:8px 0 4px; }
+      .pdf-small { font-size:11px; color:#6b7280; }
+      .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:10px 16px 4px 16px; }
+      .kpi-box { border:2px solid rgba(37,99,235,.9); border-radius:14px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; min-height:78px; }
+      .kpi-box .v { font-size:20px; font-weight:800; color:#2563eb; line-height:1; }
+      .kpi-box .l { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#6b7280; margin-top:6px; }
+      .kpi-box.low { border-color:#EF4444; }
+      .kpi-box.low .v { color:#EF4444; }
+      .fig { margin:8px 16px; }
+      .fig h4 { font-size:12px; font-weight:700; color:#111827; margin:4px 0 8px; }
+      .card-block { border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
+      .chart-img { width:100%; height:auto; display:block; }
+      @media (max-width:680px){ .kpi-grid { grid-template-columns:1fr; } }
+    `;
+    pdfRoot.appendChild(style);
 
-    // ===== Cover (with your logo) =====
-    const cover = document.createElement("section");
-    cover.className = "pdf-cover";
-    cover.style.breakAfter = "page";
-    cover.style.pageBreakAfter = "always";
-    cover.innerHTML = `
-      <div class="brand-row">
-        <div style="display:flex;align-items:center;gap:10px">
-          <img src="${LOGO_PATH}" alt="logo" style="height:40px;width:auto;object-fit:contain" />
-          <div class="brand-chip"><i class="fas fa-briefcase"></i> ${SYSTEM_NAME}</div>
+    // ======= Header =======
+    const now = new Date();
+    const head = document.createElement("section");
+    head.className = "pdf-head";
+    head.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <img src="${LOGO_URL}" alt="logo" style="width:36px;height:36px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;background:#fff;" />
+          <div>
+            <div style="font-size:18px;font-weight:700;color:#111827;">Inventory Management Report</div>
+            <div class="pdf-small">Generated on ${now.toLocaleDateString()}, ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</div>
+          </div>
         </div>
-        <div style="font-size:12px;color:#475569">Generated: ${today.toLocaleDateString()}</div>
-      </div>
-      <div class="cover-title">Inventory & Analytics Report</div>
-      <div class="cover-sub">Charts & KPIs Summary</div>
-      <div class="cover-meta">
-        <div class="meta-item"><strong>Period</strong><br>${startDate || "—"} → ${endDate || "—"}</div>
-        <div class="meta-item"><strong>Prepared By</strong><br>Automated Reporting Service</div>
-      </div>
-      <div style="margin-top:18px;display:flex;gap:10px">
-        <div style="flex:1;height:6px;background:linear-gradient(90deg,#2563eb,#6366f1);border-radius:999px"></div>
-        <div style="flex:1;height:6px;background:linear-gradient(90deg,#10b981,#22c55e);border-radius:999px"></div>
-      </div>
-    `;
-    pdfRoot.appendChild(cover);
-
-    // ===== TOC =====
-    const toc = document.createElement("section");
-    toc.className = "pdf-section";
-    toc.style.breakAfter = "page";
-    toc.style.pageBreakAfter = "always";
-    toc.innerHTML = `
-      <div class="toc">
-        <div class="toc-title"><i class="fas fa-list-ol" style="color:var(--brand)"></i> Table of Contents</div>
-        <ul id="tocList"></ul>
-      </div>
-    `;
-    pdfRoot.appendChild(toc);
-
-    // ===== KPI section =====
-    const kpiSec = document.createElement("section");
-    kpiSec.className = "pdf-section";
-    kpiSec.innerHTML = `
-      <div class="figure avoid-break" style="break-inside: avoid; page-break-inside: avoid;">
-        <div class="figure-title">Figure 1 — Key Performance Indicators</div>
-        <div class="kpi-grid" id="kpiGrid"></div>
-        <div class="figure-caption">Snapshot of core metrics for the selected period.</div>
-      </div>
-    `;
-    pdfRoot.appendChild(kpiSec);
-
-    // Copy KPI cards from the page
-    const kpiGrid = kpiSec.querySelector("#kpiGrid");
-    const firstPartCards = reportParts[0].querySelectorAll(".metric-card");
-    firstPartCards.forEach((card) => {
-      const val = card.querySelector(".metric-value")?.textContent?.trim() || "";
-      const lab = card.querySelector(".metric-label")?.textContent?.trim() || "";
-      const icon = card.querySelector(".metric-icon")?.className || "fas fa-chart-line";
-      const k = document.createElement("div");
-      k.className = "kpi-card";
-      k.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div class="kpi-label">${lab}</div>
-          <i class="${icon}" style="color:var(--brand)"></i>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:700;color:#111827;">${COMPANY.name}</div>
+          <div class="pdf-small" style="color:#374151;">${COMPANY.address}</div>
+          <div class="pdf-small" style="color:#2563eb;">${COMPANY.email}</div>
         </div>
-        <div class="kpi-value">${val}</div>
+      </div>
+      <div class="pdf-rule"></div>
+      <div class="pdf-small" style="color:#374151;">Period: ${startDate || "—"} to ${endDate || "—"}</div>
+    `;
+    pdfRoot.appendChild(head);
+
+    // ======= KPI grid for PDF =======
+    const kpiGrid = document.createElement("section");
+    kpiGrid.className = "kpi-grid";
+    const kpis = [
+      { id: "#kpiTotalProducts", label: "Total Products" },
+      { id: "#kpiTotalItems", label: "Total Items" },
+      { id: "#kpiProductsValue", label: "Total Products Value" },
+      { id: "#kpiItemsValue", label: "Total Items Value" },
+      { id: "#kpiInventoryValue", label: "Total Inventory Value" },
+      { id: "#kpiLowStock", label: "Low Stock Items", low: true },
+    ];
+    kpis.forEach((k) => {
+      const val = (document.querySelector(k.id)?.textContent || "").trim();
+      const box = document.createElement("div");
+      box.className = `kpi-box${k.low ? " low" : ""}`;
+      box.innerHTML = `
+        <div>
+          <div class="v">${val || "—"}</div>
+          <div class="l">${k.label}</div>
+        </div>
+        <div style="font-size:14px;color:${k.low ? "#EF4444" : "#2563eb"}">
+          ${k.low ? "&#9888;" : "&#128181;"}
+        </div>
       `;
-      kpiGrid.appendChild(k);
+      kpiGrid.appendChild(box);
     });
+    pdfRoot.appendChild(kpiGrid);
 
-    // ===== Figures (charts) =====
+    // ======= Figures (each report-part; canvases -> images) =======
+    // IMPORTANT: skip the on-screen KPI section so it doesn't appear again in the PDF
+    const allParts = Array.from((mainRef.current || document).querySelectorAll(".report-part"));
+    const parts = allParts.filter((p) => !p.querySelector(".metric-card")); // <-- skip KPI grid
+
     const escapeHtml = (s = "") =>
       s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
-    const tocList = toc.querySelector("#tocList");
-    let figNum = 2;
-    for (let p = 1; p < reportParts.length; p++) {
-      const part = reportParts[p];
-      const figure = document.createElement("section");
-      figure.className = "pdf-section";
+
+    let fig = 1;
+    for (const part of parts) {
       const clone = part.cloneNode(true);
 
-      // replace canvases with images so html2pdf captures them
+      // Convert canvases to images
       const srcCanvases = part.querySelectorAll("canvas");
       const dstCanvases = clone.querySelectorAll("canvas");
       srcCanvases.forEach((canvas, i) => {
         const img = document.createElement("img");
         try { img.src = canvas.toDataURL("image/png"); } catch {}
-        img.style.width = "100%";
-        img.style.height = "auto";
-        img.style.display = "block";
+        img.className = "chart-img";
         if (dstCanvases[i]) dstCanvases[i].replaceWith(img);
       });
 
-      const titles = Array.from(clone.querySelectorAll(".card-title")).map((n) => n.textContent.trim());
-      const figureTitle = titles.length ? titles.join(" · ") : "Charts";
+      const titles = Array.from(part.querySelectorAll(".card-title")).map((n) => n.textContent.trim());
+      const figureTitle = titles.length ? titles.join(" · ") : `Section ${fig}`;
 
-      figure.innerHTML = `
-        <div class="figure avoid-break" style="break-inside: avoid; page-break-inside: avoid;">
-          <div class="figure-title">Figure ${figNum} — ${escapeHtml(figureTitle)}</div>
-          <div class="figure-img">${clone.innerHTML}</div>
-          <div class="figure-caption">Data visualizations for ${startDate || "—"} → ${endDate || "—"}.</div>
-        </div>
+      const section = document.createElement("section");
+      section.className = "fig";
+      section.style.pageBreakInside = "avoid";
+      section.innerHTML = `
+        <h4>${escapeHtml(`Figure ${fig} — ${figureTitle}`)}</h4>
+        <div class="card-block">${clone.innerHTML}</div>
       `;
-      pdfRoot.appendChild(figure);
-
-      const li = document.createElement("li");
-      li.innerHTML = `<span>Figure ${figNum} — ${escapeHtml(figureTitle)}</span><span>Page …</span>`;
-      tocList.appendChild(li);
-
-      figNum++;
+      pdfRoot.appendChild(section);
+      fig += 1;
     }
 
-    // ===== Signature page =====
-    const sig = document.createElement("section");
-    sig.className = "pdf-section";
-    sig.style.breakBefore = "page";
-    sig.style.pageBreakBefore = "always";
-    sig.innerHTML = `
-      <div class="figure" style="padding-top:12px">
-        <div class="figure-title">Authorization</div>
-        <div style="margin-top:24px;display:flex;gap:60px;align-items:flex-end;flex-wrap:wrap">
-          <div style="flex:1;min-width:240px">
-            <div style="height:80px;display:flex;align-items:flex-end">
-              <img src="${SIGNATURE_PATH}" alt="signature" style="max-height:70px;width:auto;object-fit:contain" onerror="this.style.display='none'"/>
-            </div>
-            <div style="border-top:1px solid #cbd5e1;margin-top:10px;padding-top:6px;font-size:12px">
-              Authorized Signature
-              <div style="color:#64748b">Date: ${new Date().toISOString().slice(0,10)}</div>
-            </div>
-          </div>
-          <div style="flex:1;min-width:240px">
-            <div style="height:80px"></div>
-            <div style="border-top:1px solid #cbd5e1;margin-top:10px;padding-top:6px;font-size:12px">
-              Prepared By
-              <div style="color:#64748b">Date: ${new Date().toISOString().slice(0,10)}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    pdfRoot.appendChild(sig);
-
-    document.body.appendChild(pdfRoot);
-
+    // ======= Build + save the PDF =======
     const opt = {
-      margin: [10, 10, 12, 10],
-      filename: `inventory-report-${new Date().toISOString().split("T")[0]}.pdf`,
+      margin: [8, 8, 10, 8],
+      filename: `inventory-report-${iso(new Date())}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
       pagebreak: { mode: ["css"], avoid: [".avoid-break"] },
       html2canvas: { scale: 3, useCORS: true, backgroundColor: "#ffffff", logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
 
-    // Preload logo for page headers
-    const logoDataUrl = await loadImageAsDataURL(LOGO_PATH);
+    document.body.appendChild(pdfRoot);
 
     try {
       await html2pdf()
@@ -667,37 +566,15 @@ export default function Report() {
           const total = pdf.internal.getNumberOfPages();
           const pageW = pdf.internal.pageSize.getWidth();
           const pageH = pdf.internal.pageSize.getHeight();
-
-          // TOC pages: assume first figure starts at page 3 (Cover + TOC)
-          const tocItems = toc.querySelectorAll("li");
-          let figureStartPage = 3;
-          tocItems.forEach((li, idx) => {
-            li.querySelector("span:last-child").textContent = figureStartPage + idx;
-          });
-
-          // Header/footer on each page + logo
           for (let i = 1; i <= total; i++) {
             pdf.setPage(i);
-            pdf.setDrawColor(220);
-            pdf.line(10, 10, pageW - 10, 10);
-
-            if (logoDataUrl) {
-              pdf.addImage(logoDataUrl, "PNG", 10, 12, 10, 10);
-              pdf.setFontSize(10);
-              pdf.setTextColor(30);
-              pdf.text(SYSTEM_NAME, 22, 19);
-            } else {
-              pdf.setFontSize(10);
-              pdf.setTextColor(30);
-              pdf.text(SYSTEM_NAME, 10, 19);
-            }
-
-            const label = `Page ${i} of ${total}`;
             pdf.setFontSize(9);
             pdf.setTextColor(120);
-            pdf.text(new Date().toLocaleDateString(), 10, pageH - 6);
-            pdf.text(`Period: ${startDate || "—"} → ${endDate || "—"}`, 10, pageH - 12);
-            pdf.text(label, pageW - 10 - pdf.getTextWidth(label), pageH - 6);
+            pdf.setDrawColor(220);
+            pdf.line(8, 8, pageW - 8, 8);
+            const label = `Page ${i} of ${total}`;
+            pdf.text(`${COMPANY.name}`, 8, pageH - 6);
+            pdf.text(label, pageW - 8 - pdf.getTextWidth(label), pageH - 6);
           }
         })
         .save(); // <-- triggers download automatically
@@ -706,7 +583,9 @@ export default function Report() {
     }
   }
 
-  /* ---------------- Render ---------------- */
+  /* ---------------- Render (UI unchanged) ---------------- */
+  const rangeInvalid = endDate < startDate;
+
   return (
     <div className="rep">
       <Sidebarpul />
@@ -725,9 +604,13 @@ export default function Report() {
                   <p className="header-subtitle">{SYSTEM_NAME}</p>
                 </div>
               </div>
-              {/* Renamed button — downloads PDF on click */}
-              <button onClick={generateReport} className="btn-primary" aria-label="Download report as PDF">
-                <i className="fas fa-file-arrow-down" /> Download PDF
+              <button
+                onClick={generateReport}
+                className="btn-primary"
+                disabled={rangeInvalid}
+                title={rangeInvalid ? "End date cannot be before start date" : "Generate Report"}
+              >
+                <i className="fas fa-download" /> Generate Report
               </button>
             </div>
           </div>
@@ -741,11 +624,14 @@ export default function Report() {
               <input
                 type="date"
                 id="startDate"
-                defaultValue="2025-06-01"
+                value={startDate}
+                max={endDate}
                 className="form-input"
-                onChange={(e) =>
-                  loadAndRender({ start: e.target.value, end: document.getElementById("endDate")?.value })
-                }
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setStartDate(next);
+                  if (endDate < next) setEndDate(next);
+                }}
               />
             </div>
             <div className="form-group">
@@ -753,16 +639,19 @@ export default function Report() {
               <input
                 type="date"
                 id="endDate"
-                defaultValue="2025-09-30"
+                value={endDate}
+                min={startDate}
                 className="form-input"
-                onChange={(e) =>
-                  loadAndRender({ start: document.getElementById("startDate")?.value, end: e.target.value })
-                }
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setEndDate(next);
+                  if (next < startDate) setStartDate(next);
+                }}
               />
             </div>
           </div>
 
-          {/* KPIs */}
+          {/* KPIs (UI layout kept) */}
           <div className="grid md-grid-4 report-part">
             <div className="metric-card">
               <div>
@@ -849,7 +738,7 @@ export default function Report() {
             </div>
           </div>
 
-          {/* Footer (not exported) */}
+          {/* Footer (UI only) */}
           <div className="card gradient-dark mt-20">
             <div className="footer-grid">
               <div className="footer-stat">

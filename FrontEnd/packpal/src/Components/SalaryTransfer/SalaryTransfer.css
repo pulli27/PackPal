@@ -14,6 +14,7 @@
 /* Header */
 .salary-transfer-page .container h1{
   text-align:center; margin-bottom:30px; font-size:2.2rem; font-weight:700;
+  margin-left: 130px;
   background:linear-gradient(45deg,#000,#000);
   -webkit-background-clip:text; -webkit-text-fill-color:transparent;
   background-clip:text; color:#2c3e50;
@@ -26,6 +27,7 @@
 }
 .salary-transfer-page .section h2{
   font-size:1.6rem; margin-bottom:20px; padding-bottom:10px; color:#2c3e50; border-bottom:3px solid #667eea;
+  
 }
 
 /* Tabs */
@@ -63,10 +65,10 @@
   transition:transform .3s, box-shadow .3s; margin:5px;
 }
 .salary-transfer-page .btn:hover{ transform:translateY(-2px); box-shadow:0 10px 20px rgba(0,0,0,.2); }
-.salary-transfer-page .btn-primary{ background:linear-gradient(45deg,#667eea,#764ba2); color:#fff; }
-.salary-transfer-page .btn-success{ background:linear-gradient(45deg,#11998e,#38ef7d); color:#fff; }
-.salary-transfer-page .btn-warning{ background:linear-gradient(45deg,#f093fb,#f5576c); color:#fff; }
-.salary-transfer-page .btn-danger{  background:linear-gradient(45deg,#fc466b,#3f5efb); color:#fff; }
+.salary-transfer-page .btn-primary{ background:linear-gradient(45deg,#e41717,#e41717); color:#fff; }
+.salary-transfer-page .btn-success{ background:linear-gradient(45deg,#1e7b35,#1e7b35); color:#fff; }
+.salary-transfer-page .btn-warning{ background:linear-gradient(45deg,#e41717,#e41717); color:#fff; }
+.salary-transfer-page .btn-danger{  background:linear-gradient(45deg,#e41717,#e41717); color:#fff; }
 
 /* Table */
 .salary-transfer-page table{
@@ -74,7 +76,7 @@
   box-shadow:0 5px 15px rgba(0,0,0,.08);
 }
 .salary-transfer-page th{
-  background:linear-gradient(45deg,#667eea,#764ba2); color:#fff; padding:15px; text-align:left; font-weight:600;
+  background:linear-gradient(45deg,#354fc5,#15122f); color:#fff; padding:15px; text-align:left; font-weight:600;
 }
 .salary-transfer-page td{ padding:15px; border-bottom:1px solid #e0e6ed; }
 .salary-transfer-page tbody tr:hover{ background:#f8f9ff; }
@@ -88,7 +90,7 @@
 
 /* Status badges */
 .salary-transfer-page .status-badge{ padding:4px 10px; border-radius:999px; font-size:.8rem; font-weight:700; }
-.salary-transfer-page .status-paid{ background:#dcfce7; color:#166534; }
+.salary-transfer-page .status-paid{ background:#167b39; color:#166534; }
 .salary-transfer-page .status-pending{ background:#fee2e2; color:#b91c1c; }
 
 /* Modal */

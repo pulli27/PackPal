@@ -9,7 +9,12 @@ const PurchaseSchema = new mongoose.Schema(
     // Supplier
     supplier:  { type: String, required: true },
 
-    // Either a free-text items list OR an array (keep flexible for legacy)
+    // Normalized item fields
+    itemId:    { type: String, required: true, index: true },
+    itemName:  { type: String, required: true },
+    quantity:  { type: Number, required: true, min: 1 },
+
+    // Legacy flexible field (kept for compatibility)
     items:     { type: mongoose.Schema.Types.Mixed, default: "" },
 
     // Dates
@@ -24,25 +29,26 @@ const PurchaseSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Optional priority shown in UI
+    // Optional priority
     priority: { type: String, enum: ["normal", "high", "urgent"], default: "normal" },
 
     // Optional notes
     notes: { type: String, default: "" },
 
-    // Optional totals for summary route compatibility
+    // ✅ Set once inventory increment for delivered order has been applied
+    receivedApplied: { type: Boolean, default: false },
+
+    // Legacy totals
     total:      { type: Number },
     amount:     { type: Number },
     grandTotal: { type: Number },
-    date:       { type: Date }, // some legacy docs may use this field
+    date:       { type: Date },
   },
   { timestamps: true, versionKey: false }
 );
 
-// Helpful text search
-PurchaseSchema.index({ supplier: "text", id: "text" });
+PurchaseSchema.index({ supplier: "text", id: "text", itemName: "text", itemId: "text" });
 
-// ✅ Single guarded registration
 module.exports =
   mongoose.models.Purchase ||
   mongoose.model("Purchase", PurchaseSchema, "purchases");

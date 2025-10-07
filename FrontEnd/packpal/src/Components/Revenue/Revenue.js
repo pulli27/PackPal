@@ -13,11 +13,15 @@ const numStr = (n) => Math.round(Number(n || 0)).toLocaleString("en-LK");
 const toNum = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+// Local YYYY-MM-DD (no timezone shifting)
+const pad2 = (n) => String(n).padStart(2, "0");
+const localISODate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 /* compute line total for a transaction doc */
 const lineTotal = (t) => {
-  const q  = toNum(t?.qty, 0);
-  const p  = toNum(t?.unitPrice, 0);
-  const d  = toNum(t?.discountPerUnit, 0);
+  const q  = toNum(t?.qty ?? t?.quantity, 0);
+  const p  = toNum(t?.unitPrice ?? t?.price, 0);
+  const d  = toNum(t?.discountPerUnit ?? t?.discount, 0);
   const tt = t?.total;
   const calc = q * p - q * d;
   const num = toNum(tt, null);
@@ -38,13 +42,28 @@ const sumUnitsFromTransactions = (arr) => {
   }, 0);
 };
 
+/* build a 2-month (prev + current) local range + label like "Sep + Oct" */
+const twoMonthWindow = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0..11
+  const prevStartLocal = new Date(y, m - 1, 1);
+  const currEndLocal   = new Date(y, m + 1, 0);
+  const startISO = localISODate(prevStartLocal);
+  const endISO   = localISODate(currEndLocal);
+
+  const prevLabel = prevStartLocal.toLocaleString("en-US", { month: "short" });
+  const currLabel = now.toLocaleString("en-US", { month: "short" });
+  const label = `${prevLabel} + ${currLabel}`;
+
+  return { startISO, endISO, label };
+};
+
 function Revenue() {
   /* ---------- Refs ---------- */
   const revenueRef = useRef(null);
   const productRef = useRef(null);
-  const dateFromRef = useRef(null);
-  const dateToRef   = useRef(null);
-  const chartsRef   = useRef({});
+  const chartsRef  = useRef({});
 
   /* ---------- Toast helper ---------- */
   const notify = (msg, type = "info") => {
@@ -76,13 +95,13 @@ function Revenue() {
   /* ---------- KPI state ---------- */
   const [revKpi, setRevKpi]       = useState({ revenue: 0 });
   const [ordersKpi, setOrdersKpi] = useState({ units: 0 });
+  const [ordersSubtitle, setOrdersSubtitle] = useState("Units Sold"); // dynamic (Sep + Oct)
   const [marginPct, setMarginPct] = useState(0);
 
-  // Added: loading flags to support your pasted IIFEs
   const [revLoading, setRevLoading] = useState(true);
   const [invLoading, setInvLoading] = useState(true);
 
-  /* ---------- Inventory (added to host your new code) ---------- */
+  /* ---------- Inventory (not shown in UI here, but kept) ---------- */
   const [inv, setInv] = useState({
     inventoryValue: 0,
     productValue: 0,
@@ -115,32 +134,184 @@ function Revenue() {
     []
   );
 
-  /* ---------- Fetch KPIs & table + aggregate for charts ---------- */
+  /* ---------- Fetch KPIs & tables & charts ---------- */
   useEffect(() => {
     let cancelled = false;
 
     const fetchAll = async () => {
-      /* ========================
-         Your pasted async blocks
-         (wrapped here so await is valid)
-         ======================== */
+      // ---------- Month ranges ----------
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth(); // 0..11
+      const startLocal = new Date(y, m, 1);
+      const endLocal   = new Date(y, m + 1, 0);
+      const startISO   = localISODate(startLocal);
+      const endISO     = localISODate(endLocal);
+      const monthQs    = `?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`;
 
-      // REVENUE (from /transactions/summary) -> mapped to this page's KPI
+      // ---------- Revenue KPI (prev + current month, LOCAL boundaries) ----------
       try {
-        const { data } = await api.get("/transactions/summary");
+        const { startISO: revStartISO, endISO: revEndISO } = twoMonthWindow();
+        const twoMonthQs = `?start=${encodeURIComponent(revStartISO)}&end=${encodeURIComponent(revEndISO)}`;
+
+        let twoMonthRevenue = 0;
+
+        // Prefer a server summary if it returns a total for the range
+        try {
+          const { data } = await api.get(`/transactions/summary${twoMonthQs}`);
+          const v = Number(data?.revenue);
+          if (Number.isFinite(v)) twoMonthRevenue = v;
+        } catch {}
+
+        // Fallback: sum raw transactions in the 2-month range, excluding refunds
+        if (!twoMonthRevenue) {
+          const { data: tx } = await api.get(`/transactions${twoMonthQs}&limit=5000&sort=+date`);
+          const list = Array.isArray(tx) ? tx : [];
+          twoMonthRevenue = list
+            .filter((t) => String(t?.status || "").toLowerCase() !== "refund")
+            .reduce((acc, t) => acc + lineTotal(t), 0);
+        }
+
         if (!cancelled) {
-          setRevKpi({ revenue: Number(data.revenue || 0) });
+          setRevKpi({ revenue: twoMonthRevenue });
           setRevLoading(false);
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) {
-          notify(e?.response?.data?.message || "Failed to load revenue", "error");
           setRevKpi({ revenue: 0 });
           setRevLoading(false);
         }
       }
 
-      // INVENTORY (from /inventory/summary) -> stored locally (not shown in UI here)
+      // ---------- Orders KPI (UNITS) for Sep + Oct (prev + current month) ----------
+      try {
+        const { startISO: unitsStartISO, endISO: unitsEndISO, label } = twoMonthWindow();
+        setOrdersSubtitle(`Units Sold (${label})`);
+
+        let units = 0;
+
+        // Prefer summary fields if present (with 2-month range)
+        try {
+          const { data } = await api.get(
+            `/transactions/summary?start=${encodeURIComponent(unitsStartISO)}&end=${encodeURIComponent(unitsEndISO)}`
+          );
+          const candidates = [
+            data?.totalQty,
+            data?.totalUnits,
+            data?.units,
+            data?.countQty
+          ].map((n) => toNum(n, NaN));
+          const picked = candidates.find(Number.isFinite);
+          if (Number.isFinite(picked)) units = picked;
+        } catch {}
+
+        // Fallback: sum from raw transactions in the 2-month window
+        if (!units) {
+          const { data: list } = await api.get(
+            `/transactions?start=${encodeURIComponent(unitsStartISO)}&end=${encodeURIComponent(unitsEndISO)}&limit=5000&sort=+date`
+          );
+          units = sumUnitsFromTransactions(list);
+        }
+
+        if (!cancelled) setOrdersKpi({ units });
+      } catch {
+        if (!cancelled) setOrdersKpi({ units: 0 });
+      }
+
+      // ---------- Recent transactions table (top 20) ----------
+      let recent = [];
+      try {
+        const { data } = await api.get("/transactions?limit=200&sort=-date");
+        recent = Array.isArray(data) ? data : [];
+        if (!cancelled) setTxRows(recent.slice(0, 20));
+      } catch {
+        if (!cancelled) setTxRows([]);
+      }
+
+      // ---------- Monthly revenue for the chart (server-monthly preferred; fallback UTC bucketing) ----------
+      try {
+        const yr  = new Date().getUTCFullYear();
+        const startYISO = `${yr}-01-01`;
+        const endYISO   = `${yr}-12-31`;
+        const qs = `?start=${encodeURIComponent(startYISO)}&end=${encodeURIComponent(endYISO)}`;
+
+        const monthIdx = (key /* YYYY-MM */) => Number(key.slice(5, 7)) - 1;
+        let byMonth = Array(12).fill(0);
+
+        const tryGet = async (path) => {
+          try {
+            const { data } = await api.get(path);
+            return data;
+          } catch { return null; }
+        };
+
+        let monthly =
+          (await tryGet(`/analytics/revenue/monthly${qs}`)) ||
+          (await tryGet(`/transactions/revenue/monthly${qs}`)) ||
+          (await tryGet(`/reports/revenue/monthly${qs}`));
+
+        if (Array.isArray(monthly) && monthly.length) {
+          monthly.forEach((r) => {
+            const rawKey = r?.key ?? r?.month ?? r?.date;
+            if (!rawKey) return;
+            const key =
+              typeof rawKey === "string"
+                ? (rawKey.length >= 7 ? rawKey.slice(0, 7) : rawKey)
+                : new Date(rawKey).toISOString().slice(0, 7);
+            const val = Number(r?.revenue ?? r?.total ?? r?.value ?? 0);
+            const idx = monthIdx(key);
+            if (idx >= 0 && idx < 12) byMonth[idx] += val;
+          });
+        } else {
+          // Fallback: big bounded list & UTC month bucketing; exclude refunds
+          const big = await tryGet(
+            `/transactions?start=${encodeURIComponent(startYISO)}&end=${encodeURIComponent(endYISO)}&limit=5000&sort=+date`
+          );
+          const list = Array.isArray(big) ? big : [];
+          byMonth = Array(12).fill(0);
+
+          const isRefund = (t) => String(t?.status || "").toLowerCase() === "refund";
+          const pickDate = (t) => t?.date || t?.createdAt || t?.updatedAt || null;
+
+          list.forEach((t) => {
+            if (isRefund(t)) return;
+            const raw = pickDate(t);
+            if (!raw) return;
+            const d = new Date(raw);
+            const yUTC = d.getUTCFullYear();
+            if (yUTC !== yr) return;
+            const mUTC = d.getUTCMonth(); // 0..11
+            const ttl = lineTotal(t);
+            byMonth[mUTC] += ttl;
+          });
+        }
+
+        if (!cancelled) setRevLine(byMonth);
+      } catch {
+        if (!cancelled) setRevLine(Array(12).fill(0));
+      }
+
+      // ---------- Top categories (use the same recent slice) ----------
+      try {
+        const byProduct = new Map();
+        (Array.isArray(recent) ? recent : []).forEach((t) => {
+          if (String(t?.status || "").toLowerCase() === "refund") return;
+          const key = (t?.productName || "Other").toString();
+          const ttl = lineTotal(t);
+          byProduct.set(key, (byProduct.get(key) || 0) + ttl);
+        });
+
+        const top = [...byProduct.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([label, value]) => ({ label, value }));
+
+        if (!cancelled) setCatBars(top);
+      } catch {
+        if (!cancelled) setCatBars([]);
+      }
+
+      // ---------- Inventory (unchanged) ----------
       try {
         const { data } = await api.get("/inventory/summary");
         if (!cancelled) {
@@ -168,64 +339,7 @@ function Revenue() {
         }
       }
 
-      /* ===== Existing logic in this page ===== */
-
-      // Orders KPI (units)
-      try {
-        let units = 0;
-        try {
-          const { data } = await api.get("/transactions/summary");
-          if (data && data.totalQty !== undefined) units = toNum(data.totalQty, 0);
-        } catch {}
-        if (!units) {
-          const { data: list } = await api.get("/transactions?limit=500&sort=-date");
-          units = sumUnitsFromTransactions(list);
-        }
-        if (!cancelled) setOrdersKpi({ units });
-      } catch {
-        if (!cancelled) setOrdersKpi({ units: 0 });
-      }
-
-      // Recent transactions + aggregate for charts
-      try {
-        const { data: list } = await api.get("/transactions?limit=200&sort=-date");
-        if (cancelled) return;
-
-        setTxRows(Array.isArray(list) ? list.slice(0, 20) : []);
-
-        const now = new Date();
-        const yr  = now.getFullYear();
-        const byMonth = Array(12).fill(0);
-        const byProduct = new Map();
-
-        (Array.isArray(list) ? list : []).forEach((t) => {
-          if ((t?.status || "").toLowerCase() === "refund") return;
-          const dt = new Date(t?.date || t?.createdAt || t?.updatedAt || Date.now());
-          const m  = dt.getMonth();
-          const y  = dt.getFullYear();
-          const lt = lineTotal(t);
-
-          if (y === yr) byMonth[m] += lt;
-          const key = (t?.productName || "Other").toString();
-          byProduct.set(key, (byProduct.get(key) || 0) + lt);
-        });
-
-        setRevLine(byMonth);
-
-        const top = [...byProduct.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 6)
-          .map(([label, value]) => ({ label, value }));
-        setCatBars(top);
-      } catch {
-        if (!cancelled) {
-          setTxRows([]);
-          setRevLine(Array(12).fill(0));
-          setCatBars([]);
-        }
-      }
-
-      // Profit margin (uses the same summary revenue we set above)
+      // ---------- Profit margin (kept same logic) ----------
       try {
         const [{ data: revSummary }, { data: payroll }, { data: contrib }, { data: invSum }] =
           await Promise.all([
@@ -275,20 +389,22 @@ function Revenue() {
           ],
         },
         options: {
-          ...baseOptions,
+          responsive: true,
+          maintainAspectRatio: false,
           interaction: { intersect: false, mode: "index" },
           scales: {
-            ...baseOptions.scales,
             y: {
-              ...baseOptions.scales.y,
+              beginAtZero: true,
+              grid: { color: "#e9ebf2" },
               ticks: {
-                ...baseOptions.scales.y.ticks,
+                color: "#6b7280",
                 callback: (v) => "LKR " + Math.round(v / 1000).toLocaleString("en-LK") + "K",
               },
             },
+            x: { grid: { color: "#e9ebf2" }, ticks: { color: "#6b7280" } },
           },
           plugins: {
-            ...baseOptions.plugins,
+            legend: { labels: { usePointStyle: true, color: "#111827" } },
             tooltip: {
               callbacks: {
                 label: (ctx) => `${ctx.dataset.label}: ${fmtLKR(ctx.parsed.y)}`
@@ -313,19 +429,21 @@ function Revenue() {
           }],
         },
         options: {
-          ...baseOptions,
+          responsive: true,
+          maintainAspectRatio: false,
           scales: {
-            ...baseOptions.scales,
             y: {
-              ...baseOptions.scales.y,
+              beginAtZero: true,
+              grid: { color: "#e9ebf2" },
               ticks: {
-                ...baseOptions.scales.y.ticks,
+                color: "#6b7280",
                 callback: (v) => "LKR " + Number(v).toLocaleString("en-LK") + "K",
               },
             },
+            x: { grid: { color: "#e9ebf2" }, ticks: { color: "#6b7280" } },
           },
           plugins: {
-            ...baseOptions.plugins,
+            legend: { labels: { usePointStyle: true, color: "#111827" } },
             tooltip: {
               callbacks: {
                 label: (ctx) => `LKR ${Number(ctx.parsed.y).toLocaleString("en-LK")}K`,
@@ -340,13 +458,9 @@ function Revenue() {
       Object.values(chartsRef.current).forEach((c) => c?.destroy());
       chartsRef.current = {};
     };
-  }, [revLine, catBars, baseOptions]);
+  }, [revLine, catBars]);
 
-  /* ---------- Actions: View / Invoice / PDF ---------- */
-  const viewOrder = (tx) => setSelectedTx(tx);
-
-  const closeModal = () => setSelectedTx(null);
-
+  /* ---------- Printable helpers ---------- */
   const buildDocStyles = () => `
     <style>
       * { box-sizing: border-box; }
@@ -407,7 +521,7 @@ function Revenue() {
             </div>
           </div>
           <div class="muted">
-            <div>Date: ${date.toISOString().slice(0,10)}</div>
+            <div>Date: ${localISODate(date)}</div>
             <div>Method: ${tx?.method || "—"}</div>
             <div>Status: <span class="tag">${tx?.status || "paid"}</span></div>
           </div>
@@ -472,7 +586,7 @@ function Revenue() {
             </div>
           </div>
           <div class="muted">
-            <div>${date.toISOString().slice(0,10)}</div>
+            <div>${localISODate(date)}</div>
             <div>Status: <span class="tag">${tx?.status || "paid"}</span></div>
           </div>
         </div>
@@ -488,8 +602,8 @@ function Revenue() {
         </div>
 
         <div class="foot">
-          <button class="btn" onclick="window.close()">Close</button>
-          <button class="btn primary" onclick="window.print()">Print / Save PDF</button>
+          <button className="btn" onclick="window.close()">Close</button>
+          <button className="btn primary" onclick="window.print()">Print / Save PDF</button>
         </div>
       </div>
     `;
@@ -521,7 +635,7 @@ function Revenue() {
               <div className="rev-kpi-icon"><i className="fas fa-building-columns" /></div>
               <div>
                 <div className="rev-kpi-title">Revenue</div>
-                <div className="rev-kpi-sub">Total Sales</div>
+                <div className="rev-kpi-sub">Total Sales (Prev + Current)</div>
               </div>
             </div>
             <div className="rev-kpi-value">
@@ -538,7 +652,7 @@ function Revenue() {
               <div className="rev-kpi-icon"><i className="fas fa-credit-card" /></div>
               <div>
                 <div className="rev-kpi-title">Orders</div>
-                <div className="rev-kpi-sub">Units Sold</div>
+                <div className="rev-kpi-sub">{ordersSubtitle}</div>
               </div>
             </div>
             <div className="rev-kpi-value">{numStr(ordersKpi.units)}</div>
@@ -600,7 +714,7 @@ function Revenue() {
                 {txRows.map((t) => {
                   const id = t?._id || "—";
                   const customer = t?.customer || "—";
-                  const date = t?.date ? new Date(t.date).toISOString().slice(0,10) : "—";
+                  const date = t?.date ? localISODate(new Date(t.date)) : "—";
                   const value = fmtLKR(lineTotal(t));
                   const channel = t?.method || "—";
                   const status = (t?.status || "paid").toLowerCase();
@@ -620,7 +734,7 @@ function Revenue() {
                       <td>
                         <button
                           className="rev-btn rev-btn-primary rev-btn-sm"
-                          onClick={() => viewOrder(t)}
+                          onClick={() => setSelectedTx(t)}
                         >
                           View
                         </button>{" "}
@@ -652,7 +766,7 @@ function Revenue() {
         {selectedTx && (
           <div
             className="rev-modal-backdrop"
-            onClick={closeModal}
+            onClick={() => setSelectedTx(null)}
             style={{
               position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 10000,
               display: "flex", alignItems: "center", justifyContent: "center", padding: 16
@@ -663,17 +777,17 @@ function Revenue() {
               onClick={(e) => e.stopPropagation()}
               style={{
                 background: "#fff", borderRadius: 16, width: "min(760px, 96vw)",
-                boxShadow: "0 20px 60px rgba(0,0,0,.2)", padding: 20
+                boxShadow: "0 20px 60px rgba(255, 255, 255, 0.2)", padding: 20
               }}
             >
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 8}}>
                 <h3 style={{margin:0}}>Order #{(selectedTx?._id || "").toString().slice(-8).toUpperCase()}</h3>
-                <button className="rev-btn rev-btn-sm" onClick={closeModal}>Close</button>
+                <button className="rev-btn rev-btn-sm" onClick={() => setSelectedTx(null)}>Close</button>
               </div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 12}}>
                 <div>
                   <div><strong>Customer:</strong> {selectedTx.customer || "—"}</div>
-                  <div><strong>Date:</strong> {selectedTx.date ? new Date(selectedTx.date).toISOString().slice(0,10) : "—"}</div>
+                  <div><strong>Date:</strong> {selectedTx.date ? localISODate(new Date(selectedTx.date)) : "—"}</div>
                   <div><strong>Status:</strong> {selectedTx.status || "paid"}</div>
                   <div><strong>Channel:</strong> {selectedTx.method || "—"}</div>
                 </div>

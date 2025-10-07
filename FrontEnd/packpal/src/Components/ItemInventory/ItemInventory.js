@@ -40,13 +40,13 @@ async function ensurePdfTools() {
 }
 
 export default function ItemInventory() {
-  // Seed data to render UI immediately; replaced by backend data after load
+  // Seed data (UI shows instantly; gets replaced by backend)
   const inventoryRef = useRef([
-    { id: "1001", name: "Leather Backpack",  description: "Brown leather bag", quantity: 450, unitPrice: 80.0,  avgDailyUsage: 3, leadTimeDays: 3 },
-    { id: "1002", name: "Canvas Tote",       description: "Beige shoulder bag", quantity: 300, unitPrice: 25.0,  avgDailyUsage: 2, leadTimeDays: 2 },
-    { id: "1003", name: "Laptop Briefcase",  description: "Black laptop bag",   quantity: 12,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 5 },
-    { id: "1004", name: "Travel Duffel",     description: "Large blue bag",     quantity: 500, unitPrice: 20.0,  avgDailyUsage: 2, leadTimeDays: 2 },
-    { id: "1005", name: "Travel Duffel",     description: "Large blue bag",     quantity: 10,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 7 }
+    { id: "1001", name: "Leather Backpack",  description: "Brown leather bag", quantity: 450, unitPrice: 80.0,  avgDailyUsage: 3, leadTimeDays: 3, reorderAdj: 0 },
+    { id: "1002", name: "Canvas Tote",       description: "Beige shoulder bag", quantity: 300, unitPrice: 25.0,  avgDailyUsage: 2, leadTimeDays: 2, reorderAdj: 0 },
+    { id: "1003", name: "Laptop Briefcase",  description: "Black laptop bag",   quantity: 12,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 5, reorderAdj: 0 },
+    { id: "1004", name: "Travel Duffel",     description: "Large blue bag",     quantity: 500, unitPrice: 20.0,  avgDailyUsage: 2, leadTimeDays: 2, reorderAdj: 0 },
+    { id: "1005", name: "Travel Duffel",     description: "Large blue bag",     quantity: 10,  unitPrice: 110.0, avgDailyUsage: 1, leadTimeDays: 7, reorderAdj: 0 }
   ]);
   const editingIndexRef = useRef(-1);
 
@@ -56,8 +56,17 @@ export default function ItemInventory() {
     const toNum = (v) => Number(v) || 0;
     const asLKR = (n) => `LKR ${Number(n || 0).toLocaleString()}`;
 
+    // ✅ Effective Reorder Level includes dynamic reorderAdj
     const computeReorderLevel = (item) =>
-      Math.max(0, Math.round((toNum(item.avgDailyUsage) * toNum(item.leadTimeDays)) + SAFETY_STOCK));
+      Math.max(
+        0,
+        Math.round(
+          (toNum(item.avgDailyUsage) * toNum(item.leadTimeDays)) +
+          SAFETY_STOCK +
+          toNum(item.reorderAdj || 0)
+        )
+      );
+
     const totalPriceOf = (item) => (toNum(item.unitPrice) * toNum(item.quantity));
 
     function showInlineForm(show = true) {
@@ -109,8 +118,11 @@ export default function ItemInventory() {
           <td>${item.description}</td>
           <td class="quantity">${item.quantity}</td>
           <td class="reorder-level">${rop}</td>
+          <td class="unit-price">LKR ${Number(toNum(item.unitPrice)).toFixed(2)}</td>
+
+
           <td class="price">${asLKR(totalPrice)}</td>
-          <td class="unit-price">${Number(toNum(item.unitPrice)).toFixed(2)}</td>
+          
           <td>
             <div class="action-cell">
               <button class="btn-edit"   onclick="window.__inv_editItem(${index})">Edit</button>
@@ -147,7 +159,7 @@ export default function ItemInventory() {
       editingIndexRef.current = index;
       $("inlineForm")?.scrollIntoView({ behavior: "smooth" });
       validateNameField();
-      validateQuantityField(); // ensure existing 0 never passes
+      validateQuantityField();
     }
 
     async function deleteItem(index) {
@@ -165,6 +177,7 @@ export default function ItemInventory() {
           unitPrice: Number(it.unitPrice ?? 0),
           avgDailyUsage: Number(it.avgDailyUsage ?? 0),
           leadTimeDays: Number(it.leadTimeDays ?? 0),
+          reorderAdj: Number(it.reorderAdj ?? 0),
         }));
         renderTable();
       } catch (err) {
@@ -310,18 +323,7 @@ export default function ItemInventory() {
       if (m) m.style.display = "none";
     }
 
-    /* ===== vector icons + export/print/download (unchanged) ===== */
-    function drawReceiptIcon(doc, x, y) {
-      doc.setDrawColor(53, 99, 255);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(x, y, 8, 8, 1.5, 1.5);
-      doc.line(x+1, y+8, x+2, y+7);
-      doc.line(x+3, y+8, x+4, y+7);
-      doc.line(x+5, y+8, x+6, y+7);
-      doc.setDrawColor(120, 130, 150);
-      doc.line(x+2, y+3, x+6, y+3);
-      doc.line(x+2, y+5, x+6, y+5);
-    }
+    /* ===== simple vector icons for PDF ===== */
     function drawWarningIcon(doc, x, y) {
       doc.setFillColor(244, 143, 64);
       doc.circle(x+4, y+4, 4, "F");
@@ -338,6 +340,7 @@ export default function ItemInventory() {
       doc.line(x+4, y+2, x+4, y+4);
     }
 
+    // ===== PDF export =====
     async function exportToPDF() {
       try {
         await ensurePdfTools();
@@ -345,19 +348,75 @@ export default function ItemInventory() {
         const jsPDF = getJsPDFCtor();
         const doc = new jsPDF("p", "mm", "a4");
 
+        const PAGE = { left: 14, right: 196, top: 12, width: 210, height: 297 };
+        const HEADER_HEIGHT = 24;
+        const CONTENT_TOP = HEADER_HEIGHT + 10;
+
+        const ORG = {
+          name: "PackPal (Pvt) Ltd",
+          address: "No. 42, Elm Street, Colombo",
+          email: "hello@packpal.lk",
+        };
+
         const BLUE = [53, 99, 255];
         const BLUE_HEAD = [64, 97, 239];
         const GREY = [110, 119, 129];
         const ORANGE = [244, 143, 64];
         const RED = [231, 76, 60];
 
-        drawReceiptIcon(doc, 14, 9);
+        let logoImg = null;
+        try {
+          const img = new Image();
+          img.src = "/new logo.png";
+          await img.decode();
+          logoImg = img;
+        } catch {}
+
+        function drawLetterhead(docInstance) {
+          const x = PAGE.left;
+          const y = PAGE.top;
+          const LOGO_W = 18, LOGO_H = 18;
+
+          if (logoImg) docInstance.addImage(logoImg, "PNG", x, y, LOGO_W, LOGO_H);
+
+          const textRightX = PAGE.right;
+          const ty = y + 4.5;
+
+          docInstance.setFontSize(14);
+          docInstance.setTextColor(25, 25, 25);
+          docInstance.setFont(undefined, "bold");
+          docInstance.text(ORG.name, textRightX, ty, { align: "right" });
+
+          docInstance.setFontSize(10);
+          docInstance.setFont(undefined, "normal");
+          docInstance.setTextColor(80, 86, 100);
+          docInstance.text(ORG.address, textRightX, ty + 6, { align: "right" });
+          docInstance.text(ORG.email,   textRightX, ty + 12, { align: "right" });
+
+          docInstance.setDrawColor(210, 210, 210);
+          docInstance.setLineWidth(0.4);
+          docInstance.line(PAGE.left, y + HEADER_HEIGHT, PAGE.right, y + HEADER_HEIGHT);
+        }
+
+        const headerHook = () => {
+          drawLetterhead(doc);
+          const pageStr = `Page ${doc.getNumberOfPages()}`;
+          doc.setFontSize(9);
+          doc.setTextColor(120, 120, 120);
+          doc.text(pageStr, PAGE.right, PAGE.height - 8, { align: "right" });
+        };
+
+        drawLetterhead(doc);
+
         doc.setFontSize(16);
         doc.setTextColor(40, 40, 40);
-        doc.text(" Inventory Management Report", 24, 16);
+        doc.setFont(undefined, "bold");
+        doc.text("Inventory Management Report", PAGE.left + 15, CONTENT_TOP - 10);
+
         doc.setFontSize(10);
         doc.setTextColor(...GREY);
-        doc.text(`Generated on ${data.summary.reportDate}`, 24, 22);
+        doc.setFont(undefined, "normal");
+        doc.text(`Generated on ${data.summary.reportDate}`, PAGE.left + 15, CONTENT_TOP - 3);
 
         const cards = [
           [String(data.summary.totalItems), "TOTAL ITEMS"],
@@ -367,7 +426,7 @@ export default function ItemInventory() {
           [`LKR ${Number(data.summary.avgUnitPrice || 0).toFixed(2)}`, "AVG UNIT PRICE"],
           [String(data.summary.fixedSafetyStock), "SAFETY STOCK"],
         ];
-        let cx = 14, cy = 30;
+        let cx = PAGE.left, cy = CONTENT_TOP + 10;
         const cw = 60, ch = 22, r = 3, gapX = 6, gapY = 6;
 
         cards.forEach(([num, label, danger], i) => {
@@ -384,19 +443,22 @@ export default function ItemInventory() {
 
           cx += cw + gapX;
           if ((i + 1) % 3 === 0) {
-            cx = 14;
+            cx = PAGE.left;
             cy += ch + gapY;
           }
         });
 
-        let y = cy + 6;
-        drawWarningIcon(doc, 14, y - 8);
+        // Low stock
+        let y = cy + 8;
+        drawWarningIcon(doc, PAGE.left, y - 8);
         doc.setTextColor(40, 40, 40);
         doc.setFontSize(14);
-        doc.text("Low Stock Alert", 24, y);
+        doc.setFont(undefined, "bold");
+        doc.text("Low Stock Alert", PAGE.left + 10, y);
         y += 2;
         doc.setDrawColor(...ORANGE);
-        doc.line(14, y, 196, y);
+        doc.setLineWidth(0.3);
+        doc.line(PAGE.left, y, PAGE.right, y);
         y += 4;
 
         if (data.lowStockItems.length) {
@@ -411,23 +473,27 @@ export default function ItemInventory() {
             styles: { fontSize: 10, cellPadding: 3 },
             headStyles: { fillColor: RED, textColor: 255, halign: "left" },
             theme: "grid",
-            margin: { left: 14, right: 14 },
+            margin: { left: PAGE.left, right: PAGE.left, top: CONTENT_TOP },
+            didDrawPage: headerHook,
           });
-          y = doc.lastAutoTable.finalY + 20;
+          y = doc.lastAutoTable.finalY + 18;
         } else {
           doc.setFontSize(10);
           doc.setTextColor(100, 100, 100);
-          doc.text("Great news — no items are currently below their reorder level.", 14, y);
-          y += 20;
+          doc.setFont(undefined, "normal");
+          doc.text("Great news — no items are currently below their reorder level.", PAGE.left, y);
+          y += 18;
         }
 
-        drawBoxIcon(doc, 14, y - 8);
+        // Complete Inventory
+        drawBoxIcon(doc, PAGE.left, y - 8);
         doc.setTextColor(40, 40, 40);
         doc.setFontSize(14);
-        doc.text("Complete Inventory", 24, y);
+        doc.setFont(undefined, "bold");
+        doc.text("Complete Inventory", PAGE.left + 10, y);
         y += 2;
         doc.setDrawColor(...BLUE);
-        doc.line(14, y, 196, y);
+        doc.line(PAGE.left, y, PAGE.right, y);
         y += 4;
 
         doc.autoTable({
@@ -441,13 +507,14 @@ export default function ItemInventory() {
           styles: { fontSize: 10, cellPadding: 3 },
           headStyles: { fillColor: BLUE_HEAD, textColor: 255, halign: "left" },
           theme: "grid",
-          margin: { left: 14, right: 14 },
+          margin: { left: PAGE.left, right: PAGE.left, top: CONTENT_TOP },
           columnStyles: { 2: { cellWidth: 52 } },
           didParseCell: function (hook) {
             if (hook.section === "body" && hook.row.index % 2 === 0) {
               hook.cell.styles.fillColor = [247, 248, 255];
             }
           },
+          didDrawPage: headerHook,
         });
 
         doc.save(`inventory_report_${new Date().toISOString().split("T")[0]}.pdf`);
@@ -464,9 +531,9 @@ export default function ItemInventory() {
         <!DOCTYPE html><html><head><title>Inventory Report</title>
         <meta charset="utf-8"/>
         <style>
-          body{font-family:Arial, sans-serif;margin:0;padding:20px;color:#333}
-          .report-header{text-align:center;margin-bottom:30px;border-bottom:2px solid #000;padding-bottom:15px}
-          .report-title{font-size:24px;margin-bottom:10px}
+          body{font-family:Arial, sans-serif;margin:0;padding:50px;color:#333}
+          .report-header{text-align:center;margin-bottom:100px;border-bottom:2px solid #000;padding-bottom:15px}
+          .report-title{font-size:24px;margin-bottom:100px}
           .report-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0}
           .report-stat{text-align:center;padding:15px;border:1px solid #333}
           .report-stat-number{font-size:18px;font-weight:bold}
@@ -505,14 +572,12 @@ export default function ItemInventory() {
     const lead = $("leadTimeDays");
     const form = $("itemForm");
 
-    // --- NEW: inputs we validate ---
     const nameInput  = $("itemName");
     const qtyInput   = $("quantity");
     const priceInput = $("unitPrice");
-    const avgInput   = avg;   // avgDailyUsage
-    const leadInput  = lead;  // leadTimeDays
+    const avgInput   = avg;
+    const leadInput  = lead;
 
-    // --- NEW: helpers for validation ---
     function validateNameField() {
       if (!nameInput) return true;
       const clean = (nameInput.value || "").trim();
@@ -525,7 +590,6 @@ export default function ItemInventory() {
       return ok;
     }
 
-    // STRICT quantity > 0 validation
     function validateQuantityField() {
       if (!qtyInput) return true;
       const n = parseInt(qtyInput.value, 10);
@@ -553,9 +617,7 @@ export default function ItemInventory() {
     }
     function sanitizePasteToDigits(e) {
       const txtRaw = (e.clipboardData?.getData("text") ?? "");
-      // Keep digits only, drop leading zeros to avoid "0"
       let txt = txtRaw.replace(/[^\d]/g, "");
-      // Remove leading zeros
       txt = txt.replace(/^0+/, "");
       if (txt !== "") {
         e.preventDefault();
@@ -634,9 +696,9 @@ export default function ItemInventory() {
         unitPrice: parseFloat($("unitPrice").value) || 0,
         avgDailyUsage: parseInt($("avgDailyUsage").value, 10) || 0,
         leadTimeDays: parseInt($("leadTimeDays").value, 10) || 0,
+        // reorderAdj is NOT edited here; maintained by other flows (HiruInventory / PurchaseItems)
       };
 
-      // guards: strict positive quantity, integers for qty/avg/lead; non-negative price
       if (!Number.isInteger(data.quantity) || data.quantity <= 0) {
         alert("Quantity must be a positive whole number (greater than 0).");
         $("quantity")?.focus();
@@ -676,6 +738,7 @@ export default function ItemInventory() {
           unitPrice: Number(it.unitPrice ?? 0),
           avgDailyUsage: Number(it.avgDailyUsage ?? 0),
           leadTimeDays: Number(it.leadTimeDays ?? 0),
+          reorderAdj: Number(it.reorderAdj ?? 0),
         }));
 
         renderTable();
@@ -701,32 +764,28 @@ export default function ItemInventory() {
     searchInput?.addEventListener("input", onSearch);
     form?.addEventListener("submit", onSubmit);
 
-    // --- NEW: attach validation listeners ---
+    // validation listeners
     nameInput?.addEventListener("input", sanitizeNameOnInput);
 
-    // Quantity (integers only); disallow 0; strip leading zeros
+    // Quantity
     qtyInput?.addEventListener("keydown", (e) => {
-      // block scientific/ops keys
       preventInvalidNumberKeys(e, { allowDot: false });
-      // prevent entering 0 as the very first character
       if (e.key === "0" && (e.target.value === "" || e.target.selectionStart === 0)) {
         e.preventDefault();
       }
     });
     qtyInput?.addEventListener("input", () => {
-      // strip leading zeros
       if (qtyInput.value) qtyInput.value = qtyInput.value.replace(/^0+/, "");
       validateQuantityField();
     });
     qtyInput?.addEventListener("paste", sanitizePasteToDigits);
     qtyInput?.addEventListener("blur", () => {
-      // final guard: empty or non-positive -> empty so native validity kicks in with min=1
       const n = parseInt(qtyInput.value, 10);
       if (!Number.isInteger(n) || n <= 0) qtyInput.value = "";
       validateQuantityField();
     });
 
-    // Unit Price (decimal allowed, but no e/E/+/−)
+    // Unit Price
     priceInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: true }));
     priceInput?.addEventListener("paste", sanitizePasteToDecimal);
     priceInput?.addEventListener("blur", () => {
@@ -736,12 +795,12 @@ export default function ItemInventory() {
       if (!ok) priceInput.value = v.replace(/[^\d.]/g, "");
     });
 
-    // NEW: Avg Daily Usage (integers only)
+    // Avg Daily Usage
     avgInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
     avgInput?.addEventListener("paste", sanitizePasteToDigits);
     avgInput?.addEventListener("blur", () => { if (avgInput) avgInput.value = (avgInput.value || "").replace(/[^\d]/g, ""); });
 
-    // NEW: Lead Time (integers only)
+    // Lead Time
     leadInput?.addEventListener("keydown", (e) => preventInvalidNumberKeys(e, { allowDot: false }));
     leadInput?.addEventListener("paste", sanitizePasteToDigits);
     leadInput?.addEventListener("blur", () => { if (leadInput) leadInput.value = (leadInput.value || "").replace(/[^\d]/g, ""); });
@@ -753,11 +812,11 @@ export default function ItemInventory() {
     }
     window.addEventListener("click", clickHandler);
 
-    // initial
+    // initial render
     showInlineForm(false);
     renderTable();
 
-    // load from backend after initial render
+    // load from backend
     async function loadFromBackend() {
       try {
         const res = await apiInv.list();
@@ -770,6 +829,7 @@ export default function ItemInventory() {
           unitPrice: Number(it.unitPrice ?? 0),
           avgDailyUsage: Number(it.avgDailyUsage ?? 0),
           leadTimeDays: Number(it.leadTimeDays ?? 0),
+          reorderAdj: Number(it.reorderAdj ?? 0),
         }));
         renderTable();
       } catch (err) {
@@ -833,8 +893,8 @@ export default function ItemInventory() {
               <div>
                 <div className="form-title" id="formTitle">Add New Item</div>
                 <div className="hint">
-                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (fixed at 40)</b>.
-                  <br/>The value updates automatically and is read-only.
+                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (40)</b> + <b>Dynamic Adj</b>.
+                  <br/>Dynamic Adj changes automatically when stock is deducted (Hiru) or delivered (Purchases).
                   <br/><br/><b>Total price</b> is calculated automatically.
                 </div>
               </div>
@@ -956,8 +1016,8 @@ export default function ItemInventory() {
                   <th>DESCRIPTION</th>
                   <th>QUANTITY</th>
                   <th>REORDER LEVEL</th>
-                  <th>TOTAL PRICE</th>
                   <th>UNIT PRICE</th>
+                  <th>TOTAL PRICE</th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>

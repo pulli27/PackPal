@@ -2,14 +2,84 @@
 import React, { useMemo, useState, useEffect } from "react";
 import "./UserManagement.css";
 import Sidebar from "../Sidebar/Sidebaris";
-
-// ✅ jsPDF + autotable (function import)
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+/* =========================
+   API base
+   ========================= */
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const USERS_URL = `${API_BASE}/api/users`;
 
-function slugify(s = "") {  
+/* =========================
+   Company / PDF header config
+   ========================= */
+const COMPANY = {
+  name: "PackPal (Pvt) Ltd",
+  address: "No. 42, Elm Street, Colombo",
+  email: "hello@packpal.lk",
+  // Use same-origin image path or a Base64 data URL for reliability
+  logo: "/new logo.png",
+};
+
+// Draws the header on the current jsPDF page (we call this ONLY on page 1)
+function drawHeader(doc, { title }) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginX = 22;
+  const rightX = pageW - 22;
+
+  // Left: logo
+  try {
+    doc.addImage(COMPANY.logo, "PNG", marginX - 2, 14, 22, 22);
+  } catch {}
+
+  // Left: title + generated date
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(0);
+  doc.text(String(title || "Report"), marginX + 26, 24);
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120);
+  doc.setFontSize(10);
+  doc.text(`Generated on ${new Date().toLocaleString()}`, marginX + 26, 38);
+
+  // Right block
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(COMPANY.name, rightX, 20, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(80);
+  doc.text(COMPANY.address, rightX, 32, { align: "right" });
+
+  doc.setTextColor(34, 87, 215);
+  doc.textWithLink(COMPANY.email, rightX, 44, {
+    align: "right",
+    url: `mailto:${COMPANY.email}`,
+  });
+
+  // Divider
+  doc.setDrawColor(220);
+  doc.setLineWidth(0.6);
+  doc.line(marginX, 52, rightX, 52);
+
+  doc.setTextColor(0);
+}
+
+/* =========================
+   Name helpers / validation
+   ========================= */
+const NAME_DISALLOWED_RE = /[^A-Za-zÀ-ÖØ-öø-ÿ' .-]/g;
+const NAME_PATTERN = "^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$";
+
+function sanitizeName(value = "") {
+  return value.replace(NAME_DISALLOWED_RE, "").replace(/\s{2,}/g, " ").trim();
+}
+
+function slugify(s = "") {
   return s
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -34,13 +104,11 @@ function genPassword(first, last) {
   return `${upper}${lower}${num}${sym}${pad}`;
 }
 
-// 👉 helper: push customers to localStorage so Orders page can read them
+// Save only customers to localStorage for Orders page (optional)
 function syncCustomersToLocalStorage(users = []) {
   try {
     const customers = users
-      .filter(
-        (u) => String(u.role || "").toLowerCase() === "customer"
-      )
+      .filter((u) => String(u.role || "").toLowerCase() === "customer")
       .map((u) => ({
         _id: u._id,
         name: [u.firstName, u.lastName].filter(Boolean).join(" ").trim(),
@@ -74,31 +142,35 @@ export default function UserManagement() {
 
   const isLocked = (u) => (u?.role || "").toLowerCase() === "customer";
 
+  // Load users
   useEffect(() => {
-    async function loadUsers() {
+    let abort = false;
+    (async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${API_BASE}/users`);
-        const data = await res.json();
-        if (res.ok) {
-          setUsers(data.users || []);
-        } else {
-          console.error("Fetch users failed:", data);
+        const res = await fetch(USERS_URL, { credentials: "include" });
+        const data = await res.json().catch(() => ({}));
+        if (!abort) {
+          if (res.ok) setUsers(data.users || []);
+          else console.error("Fetch users failed:", data?.message || res.statusText);
         }
       } catch (err) {
-        console.error("Network error fetching users:", err);
+        if (!abort) console.error("Network error fetching users:", err);
       } finally {
-        setLoading(false);
+        if (!abort) setLoading(false);
       }
-    }
-    loadUsers();
+    })();
+    return () => {
+      abort = true;
+    };
   }, []);
 
-  // 🔁 Whenever users change, also refresh localStorage copy of customers
+  // Orders page mirror
   useEffect(() => {
     syncCustomersToLocalStorage(users);
   }, [users]);
 
+  // Auto-generate email/password in Add modal
   useEffect(() => {
     if (!adding) return;
     const { firstName, lastName } = newUser;
@@ -113,73 +185,76 @@ export default function UserManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newUser.firstName, newUser.lastName, adding, emailTouched, pwdTouched]);
 
+  // filters / stats
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     return users.filter((u) => {
       const hay = (u.firstName + " " + u.lastName + " " + u.email).toLowerCase();
       const byText = !t || hay.includes(t);
-      const byRole =
-        role === "All" || (u.role || "").toLowerCase() === role.toLowerCase();
+      const byRole = role === "All" || (u.role || "").toLowerCase() === role.toLowerCase();
       return byText && byRole;
     });
   }, [users, q, role]);
 
   const today = new Date().toISOString().slice(0, 10);
   const statTotal = users.length;
-  const statNew = users.filter((u) => u.createdAt?.slice(0, 10) === today).length;
+  const statNew = users.filter((u) => String(u.createdAt || "").slice(0, 10) === today).length;
   const statPending = users.filter((u) => (u.status || "").toLowerCase() === "pending").length;
 
+  // Pills
   function pill(status = "") {
     const s = (status || "").toLowerCase();
     const cls = s === "active" ? "active" : s === "pending" ? "pending" : "suspended";
-    return <span className={`pill ${cls}`}>{status}</span>;
+    return <span className={`pill ${cls}`}>{status || "active"}</span>;
   }
 
+  // Edit
   function openEdit(u) {
-    if (isLocked(u)) return;
-    setEditing({ ...u });
+    if (!isLocked(u)) setEditing({ ...u });
   }
   function closeEdit() {
     setEditing(null);
   }
-
   async function saveEdit(e) {
     e.preventDefault();
     if (isLocked(editing)) return;
     try {
-      const res = await fetch(`${API_BASE}/users/${editing._id}`, {
+      const res = await fetch(`${USERS_URL}/${editing._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(editing),
       });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.user) {
         setUsers((prev) => prev.map((u) => (u._id === data.user._id ? data.user : u)));
         closeEdit();
       } else {
-        alert("Update failed: " + (data.message || res.statusText));
+        alert("Update failed: " + (data?.message || res.statusText));
       }
     } catch (err) {
       console.error("Update error:", err);
     }
   }
 
+  // Delete
   async function del(id) {
     const user = users.find((u) => u._id === id);
     if (isLocked(user)) return;
     if (!window.confirm("Delete this user?")) return;
     try {
-      const res = await fetch(`${API_BASE}/users/${id}`, { method: "DELETE" });
+      const res = await fetch(`${USERS_URL}/${id}`, { method: "DELETE", credentials: "include" });
       if (res.ok) setUsers((prev) => prev.filter((u) => u._id !== id));
       else {
-        const data = await res.json();
-        alert("Delete failed: " + (data.message || res.statusText));
+        const data = await res.json().catch(() => ({}));
+        alert("Delete failed: " + (data?.message || res.statusText));
       }
     } catch (err) {
       console.error("Delete error:", err);
     }
   }
 
+  // Add
   function openAdd() {
     setNewUser({
       firstName: "",
@@ -198,88 +273,95 @@ export default function UserManagement() {
   async function saveAdd(e) {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/users`, {
+      const res = await fetch(USERS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(newUser),
       });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.user) {
         setUsers((prev) => [...prev, data.user]);
         closeAdd();
       } else {
-        alert("Add failed: " + (data.message || res.statusText));
+        alert("Add failed: " + (data?.message || res.statusText));
       }
     } catch (err) {
       console.error("Add error:", err);
     }
   }
 
-  // CSV export (kept)
+  // --- CSV export ---
   function exportCsv() {
-    const cols = ["firstName", "lastName", "email", "role", "createdAt", "status"];
-    const csv = [cols.join(",")]
-      .concat(
-        filtered.map((u) =>
-          cols.map((k) => `"${(u[k] ?? "").toString().replace(/"/g, '""')}"`).join(",")
-        )
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const columns = ["First Name", "Last Name", "Email", "Role", "Status", "Created"];
+    const rows = filtered.map((u) => [
+      u.firstName || "",
+      u.lastName || "",
+      u.email || "",
+      u.role || "",
+      u.status || "active",
+      (u.createdAt || "").slice(0, 10),
+    ]);
+
+    const esc = (s) => `"${String(s).replace(/"/g, '""')}"`;
+    const csv =
+      [columns.map(esc).join(",")]
+        .concat(rows.map((r) => r.map(esc).join(",")))
+        .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = "users.csv";
     document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
     a.remove();
+    URL.revokeObjectURL(url);
   }
 
-  // ✅ PDF export using autoTable(doc, ...)
+  // --- PDF export: header only on the first page ---
   function exportPdf() {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const title = "User Management Report";
 
-    // Title + meta
-    doc.setFontSize(20);
-    doc.text("Users", 40, 40);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Exported: ${new Date().toLocaleString()}`, 40, 60);
-    doc.text(`Total: ${filtered.length}`, 40, 76);
+    // draw header ONLY once (first page)
+    drawHeader(doc, { title });
 
-    const columns = [
-      { header: "First Name", dataKey: "firstName" },
-      { header: "Last Name", dataKey: "lastName" },
-      { header: "Email", dataKey: "email" },
-      { header: "Role", dataKey: "role" },
-      { header: "Created", dataKey: "createdAt" },
-      { header: "Status", dataKey: "status" },
-    ];
-
-    const rows = filtered.map((u) => ({
-      firstName: u.firstName || "",
-      lastName: u.lastName || "",
-      email: u.email || "",
-      role: u.role || "",
-      createdAt: (u.createdAt || "").slice(0, 10),
-      status: (u.status || "").toLowerCase(),
-    }));
+    const head = ["First Name", "Last Name", "Email", "Role", "Status", "Created"];
+    const rows = filtered.map((u) => [
+      u.firstName || "",
+      u.lastName || "",
+      u.email || "",
+      u.role || "",
+      u.status || "active",
+      (u.createdAt || "").slice(0, 10),
+    ]);
 
     autoTable(doc, {
-      columns,
+      head: [head],
       body: rows,
-      startY: 100,
+
+      // header space on page 1
+      startY: 70,
+
+      // give subsequent pages a little top margin (no header there)
+      margin: { top: 24 },
+
       styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
-      headStyles: { fillColor: [53, 79, 197] },
+      headStyles: { fillColor: [25, 118, 210] },
+
+      // Only add page numbers; do NOT redraw header
       didDrawPage: (data) => {
-        const pageCount = doc.internal.getNumberOfPages();
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
         doc.setTextColor(120);
         doc.text(
-          `Page ${data.pageNumber} of ${pageCount}`,
-          doc.internal.pageSize.getWidth() - 100,
-          doc.internal.pageSize.getHeight() - 20
+          `Page ${data.pageNumber} of ${doc.internal.getNumberOfPages()}`,
+          pageW - 22,
+          pageH - 16,
+          { align: "right" }
         );
       },
     });
@@ -361,7 +443,7 @@ export default function UserManagement() {
                         <td>{u.lastName}</td>
                         <td>{u.email}</td>
                         <td>{u.role}</td>
-                        <td>{u.createdAt?.slice(0, 10)}</td>
+                        <td>{String(u.createdAt || "").slice(0, 10)}</td>
                         <td>{pill(u.status)}</td>
                         <td>
                           <button
@@ -401,7 +483,12 @@ export default function UserManagement() {
                   <label>First Name</label>
                   <input
                     value={newUser.firstName}
-                    onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, firstName: sanitizeName(e.target.value) })
+                    }
+                    inputMode="text"
+                    pattern={NAME_PATTERN}
+                    title="Only letters, spaces, apostrophes, periods and hyphens. Minimum 2 characters."
                     required
                   />
                 </div>
@@ -409,7 +496,12 @@ export default function UserManagement() {
                   <label>Last Name</label>
                   <input
                     value={newUser.lastName}
-                    onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, lastName: sanitizeName(e.target.value) })
+                    }
+                    inputMode="text"
+                    pattern={NAME_PATTERN}
+                    title="Only letters, spaces, apostrophes, periods and hyphens. Minimum 2 characters."
                     required
                   />
                 </div>
@@ -418,7 +510,10 @@ export default function UserManagement() {
                   <input
                     type="email"
                     value={newUser.email}
-                    onChange={(e) => { setNewUser({ ...newUser, email: e.target.value }); setEmailTouched(true); }}
+                    onChange={(e) => {
+                      setNewUser({ ...newUser, email: e.target.value });
+                      setEmailTouched(true);
+                    }}
                     onBlur={() => setEmailTouched(true)}
                     required
                   />
@@ -442,7 +537,10 @@ export default function UserManagement() {
                   <input
                     type="text"
                     value={newUser.password}
-                    onChange={(e) => { setNewUser({ ...newUser, password: e.target.value }); setPwdTouched(true); }}
+                    onChange={(e) => {
+                      setNewUser({ ...newUser, password: e.target.value });
+                      setPwdTouched(true);
+                    }}
                     onBlur={() => setPwdTouched(true)}
                     required
                   />
@@ -473,7 +571,12 @@ export default function UserManagement() {
                   <label>First Name</label>
                   <input
                     value={editing.firstName}
-                    onChange={(e) => setEditing({ ...editing, firstName: e.target.value })}
+                    onChange={(e) =>
+                      setEditing({ ...editing, firstName: sanitizeName(e.target.value) })
+                    }
+                    inputMode="text"
+                    pattern={NAME_PATTERN}
+                    title="Only letters, spaces, apostrophes, periods and hyphens. Minimum 2 characters."
                     required
                   />
                 </div>
@@ -481,20 +584,18 @@ export default function UserManagement() {
                   <label>Last Name</label>
                   <input
                     value={editing.lastName}
-                    onChange={(e) => setEditing({ ...editing, lastName: e.target.value })}
+                    onChange={(e) =>
+                      setEditing({ ...editing, lastName: sanitizeName(e.target.value) })
+                    }
+                    inputMode="text"
+                    pattern={NAME_PATTERN}
+                    title="Only letters, spaces, apostrophes, periods and hyphens. Minimum 2 characters."
                     required
                   />
                 </div>
                 <div className="um-field">
                   <label>Email</label>
-                  {/* 🔒 Email is read-only & disabled in edit mode */}
-                  <input
-                    type="email"
-                    value={editing.email}
-                    readOnly
-                    disabled
-                    title="Email cannot be changed"
-                  />
+                  <input type="email" value={editing.email} readOnly disabled title="Email cannot be changed" />
                 </div>
                 <div className="um-field">
                   <label>Role</label>

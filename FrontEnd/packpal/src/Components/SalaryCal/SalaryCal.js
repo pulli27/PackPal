@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./SalaryCal.css";
 import Sidebar from "../Sidebar/Sidebarsanu";
 import { NavLink } from "react-router-dom";
@@ -6,37 +6,45 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import { api } from "../../lib/api";
 
 const rs = (n) => `Rs. ${Math.round(Number(n || 0)).toLocaleString()}`;
-const toast = (msg, type = "info") => alert(`${type.toUpperCase()}: ${msg}`);
+const toast = (msg, type = "info") =>
+  alert(`${(type?.toUpperCase?.() || String(type)).toUpperCase()}: ${msg}`);
 
-// === Validation helpers ===
-// Final (strict) sanitizer: letters + single spaces, trimmed
+// --- Sanitizers / Validators ---
 const sanitizeLettersOnly = (v) =>
   String(v || "")
     .replace(/[^A-Za-z\s]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 
-// Live (typing) sanitizer: letters + spaces, collapse multiples, DO NOT trim
 const sanitizeLettersOnlyLive = (v) =>
   String(v || "")
     .replace(/[^A-Za-z\s]/g, "")
     .replace(/\s{2,}/g, " ");
 
-// Validator: letters and single spaces between words
 const isLettersOnly = (v) => {
   const s = String(v || "").trim();
   if (!s) return false;
   return /^[A-Za-z]+(?:\s[A-Za-z]+)*$/.test(s);
 };
 
-// Digits only for account no
 const sanitizeDigitsOnly = (v) => String(v || "").replace(/\D/g, "");
 const isDigitsOnly = (v) => /^[0-9]+$/.test(String(v || ""));
 
-// Block scientific notation chars in numeric fields
 const blockExpKeys = (e) => {
   if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
 };
+
+// Fixed list of designations
+const DESIGNATION_OPTIONS = [
+  "Finance Manager",
+  "Inventory Manager",
+  "Cart Manager",
+  "User Manager",
+  "Product Manager",
+];
+
+// utils
+const norm = (s) => String(s ?? "").toLowerCase();
 
 export default function SalaryCal() {
   const [rows, setRows] = useState([]);
@@ -53,6 +61,10 @@ export default function SalaryCal() {
     Acc_No: "",
   });
   const [editing, setEditing] = useState(null);
+
+  // Search (EmpId only)
+  const [q, setQ] = useState("");
+  const searchRef = useRef(null);
 
   async function load() {
     try {
@@ -79,16 +91,28 @@ export default function SalaryCal() {
     load();
   }, []);
 
-  // ---------- CREATE ----------
+  useEffect(() => {
+    const onSlash = (e) => {
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onSlash);
+    return () => window.removeEventListener("keydown", onSlash);
+  }, []);
+
+  // Create
   async function create() {
     if (!form.EmpId || !form.Emp_Name || !form.Base_Sal)
       return toast("EmpId, Name, Salary required", "warning");
 
-    // validate final (trimmed) values
     if (!isLettersOnly(form.Emp_Name))
       return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
+
     if (form.Designation && !isLettersOnly(form.Designation))
-      return toast("Designation: letters only (A–Z), no numbers/symbols.", "warning");
+      return toast("Designation: letters only (A–Z).", "warning");
+
     if (form.Bank_Name && !isLettersOnly(form.Bank_Name))
       return toast("Bank Name: letters only (A–Z), no numbers/symbols.", "warning");
     if (form.branch && !isLettersOnly(form.branch))
@@ -100,7 +124,6 @@ export default function SalaryCal() {
     try {
       const payload = {
         ...form,
-        // finalize by trimming here
         Emp_Name: sanitizeLettersOnly(form.Emp_Name),
         Designation: sanitizeLettersOnly(form.Designation),
         Bank_Name: sanitizeLettersOnly(form.Bank_Name),
@@ -127,7 +150,7 @@ export default function SalaryCal() {
     }
   }
 
-  // ---------- EDIT SAVE ----------
+  // Save Edit
   async function saveEdit() {
     const id = editing?._id;
     if (!id) return toast("Update failed: missing _id", "error");
@@ -135,7 +158,6 @@ export default function SalaryCal() {
     if (!editing.EmpId || !editing.Emp_Name || editing.Base_Sal === "")
       return toast("EmpId, Name, Salary required", "warning");
 
-    // validate final (trimmed) values
     if (!isLettersOnly(editing.Emp_Name))
       return toast("Name: letters only (A–Z), no numbers/symbols.", "warning");
     if (editing.Designation && !isLettersOnly(editing.Designation))
@@ -150,7 +172,6 @@ export default function SalaryCal() {
 
     const payload = {
       EmpId: editing.EmpId,
-      // finalize by trimming here
       Emp_Name: sanitizeLettersOnly(editing.Emp_Name),
       Designation: sanitizeLettersOnly(editing.Designation),
       Epf_No: editing.Epf_No,
@@ -187,27 +208,36 @@ export default function SalaryCal() {
     }
   }
 
-  // Sanitizing on type for Add form fields (LIVE: keep spaces)
+  // On-change handlers
   const handleAddChange = (k, val) => {
     let v = val;
     if (k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch") {
-      v = sanitizeLettersOnlyLive(v); // ← no trim while typing
+      v = sanitizeLettersOnlyLive(v);
     }
     if (k === "Acc_No") v = sanitizeDigitsOnly(v);
-    if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, ""); // strips e/E/+/- and any symbols
+    if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, "");
     setForm((s) => ({ ...s, [k]: v }));
   };
 
-  // Sanitizing on type for Edit form fields (LIVE: keep spaces)
   const handleEditChange = (k, val) => {
     let v = val;
     if (k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch") {
-      v = sanitizeLettersOnlyLive(v); // ← no trim while typing
+      v = sanitizeLettersOnlyLive(v);
     }
     if (k === "Acc_No") v = sanitizeDigitsOnly(v);
     if (k === "Base_Sal") v = String(v).replace(/[^\d.]/g, "");
     setEditing((s) => ({ ...s, [k]: v }));
   };
+
+  /* ====== Filter by EmpId only ====== */
+  const filteredRows = useMemo(() => {
+    const query = norm(q);
+    if (!query) return rows;
+    return rows.filter((r) => norm(r.EmpId).includes(query));
+  }, [rows, q]);
+
+  const showing = filteredRows.length;
+  const total = rows.length;
 
   return (
     <div className="salarycal page-wrap">
@@ -218,89 +248,255 @@ export default function SalaryCal() {
 
         <div className="section">
           <div className="nav">
-            <NavLink
-              to="/finance/employees"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/employees" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               👥 Employees
             </NavLink>
-            <NavLink
-              to="/finance/attendance"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/attendance" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               📅 Attendance
             </NavLink>
-            <NavLink
-              to="/finance/advance"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/advance" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               💰 Advance
             </NavLink>
-            <NavLink
-              to="/finance/salary"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/salary" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               📊 Salary Management
             </NavLink>
-            <NavLink
-              to="/finance/transfers"
-              className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="/finance/transfers" className={({ isActive }) => `tab-btn ${isActive ? "active" : ""}`}>
               💸 Salary Transfers
             </NavLink>
           </div>
 
-          <h2>Employee Information</h2>
-          <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
-            + Add New Employee
-          </button>
+          {/* ======= PRETTY SEARCH (above) ======= */}
+          <div
+            className="pretty-search"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginTop: 14,
+              marginBottom: 6,
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                flex: "1 1 360px",
+                maxWidth: 560,
+                background: "linear-gradient(180deg, #ffffff, #fafafa)",
+                border: "1px solid #e6e6e6",
+                borderRadius: 12,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                padding: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                  background: "#f8fafc",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+                title="Filter field"
+              >
+                Emp ID
+              </div>
+              <div style={{ position: "relative", flex: 1 }}>
+                <i
+                  className="fa fa-hashtag"
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    opacity: 0.6,
+                    fontSize: 14,
+                  }}
+                />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Type an Employee ID (Hint: press / to focus)"
+                  aria-label="Search by Employee ID"
+                  style={{
+                    width: "100%",
+                    padding: "10px 40px 10px 28px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 10,
+                    outline: "none",
+                    fontSize: 14,
+                    background: "white",
+                  }}
+                />
+                {q && (
+                  <button
+                    onClick={() => setQ("")}
+                    aria-label="Clear search"
+                    style={{
+                      position: "absolute",
+                      right: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      border: "none",
+                      background: "transparent",
+                      fontSize: 18,
+                      cursor: "pointer",
+                      lineHeight: 1,
+                      opacity: 0.7,
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <div
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  background: "#F3F4F6",
+                  fontSize: 12,
+                  color: "#111827",
+                }}
+                title="Matches"
+              >
+                {loading ? "…" : `${showing}/${total}`}
+              </div>
+            </div>
+          </div>
+
+          {/* helper line — fixed camelCase style key */}
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
+            Filtering by <strong>Employee ID</strong> only.
+          </div>
+
+          {/* ===== Title + Button on the SAME line ===== */}
+          <div className="section-header">
+            <h2>Employee Information</h2>
+            <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
+              + Add Employee Details
+            </button>
+          </div>
+          {/* full-width divider line under the row */}
+          <div className="section-divider" />
 
           {addOpen && (
-            <div style={{ marginTop: 20 }}>
-              <div className="form-grid">
-                {[
-                  ["EmpId", "Employee ID"],
-                  ["Emp_Name", "Name"],
-                  ["Designation", "Designation"],
-                  ["Epf_No", "EPF No"],
-                  ["Base_Sal", "Basic Salary"],
-                  ["Bank_Name", "Bank Name"],
-                  ["branch", "Branch"],
-                  ["Acc_No", "Account No"],
-                ].map(([k, label]) => (
-                  <div className="form-group" key={k}>
-                    <label>{label}</label>
-                    <input
-                      type={k === "Base_Sal" ? "number" : "text"}
-                      value={form[k]}
-                      onChange={(e) => handleAddChange(k, e.target.value)}
-                      inputMode={k === "Base_Sal" || k === "Acc_No" ? "decimal" : "text"}
-                      step={k === "Base_Sal" ? "0.01" : undefined}
-                      onKeyDown={
-                        k === "Base_Sal" || k === "Acc_No" ? blockExpKeys : undefined
-                      }
-                      pattern={
-                        k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch"
-                          ? "[A-Za-z ]+"
-                          : undefined
-                      }
-                    />
-                  </div>
-                ))}
+            <div style={{ marginTop: 10 }}>
+              {/* Ordered fields: EmpId, Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No */}
+              <div className="form-grid two-col">
+                {/* 1. EmpId */}
+                <div className="form-group">
+                  <label>Employee ID</label>
+                  <input
+                    type="text"
+                    value={form.EmpId}
+                    onChange={(e) => handleAddChange("EmpId", e.target.value)}
+                  />
+                </div>
+
+                {/* 2. Name */}
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    value={form.Emp_Name}
+                    onChange={(e) => handleAddChange("Emp_Name", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 3. Designation */}
+                <div className="form-group">
+                  <label>Designation</label>
+                  <select
+                    value={form.Designation}
+                    onChange={(e) => handleAddChange("Designation", e.target.value)}
+                  >
+                    <option value="">-- Select designation --</option>
+                    {DESIGNATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. EPF No */}
+                <div className="form-group">
+                  <label>EPF No</label>
+                  <input
+                    type="text"
+                    value={form.Epf_No}
+                    onChange={(e) => handleAddChange("Epf_No", e.target.value)}
+                  />
+                </div>
+
+                {/* 5. Basic Salary */}
+                <div className="form-group">
+                  <label>Basic Salary</label>
+                  <input
+                    type="number"
+                    value={form.Base_Sal}
+                    onChange={(e) => handleAddChange("Base_Sal", e.target.value)}
+                    inputMode="decimal"
+                    step="0.01"
+                    onKeyDown={blockExpKeys}
+                  />
+                </div>
+
+                {/* 6. Bank Name */}
+                <div className="form-group">
+                  <label>Bank Name</label>
+                  <input
+                    type="text"
+                    value={form.Bank_Name}
+                    onChange={(e) => handleAddChange("Bank_Name", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 7. Branch */}
+                <div className="form-group">
+                  <label>Branch</label>
+                  <input
+                    type="text"
+                    value={form.branch}
+                    onChange={(e) => handleAddChange("branch", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 8. Account No */}
+                <div className="form-group">
+                  <label>Account No</label>
+                  <input
+                    type="text"
+                    value={form.Acc_No}
+                    onChange={(e) => handleAddChange("Acc_No", e.target.value)}
+                    inputMode="decimal"
+                    onKeyDown={blockExpKeys}
+                  />
+                </div>
               </div>
+
               <button className="btn btn-success" onClick={create}>
                 Save Employee
               </button>
-              <button
-                className="btn btn-warning"
-                onClick={() => setAddOpen(false)}
-              >
+              <button className="btn btn-warning" onClick={() => setAddOpen(false)}>
                 Cancel
               </button>
             </div>
           )}
 
-          <table id="employeeTable" style={{ marginTop: 20 }}>
+          <table id="employeeTable" style={{ marginTop: 10 }}>
             <thead>
               <tr>
                 <th>Employee ID</th>
@@ -317,21 +513,32 @@ export default function SalaryCal() {
                 <tr>
                   <td colSpan="7">Loading…</td>
                 </tr>
-              ) : rows.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan="7">No employees yet</td>
+                  <td colSpan="7">
+                    {q ? "No matches for that Employee ID." : "No employees yet"}
+                  </td>
                 </tr>
               ) : (
-                rows.map((r) => (
+                filteredRows.map((r) => (
                   <tr key={r._id}>
-                    <td>{r.EmpId}</td>
+                    <td>
+                      {/* subtle highlight if matches */}
+                      <span
+                        style={{
+                          background: q && norm(r.EmpId).includes(norm(q)) ? "#FEF3C7" : "transparent",
+                          borderRadius: 6,
+                          padding: "2px 6px",
+                        }}
+                      >
+                        {r.EmpId}
+                      </span>
+                    </td>
                     <td>{r.Emp_Name}</td>
                     <td>{r.Designation || ""}</td>
                     <td>{r.Epf_No || ""}</td>
                     <td>{rs(r.Base_Sal)}</td>
-                    <td>
-                      {[r.Bank_Name, r.branch, r.Acc_No].filter(Boolean).join(" - ")}
-                    </td>
+                    <td>{[r.Bank_Name, r.branch, r.Acc_No].filter(Boolean).join(" - ")}</td>
                     <td className="actions">
                       <button
                         className="btn btn-warning"
@@ -376,42 +583,108 @@ export default function SalaryCal() {
             </div>
 
             <div className="modal-body">
-              {[
-                "EmpId",
-                "Emp_Name",
-                "Designation",
-                "Epf_No",
-                "Base_Sal",
-                "Bank_Name",
-                "branch",
-                "Acc_No",
-              ].map((k) => (
-                <div className="form-group" key={k}>
-                  <label>{k}</label>
+              {/* Ordered fields: EmpId, Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No */}
+              <div className="form-grid two-col">
+                {/* 1. EmpId */}
+                <div className="form-group">
+                  <label>Employee ID</label>
                   <input
-                    type={k === "Base_Sal" ? "number" : "text"}
-                    value={editing?.[k] ?? ""}
-                    onChange={(e) => handleEditChange(k, e.target.value)}
-                    inputMode={k === "Base_Sal" || k === "Acc_No" ? "decimal" : "text"}
-                    step={k === "Base_Sal" ? "0.01" : undefined}
-                    onKeyDown={
-                      k === "Base_Sal" || k === "Acc_No" ? blockExpKeys : undefined
-                    }
-                    pattern={
-                      k === "Emp_Name" || k === "Designation" || k === "Bank_Name" || k === "branch"
-                        ? "[A-Za-z ]+"
-                        : undefined
-                    }
+                    type="text"
+                    value={editing?.EmpId ?? ""}
+                    onChange={(e) => handleEditChange("EmpId", e.target.value)}
                   />
                 </div>
-              ))}
+
+                {/* 2. Name */}
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    value={editing?.Emp_Name ?? ""}
+                    onChange={(e) => handleEditChange("Emp_Name", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 3. Designation */}
+                <div className="form-group">
+                  <label>Designation</label>
+                  <select
+                    value={editing?.Designation ?? ""}
+                    onChange={(e) => handleEditChange("Designation", e.target.value)}
+                  >
+                    <option value="">-- Select designation --</option>
+                    {DESIGNATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. EPF No */}
+                <div className="form-group">
+                  <label>EPF No</label>
+                  <input
+                    type="text"
+                    value={editing?.Epf_No ?? ""}
+                    onChange={(e) => handleEditChange("Epf_No", e.target.value)}
+                  />
+                </div>
+
+                {/* 5. Basic Salary */}
+                <div className="form-group">
+                  <label>Basic Salary</label>
+                  <input
+                    type="number"
+                    value={editing?.Base_Sal ?? ""}
+                    onChange={(e) => handleEditChange("Base_Sal", e.target.value)}
+                    inputMode="decimal"
+                    step="0.01"
+                    onKeyDown={blockExpKeys}
+                  />
+                </div>
+
+                {/* 6. Bank Name */}
+                <div className="form-group">
+                  <label>Bank Name</label>
+                  <input
+                    type="text"
+                    value={editing?.Bank_Name ?? ""}
+                    onChange={(e) => handleEditChange("Bank_Name", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                    inputMode="text"
+                  />
+                </div>
+
+                {/* 7. Branch */}
+                <div className="form-group">
+                  <label>Branch</label>
+                  <input
+                    type="text"
+                    value={editing?.branch ?? ""}
+                    onChange={(e) => handleEditChange("branch", e.target.value)}
+                    pattern="[A-Za-z ]+"
+                  />
+                </div>
+
+                {/* 8. Account No */}
+                <div className="form-group">
+                  <label>Account No</label>
+                  <input
+                    type="text"
+                    value={editing?.Acc_No ?? ""}
+                    onChange={(e) => handleEditChange("Acc_No", e.target.value)}
+                    inputMode="decimal"
+                    onKeyDown={blockExpKeys}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="modal-actions">
-              <button
-                className="btn btn-warning"
-                onClick={() => setEditing(null)}
-              >
+              <button className="btn btn-warning" onClick={() => setEditing(null)}>
                 Cancel
               </button>
               <button className="btn btn-success" onClick={saveEdit}>

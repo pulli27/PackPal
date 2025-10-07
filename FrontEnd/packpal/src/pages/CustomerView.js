@@ -3,13 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Customerview.css";
 
-/* adjust paths/case to match your project */
-import Header from "../Components/Header/Header";
-import Footer from "../Components/Footer/Footer";
-
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const URL = `${API_BASE}/api/products`;
-
+const URL = "http://localhost:5000/api/carts";
 const STORAGE_KEY = "packPalCart";
 const WISHLIST_KEY = "packPalWishlist";
 
