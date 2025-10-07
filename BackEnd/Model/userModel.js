@@ -1,5 +1,3 @@
-modeluser.js
-
 // BackEnd/Model/userModel.js
 const mongoose = require("mongoose");       
 
