@@ -1,5 +1,4 @@
-// BackEnd/controllers/Transactioncontrollers.js
-/* eslint-disable camelcase */
+// controllers/Transactioncontrollers.js (CommonJS)
 const mongoose = require("mongoose");
 const Transaction = require("../Model/TransactionModel");
 const Product = require("../Model/CartModel");
@@ -34,46 +33,12 @@ function mergeMonthSeries(buckets, n = 12, valueKey = "revenue") {
 /* --------------------------------------------------------------------------- */
 
 const isObjectId = (v) => mongoose.Types.ObjectId.isValid(v);
-const txFilter = (idOrTxId) => (isObjectId(idOrTxId) ? { _id: idOrTxId } : { id: idOrTxId });
 
-/* --------------------------- helpers: date filtering -------------------------- */
-/** Build a $match that prefers createdAt and falls back to date(string) */
-function rangeMatch(startISO, endISO) {
-  if (!startISO || !endISO) return {}; // no range filter
-  return {
-    $expr: {
-      $and: [
-        {
-          $gte: [
-            {
-              $ifNull: [
-                "$createdAt",
-                { $dateFromString: { dateString: "$date", format: "%Y-%m-%d", onError: new Date(0), onNull: new Date(0) } },
-              ],
-            },
-            new Date(startISO),
-          ],
-        },
-        {
-          $lte: [
-            {
-              $ifNull: [
-                "$createdAt",
-                { $dateFromString: { dateString: "$date", format: "%Y-%m-%d", onError: new Date(0), onNull: new Date(0) } },
-              ],
-            },
-            // include the whole end day
-            new Date(new Date(endISO).getTime() + 24 * 60 * 60 * 1000 - 1),
-          ],
-        },
-      ],
-    },
-  };
-}
+// Build a filter that works with either Mongo _id or a custom string id
+const txFilter = (idOrTxId) =>
+  isObjectId(idOrTxId) ? { _id: idOrTxId } : { id: idOrTxId }; // ensure your schema has `id: String` if you use this
 
-/* ================================= CRUD ==================================== */
-
-// Get all transactions (optionally by createdAt/date range)
+// ===== Get all transactions
 exports.getTransactions = async (req, res) => {
   try {
     const { start, end } = req.query || {};
@@ -82,11 +47,15 @@ exports.getTransactions = async (req, res) => {
     return res.json(txs);
   } catch (err) {
     console.error("getTransactions:", err);
-    return res.status(500).json({ ok: false, error: "Failed to fetch transactions", details: err.message });
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch transactions",
+      details: err.message,
+    });
   }
 };
 
-// Add transaction
+// ===== Add transaction
 exports.addTransaction = async (req, res) => {
   try {
     const {
@@ -98,19 +67,27 @@ exports.addTransaction = async (req, res) => {
       method = "Cash",
       status = "Paid",
       notes = "",
-      date, // "YYYY-MM-DD" optional
-      id,   // optional custom id
+      date, // optional; e.g., "YYYY-MM-DD"
+      id, // optional custom id from client, else we create one
     } = req.body || {};
 
+    // qty must be >= 1
     const q = Math.max(1, Number(qty) || 0);
+
+    // productId must be a valid ObjectId for findById
     if (!isObjectId(productId)) {
-      return res.status(400).json({ ok: false, error: "Invalid productId (must be a Mongo ObjectId)" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Invalid productId (must be a Mongo ObjectId)" });
+    }
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(400).json({ ok: false, error: "Invalid product (not found)" });
     }
 
-    const product = await Product.findById(productId);
-    if (!product) return res.status(400).json({ ok: false, error: "Invalid product (not found)" });
-
     const unitPrice = Number(product.price ?? 0);
+
+    // normalize discount
     const discountType = product.discountType || "none"; // "none" | "percentage" | "fixed"
     const discountValue = Number(product.discountValue ?? 0);
 
@@ -123,63 +100,91 @@ exports.addTransaction = async (req, res) => {
     const total = effectiveUnit * q;
 
     const txDoc = new Transaction({
-      id: id || `TX-${Date.now()}`,
-      // store as Date; string is okay (Mongoose casts), but we normalize here
-      date: date ? new Date(`${date}T00:00:00.000Z`) : undefined,
-      customer, customerId, fmc: Boolean(fmc),
-      productId, productName: product.name || "Unknown",
-      qty: q, unitPrice, discountPerUnit, total,
-      method, status, notes,
+      id: id || `TX-${Date.now()}`, // keep a human-readable id too (optional)
+      date: date || new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+      customer,
+      customerId,
+      fmc: Boolean(fmc),
+      productId, // Mongo ObjectId
+      productName: product.name || "Unknown",
+      qty: q,
+      unitPrice,
+      discountPerUnit,
+      total,
+      method,
+      status,
+      notes,
     });
 
-    await txDoc.save();
-    return res.json(txDoc);
+    // 👇 bump reorder level by sold qty (only up)
+    await Product.findByIdAndUpdate(productId, { $inc: { reorderLevel: q } });
+
+    return res.json(doc);
   } catch (err) {
     console.error("addTransaction:", err);
-    return res.status(500).json({ ok: false, error: "Failed to add transaction", details: err.message });
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to add transaction",
+      details: err.message,
+    });
   }
 };
 
-// Update
+// ===== Update transaction (by _id or custom id)
 exports.updateTransaction = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ ok: false, error: "Missing id parameter" });
+    const { id } = req.params; // can be _id or your string id
+    if (!id)
+      return res.status(400).json({ ok: false, error: "Missing id parameter" });
 
-    // normalize possible date strings to Date
-    const body = { ...req.body };
-    if (typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
-      body.date = new Date(`${body.date}T00:00:00.000Z`);
+    const filter = txFilter(id);
+    const updated = await Transaction.findOneAndUpdate(filter, req.body, {
+      new: true,
+    });
+
+    if (!updated) {
+      return res.status(404).json({ ok: false, error: "Transaction not found" });
     }
-
-    const updated = await Transaction.findOneAndUpdate(txFilter(id), body, { new: true });
-    if (!updated) return res.status(404).json({ ok: false, error: "Transaction not found" });
     return res.json(updated);
   } catch (err) {
     console.error("updateTransaction:", err);
-    return res.status(500).json({ ok: false, error: "Failed to update transaction", details: err.message });
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to update transaction",
+      details: err.message,
+    });
   }
 };
 
-// Delete
+// ===== Delete transaction (by _id or custom id)
 exports.deleteTransaction = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ ok: false, error: "Missing id parameter" });
+    const { id } = req.params; // can be _id or your string id
+    if (!id)
+      return res.status(400).json({ ok: false, error: "Missing id parameter" });
 
-    const deleted = await Transaction.findOneAndDelete(txFilter(id));
-    if (!deleted) return res.status(404).json({ ok: false, error: "Transaction not found" });
+    const filter = txFilter(id);
+    const deleted = await Transaction.findOneAndDelete(filter);
 
-    return res.json({ ok: true, message: "Transaction deleted", deleted: { _id: deleted._id, id: deleted.id } });
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: "Transaction not found" });
+    }
+    return res.json({
+      ok: true,
+      message: "Transaction deleted",
+      deleted: { _id: deleted._id, id: deleted.id },
+    });
   } catch (err) {
     console.error("deleteTransaction:", err);
-    return res.status(500).json({ ok: false, error: "Failed to delete transaction", details: err.message });
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to delete transaction",
+      details: err.message,
+    });
   }
 };
 
-/* =============================== SUMMARIES ================================== */
-
-// All-time or range revenue + count (Refunds excluded)
+// ===== Summary: total revenue + count
 exports.getSummary = async (req, res) => {
   try {
     const { start, end } = req.query || {};
@@ -187,138 +192,26 @@ exports.getSummary = async (req, res) => {
     if (start && end) Object.assign(match, rangeMatch(start, end));
 
     const [agg] = await Transaction.aggregate([
-      { $match: match },
-      { $group: { _id: null, revenue: { $sum: "$total" }, count: { $sum: 1 } } },
-    ]);
-
-    return res.json({ revenue: Number(agg?.revenue || 0), count: Number(agg?.count || 0) });
-  } catch (err) {
-    console.error("getSummary:", err);
-    return res.status(500).json({ ok: false, error: "Failed to compute revenue", details: err.message });
-  }
-};
-
-// Month-aware (createdAt-first) summary + monthly series (last 12) + current month slice
-exports.getSummaryV2 = async (req, res) => {
-  try {
-    const months = Math.max(1, Math.min(24, Number(req.query.months || 12)));
-    const baseMatch = { status: { $ne: "Refund" } };
-
-    // 1) All-time (still useful for some cards)
-    const [all] = await Transaction.aggregate([
-      { $match: baseMatch },
-      { $group: { _id: null, revenue: { $sum: "$total" }, count: { $sum: 1 } } },
-    ]);
-
-    // 2) Monthly buckets by createdAt/date
-    const monthBuckets = await Transaction.aggregate([
-      { $match: baseMatch },
-      {
-        $addFields: {
-          ts: {
-            $ifNull: [
-              "$createdAt",
-              { $dateFromString: { dateString: "$date", format: "%Y-%m-%d", onError: new Date(0), onNull: new Date(0) } },
-            ],
-          },
-        },
-      },
+      { $match: { status: { $ne: "Refund" } } },
       {
         $group: {
-          _id: { y: { $year: "$ts" }, m: { $month: "$ts" } },
-          total: { $sum: "$total" },
+          _id: null,
+          revenue: { $sum: "$total" },
           count: { $sum: 1 },
         },
       },
-      { $sort: { "_id.y": 1, "_id.m": 1 } },
     ]);
-
-    const monthly = mergeMonthSeries(monthBuckets, months, "revenue");
-    const { y, m } = currentYM();
-    const cm = monthly.find((r) => r.y === y && r.m === m) || { revenue: 0, count: 0 };
 
     return res.json({
-      revenue: Number(all?.revenue || 0),
-      count: Number(all?.count || 0),
-      monthly, // [{month:'Sep', y:2025, m:9, revenue:..., count:...}, ...]
-      currentMonth: { revenue: Number(cm.revenue || 0), count: Number(cm.count || 0), y, m },
+      revenue: agg?.revenue || 0,
+      count: agg?.count || 0,
     });
   } catch (err) {
-    console.error("getSummaryV2:", err);
-    return res.status(500).json({ ok: false, error: "Failed to compute monthly revenue summary", details: err.message });
-  }
-};
-
-// NEW: /transactions/revenue/monthly?start=YYYY-MM-DD&end=YYYY-MM-DD
-// Buckets ONLY within the given range (createdAt-first). If no range, uses last 12 months.
-exports.getRevenueMonthly = async (req, res) => {
-  try {
-    const { start, end, months: monthsStr } = req.query || {};
-    if (start && end) {
-      const buckets = await Transaction.aggregate([
-        { $match: { status: { $ne: "Refund" }, ...rangeMatch(start, end) } },
-        {
-          $addFields: {
-            ts: {
-              $ifNull: [
-                "$createdAt",
-                { $dateFromString: { dateString: "$date", format: "%Y-%m-%d", onError: new Date(0), onNull: new Date(0) } },
-              ],
-            },
-          },
-        },
-        {
-          $group: {
-            _id: { y: { $year: "$ts" }, m: { $month: "$ts" } },
-            revenue: { $sum: "$total" },
-          },
-        },
-        { $sort: { "_id.y": 1, "_id.m": 1 } },
-        {
-          $project: {
-            key: {
-              $concat: [
-                { $toString: "$_id.y" },
-                "-",
-                { $toString: { $cond: [{ $lt: ["$_id.m", 10] }, { $concat: ["0", { $toString: "$_id.m" }] }, { $toString: "$_id.m" }] } },
-              ],
-            },
-            revenue: 1,
-            _id: 0,
-          },
-        },
-      ]);
-      return res.json(buckets);
-    }
-
-    const months = Math.max(1, Math.min(24, Number(monthsStr || 12)));
-    const series = await Transaction.aggregate([
-      { $match: { status: { $ne: "Refund" } } },
-      {
-        $addFields: {
-          ts: {
-            $ifNull: [
-              "$createdAt",
-              { $dateFromString: { dateString: "$date", format: "%Y-%m-%d", onError: new Date(0), onNull: new Date(0) } },
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: { y: { $year: "$ts" }, m: { $month: "$ts" } },
-          total: { $sum: "$total" },
-        },
-      },
-      { $sort: { "_id.y": 1, "_id.m": 1 } },
-    ]);
-    const merged = mergeMonthSeries(series, months, "revenue").map((r) => ({
-      key: `${r.y}-${String(r.m).padStart(2, "0")}`,
-      revenue: r.revenue,
-    }));
-    return res.json(merged);
-  } catch (err) {
-    console.error("getRevenueMonthly:", err);
-    return res.status(500).json({ ok: false, error: "Failed to compute monthly revenue", details: err.message });
+    console.error("getSummary:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to compute revenue",
+      details: err.message,
+    });
   }
 };

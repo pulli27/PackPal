@@ -63,8 +63,12 @@
   max-width: 880px; margin:0 auto; text-align:center; padding:10px 8px 0;
   position:relative; z-index:1;
 }
+/* <-- CHANGED: add 0.5cm space above the title */
 .cv-main .cv-hero-content h1{
-  margin:0 0 8px; font-size:clamp(28px,5vw,42px); font-weight:900; letter-spacing:.3px;
+  margin:0.5cm 0 8px; 
+  font-size:clamp(28px,5vw,42px); 
+  font-weight:900; 
+  letter-spacing:.3px;
 }
 .cv-main .cv-hero-content p{
   margin:0 auto 18px; max-width:720px; color:rgba(255,255,255,.9); font-weight:500;

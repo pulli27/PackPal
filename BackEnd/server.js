@@ -1,16 +1,34 @@
+// server.js
+require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-require("dotenv").config();
 
 const app = express();
+
+// CORS – allow your frontend origin
+app.use(cors({
+  origin: process.env.FRONTEND_ORIGIN || "http://localhost:3000",
+  credentials: true,
+}));
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("Mongo connected"))
-  .catch((e) => console.error(e));
+// Routes
+app.use("/api/auth", require("./BackEnd/Routes/authRoutes"));
+app.use("/api/users", require("./BackEnd/Routes/userRouter"));
 
-app.use("/api/auth", require("./Routes/authRoutes"));
+// Health
+app.get("/health", (_req, res) => res.json({ ok: true }));
 
-app.listen(5000, () => console.log("Server running on port 5000"));
+// MongoDB connect
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/packpal";
+mongoose.connect(MONGO_URI, { autoIndex: true })
+  .then(() => {
+    console.log("✅ MongoDB connected");
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => console.log(`✅ API running on :${PORT}`));
+  })
+  .catch((err) => {
+    console.error("❌ Mongo connection error:", err.message);
+    process.exit(1);
+  });

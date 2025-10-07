@@ -1,6 +1,6 @@
 // src/Components/Createaccount/Createaccount.jsx
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import "./Createaccount.css";
 
 export default function Createaccount() {
@@ -13,12 +13,12 @@ export default function Createaccount() {
   const [tos, setTos]             = useState(false);
 
   // UI state
-  const [showPwd, setShowPwd]      = useState(false);
-  const [status, setStatus]        = useState({ type: "", msg: "" }); // type: "good" | "bad" | ""
-  const [submitting, setSubmitting]= useState(false);
-  const [submitted, setSubmitted]  = useState(false);
+  const [showPwd, setShowPwd]       = useState(false);
+  const [status, setStatus]         = useState({ type: "", msg: "" }); // "good" | "bad" | ""
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted]   = useState(false);
 
-  // validation state
+  // touched state
   const [touched, setTouched] = useState({
     firstName: false,
     lastName:  false,
@@ -30,6 +30,7 @@ export default function Createaccount() {
 
   const navigate = useNavigate();
   const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const REGISTER_URL = `${API_BASE}/api/auth/register`;
 
   // --- Validators ---
   const validEmail = /^\S+@\S+\.\S+$/.test(email);
@@ -38,7 +39,7 @@ export default function Createaccount() {
     /[A-Z]/.test(password) &&
     /[a-z]/.test(password) &&
     /[0-9]/.test(password) &&
-    /[!@#$%^&*]/.test(password);
+    /[!@#$%^&*(),.?":{}|<>_\-\\/~`]/.test(password);
 
   const errors = {
     firstName: firstName.trim().length >= 2 ? "" : "Please enter your first name.",
@@ -52,7 +53,7 @@ export default function Createaccount() {
   const formValid = Object.values(errors).every((e) => e === "");
   const shouldShow = (field) => (touched[field] || submitted) && errors[field];
 
-  // --- Submit Handler ---
+  // --- Submit ---
   const submit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
@@ -62,44 +63,44 @@ export default function Createaccount() {
       return;
     }
 
-    try {
-      setSubmitting(true);
-      setStatus({ type: "", msg: "" });
+    setSubmitting(true);
+    setStatus({ type: "", msg: "" });
 
-      // normalize email on the client too (backend should also normalize)
+    try {
       const payload = {
         firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim().toLowerCase(),
+        lastName : lastName.trim(),
+        email    : email.trim().toLowerCase(),
         password,
       };
 
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
+      const res = await fetch(REGISTER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // keep credentials if your server sets cookies; else harmless
-        credentials: "include",
+        credentials: "include", // harmless if you don't use cookies
         body: JSON.stringify(payload),
       });
 
+      // Try to parse JSON (in case backend returns helpful message)
       let data = {};
-      try { data = await res.json(); } catch { /* ignore parse errors */ }
+      try { data = await res.json(); } catch {}
 
-      if (!res.ok || data?.success === false) {
-        // map common backend messages to friendly text
-        const msg = data?.message || (res.status === 409
-          ? "Email already registered."
-          : `Registration failed (${res.status}).`);
+      if (!res.ok) {
+        // Friendly messages
+        const msg =
+          data?.message ||
+          (res.status === 409
+            ? "Email already registered."
+            : `Registration failed (${res.status}).`);
         throw new Error(msg);
       }
 
-      setStatus({ type: "good", msg: "Account created! Redirecting to login..." });
-      // small delay to show success state
-      setTimeout(() => navigate("/login"), 1000);
+      setStatus({ type: "good", msg: "Account created! Redirecting to login…" });
+      setTimeout(() => navigate("/login"), 900);
     } catch (err) {
       const msg =
         err?.message === "Failed to fetch"
-          ? "Could not reach the server. Check backend and CORS."
+          ? "Could not reach the server. Check backend URL and CORS."
           : err?.message || "Could not create account.";
       setStatus({ type: "bad", msg });
     } finally {
@@ -121,6 +122,7 @@ export default function Createaccount() {
                   src={`${process.env.PUBLIC_URL || ""}/new logo.png`}
                   alt="PackPal logo"
                   className="brand-logo"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
                 />
                 <h1 className="brand-name">PackPal</h1>
                 <p className="brand-copy">
@@ -234,10 +236,21 @@ export default function Createaccount() {
                 </label>
                 {shouldShow("tos") && <small className="error">{errors.tos}</small>}
 
-                <div className="btn-row">
+                {status.msg && (
+                  <div
+                    className={`status ${status.type}`}
+                    role={status.type === "bad" ? "alert" : "status"}
+                    aria-live="polite"
+                    style={{ marginTop: 8 }}
+                  >
+                    {status.msg}
+                  </div>
+                )}
+
+                <div className="btn-row" style={{ marginTop: 10 }}>
                   <button
                     type="submit"
-                    className="primary-btn"
+                    className={`primary-btn ${submitting ? "loading" : ""}`}
                     disabled={submitting}
                     aria-busy={submitting ? "true" : "false"}
                   >
@@ -245,16 +258,9 @@ export default function Createaccount() {
                   </button>
                 </div>
 
-                {status.msg && (
-                  <div
-                    className={`status ${status.type}`}
-                    role={status.type === "bad" ? "alert" : "status"}
-                    aria-live="polite"
-                    style={{ marginTop: 10 }}
-                  >
-                    {status.msg}
-                  </div>
-                )}
+                <div className="alt-auth">
+                  Already have an account? <Link to="/login">Sign in</Link>
+                </div>
               </form>
             </div>
           </main>

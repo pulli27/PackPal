@@ -103,6 +103,21 @@ function inRange(dateStr, startStr, endStr) {
 }
 const rafDelay = () => new Promise((r) => requestAnimationFrame(() => r()));
 
+// fetch an image in /public as dataURL for jsPDF headers/footers
+async function loadImageAsDataURL(path) {
+  try {
+    const res = await fetch(path, { cache: "no-cache" });
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 /* ======================================== */
 
 export default function Report() {
@@ -562,7 +577,7 @@ export default function Report() {
             pdf.text(label, pageW - 8 - pdf.getTextWidth(label), pageH - 6);
           }
         })
-        .save();
+        .save(); // <-- triggers download automatically
     } finally {
       pdfRoot.remove();
     }
@@ -579,12 +594,15 @@ export default function Report() {
         <div className="header">
           <div className="container">
             <div className="header-content">
-              <div>
-                <div className="header-title">
-                  <i className="fas fa-chart-line" />
-                  Reports & Analytics
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <img src={LOGO_PATH} alt="logo" style={{ height: 28 }} />
+                <div>
+                  <div className="header-title">
+                    <i className="fas fa-chart-line" />
+                    Reports & Analytics
+                  </div>
+                  <p className="header-subtitle">{SYSTEM_NAME}</p>
                 </div>
-                <p className="header-subtitle">Comprehensive inventory and business intelligence</p>
               </div>
               <button
                 onClick={generateReport}

@@ -3,16 +3,16 @@ import "./SewingInstruction.css";
 import Sidebarhiru from "../Sidebar/Sidebarhiru";
 import { api } from "../../lib/api2";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; // <-- use function import
+import autoTable from "jspdf-autotable"; // function import
 
-// ---------- CONFIG: PackPal address lines shown under the logo in the PDF ----------
-const ADDRESS_LINES = [
-  "PackPal (Pvt) Ltd.",
-  "Makola North, Makola",
-  "Sri Lanka",
-  "Tel: +94 70 000 0000  |  Email: info@packpal.lk",
-];
+/* ------------------ Company info for the header (right block) ------------------ */
+const COMPANY = {
+  name: "PackPal (Pvt) Ltd",
+  address: "No. 42, Elm Street, Colombo",
+  email: "hello@packpal.lk",
+};
 
+/* ------------------ Helpers ------------------ */
 // Normalize date for <input type="date"> and display
 const toDateInput = (d) => {
   if (!d) return "";
@@ -25,10 +25,9 @@ const toDateInput = (d) => {
 
 // Only letters and spaces are allowed for Sewing Person
 const PERSON_RE = /^[A-Za-z ]+$/;
-const sanitizePerson = (v) =>
-  v.replace(/[^A-Za-z ]+/g, "").replace(/\s{2,}/g, " ");
+const sanitizePerson = (v) => v.replace(/[^A-Za-z ]+/g, "").replace(/\s{2,}/g, " ");
 
-// helper to load an image from /public and return a PNG data URL
+// Load an image from /public and return a PNG data URL (for jsPDF.addImage)
 const loadImageAsDataURL = (src) =>
   new Promise((resolve, reject) => {
     const img = new Image();
@@ -46,11 +45,11 @@ const loadImageAsDataURL = (src) =>
   });
 
 export default function SewingInstruction() {
-  // ---------- dialogs ----------
+  /* ---------- dialogs ---------- */
   const formRef = useRef(null);
   const viewRef = useRef(null);
 
-  // ---------- state ----------
+  /* ---------- state ---------- */
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
@@ -66,7 +65,7 @@ export default function SewingInstruction() {
   });
 
   const [personError, setPersonError] = useState("");
-  const [logoData, setLogoData] = useState(null); // <-- holds data URL for public/logo.png
+  const [logoData, setLogoData] = useState(null); // holds data URL for /public/logo.png
 
   // preload logo once
   useEffect(() => {
@@ -75,7 +74,7 @@ export default function SewingInstruction() {
       .catch(() => setLogoData(null));
   }, []);
 
-  // ---------- open/close dialogs ----------
+  /* ---------- open/close dialogs ---------- */
   useEffect(() => {
     if (!formRef.current) return;
     if (editing) formRef.current.showModal();
@@ -88,7 +87,7 @@ export default function SewingInstruction() {
     else if (viewRef.current.open) viewRef.current.close();
   }, [viewItem]);
 
-  // ---------- load from server ----------
+  /* ---------- load from server ---------- */
   const load = async () => {
     try {
       setLoading(true);
@@ -125,8 +124,12 @@ export default function SewingInstruction() {
   // broadcast refresh hooks
   useEffect(() => {
     const onBcast = () => load();
-    const onStorage = (e) => { if (e.key === "sewing:lastUpdate") load(); };
-    const onVis = () => { if (document.visibilityState === "visible") load(); };
+    const onStorage = (e) => {
+      if (e.key === "sewing:lastUpdate") load();
+    };
+    const onVis = () => {
+      if (document.visibilityState === "visible") load();
+    };
     window.addEventListener("sewing:changed", onBcast);
     window.addEventListener("storage", onStorage);
     document.addEventListener("visibilitychange", onVis);
@@ -137,7 +140,7 @@ export default function SewingInstruction() {
     };
   }, []);
 
-  // ---------- helpers ----------
+  /* ---------- helpers ---------- */
   const resetForm = () =>
     setForm({
       bag: "",
@@ -153,6 +156,7 @@ export default function SewingInstruction() {
     setPersonError("");
     setEditing({ id: null });
   };
+
   const openEdit = (row) => {
     setForm({
       bag: row.bag,
@@ -225,11 +229,13 @@ export default function SewingInstruction() {
     e.preventDefault();
 
     if (!form.bag || !form.person || !form.deadline) {
-      alert("Bag, Person and Deadline are required"); return;
+      alert("Bag, Person and Deadline are required");
+      return;
     }
     if (!PERSON_RE.test(form.person)) {
       setPersonError("Letters and spaces only (no numbers or symbols).");
-      alert("Sewing Person must contain letters and spaces only."); return;
+      alert("Sewing Person must contain letters and spaces only.");
+      return;
     }
 
     const payload = {
@@ -242,14 +248,24 @@ export default function SewingInstruction() {
     };
     try {
       if (editing?.id) {
-        const { data } = await api.put(`/api/sewing-instructions/${editing.id}`, payload);
+        const { data } = await api.put(
+          `/api/sewing-instructions/${editing.id}`,
+          payload
+        );
         const u = data.after;
         setItems((prev) =>
           prev.map((x) =>
             x.id === editing.id
-              ? { id: u._id, bag: u.bag, details: u.details || "", person: u.person,
-                  deadline: toDateInput(u.deadline), priority: u.priority,
-                  status: u.status, createdAt: u.createdAt }
+              ? {
+                  id: u._id,
+                  bag: u.bag,
+                  details: u.details || "",
+                  person: u.person,
+                  deadline: toDateInput(u.deadline),
+                  priority: u.priority,
+                  status: u.status,
+                  createdAt: u.createdAt,
+                }
               : x
           )
         );
@@ -278,53 +294,69 @@ export default function SewingInstruction() {
     }
   };
 
-  // ---------- PDF export ----------
+  /* ---------- PDF export (branded header) ---------- */
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
-    const runDate = new Date().toLocaleString();
-    const title = "Sewing Instructions Report";
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const marginX = 40;
 
-    const margin = 40;
-    const pageWidth = doc.internal.pageSize.getWidth();
+    // Header metrics
+    const logoW = 45;
+    const logoH = 45;
+    const logoX = marginX;
+    const logoY = 28;
 
-    // LEFT: logo + PackPal address
-    let leftBlockBottomY = 0;
-    const logoW = 120; // adjust if you want bigger/smaller
-    const logoH = 40;
-    const topY = 24;
-
+    // --- HEADER ---
+    // Left: logo
     if (logoData) {
       try {
-        doc.addImage(logoData, "PNG", margin, topY, logoW, logoH);
-      } catch (_) {
-        // ignore if image fails to render
+        doc.addImage(logoData, "PNG", logoX, logoY, logoW, logoH);
+      } catch {
+        /* ignore if logo fails */
       }
     }
 
-    let addrY = topY + (logoData ? logoH + 8 : 0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    ADDRESS_LINES.forEach((line, idx) => {
-      doc.text(line, margin, addrY + idx * 14); // 14pt leading
-    });
-    leftBlockBottomY = addrY + ADDRESS_LINES.length * 14;
+    // Left: title + generated datetime (beside logo)
+    const textLeftX = logoX + logoW + 12;
+    const titleY = logoY + 18;
 
-    // RIGHT: title + meta (right-aligned)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
-    doc.text(title, pageWidth - margin, 42, { align: "right" });
+    doc.setTextColor(20);
+    doc.text("Sewing Instruction Report", textLeftX, titleY);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.text(`Generated: ${runDate}`, pageWidth - margin, 62, { align: "right" });
-    doc.text(`Total Records: ${items.length}`, pageWidth - margin, 78, { align: "right" });
+    doc.setFontSize(12);
+    doc.setTextColor(90);
+    const generated = `Generated on ${new Date().toLocaleString("en-LK")}`;
+    doc.text(generated, textLeftX, titleY + 22);
 
-    // Compute safe start for the table (no overlap with either header block)
-    const rightBlockBottomY = 96; // where the table used to start
-    const tableStartY = Math.max(rightBlockBottomY, leftBlockBottomY + 12);
+    // Right: company block (name, address, email)
+    const rightX = pageW - marginX - 260; // ~260px wide block
+    const rightY = logoY + 6;
 
-    const head = [["Bag Type", "Sewing Person", "Deadline", "Priority", "Status", "Details"]];
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(20);
+    doc.text(COMPANY.name, rightX, rightY);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.setTextColor(90);
+    doc.text(COMPANY.address, rightX, rightY + 20);
+    doc.text(COMPANY.email, rightX, rightY + 40);
+
+    // Divider
+    doc.setDrawColor(200);
+    doc.setLineWidth(1);
+    doc.line(marginX, logoY + 56, pageW - marginX, logoY + 56);
+
+    // --- TABLE ---
+    const head = [
+      ["Bag Type", "Sewing Person", "Deadline", "Priority", "Status", "Details"],
+    ];
     const body = (items || []).map((i) => [
       i.bag || "",
       i.person || "",
@@ -335,11 +367,11 @@ export default function SewingInstruction() {
     ]);
 
     autoTable(doc, {
-      startY: tableStartY,
       head,
       body,
+      startY: logoY + 70, // below header
       styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
-      headStyles: { fillColor: [33, 150, 243] },
+      headStyles: { fillColor: [53, 79, 197], textColor: 255 },
       columnStyles: {
         0: { cellWidth: 130 },
         1: { cellWidth: 150 },
@@ -348,24 +380,28 @@ export default function SewingInstruction() {
         4: { cellWidth: 110 },
         5: { cellWidth: "auto" },
       },
-      didDrawPage: () => {
-        const pageCount = doc.getNumberOfPages
-          ? doc.getNumberOfPages()
-          : doc.internal.getNumberOfPages();
-        const str = `Page ${pageCount}`;
+      margin: { left: marginX, right: marginX },
+      didDrawPage: (data) => {
+        const pageCount =
+          doc.getNumberOfPages?.() ?? doc.internal.getNumberOfPages();
         doc.setFontSize(9);
-        doc.text(str, pageWidth - margin, doc.internal.pageSize.getHeight() - 20, { align: "right" });
+        doc.setTextColor(120);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount}`,
+          pageW - 80,
+          pageH - 20
+        );
       },
-      margin: { left: margin, right: margin },
     });
 
-    doc.save("sewing_instructions_report.pdf");
+    doc.save("sewing_instruction_report.pdf");
   };
 
   const BadgePriority = ({ p }) => {
     const cls = p === "High" ? "high" : p === "Medium" ? "medium" : "low";
     return <span className={`badge ${cls}`}>{p}</span>;
   };
+
   const BadgeStatus = ({ s }) => {
     const map = {
       "In Progress": "info",
@@ -375,23 +411,6 @@ export default function SewingInstruction() {
     };
     return <span className={`badge ${map[s] || "pending"}`}>{s}</span>;
   };
-
-  const Eye = () => (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-  const Pen = () => (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 21l3-1 14-14-2-2L4 18l-1 3Z" />
-    </svg>
-  );
-  const Trash = () => (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 6h18M9 6V4h6v2M7 6l1 14h8l1-14" />
-    </svg>
-  );
 
   if (loading)
     return (
@@ -457,9 +476,34 @@ export default function SewingInstruction() {
                       <td><BadgeStatus s={i.status} /></td>
                       <td>
                         <div className="actions">
-                          <button className="icon-btn icon-view" title="View" onClick={() => setViewItem(i)}><Eye /></button>
-                          <button className="icon-btn icon-edit" title="Edit" onClick={() => openEdit(i)}><Pen /></button>
-                          <button className="icon-btn icon-del" title="Delete" onClick={() => handleDelete(i.id)}><Trash /></button>
+                          <button
+                            className="icon-btn icon-view"
+                            title="View"
+                            onClick={() => setViewItem(i)}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
+                          <button
+                            className="icon-btn icon-edit"
+                            title="Edit"
+                            onClick={() => openEdit(i)}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M3 21l3-1 14-14-2-2L4 18l-1 3Z" />
+                            </svg>
+                          </button>
+                          <button
+                            className="icon-btn icon-del"
+                            title="Delete"
+                            onClick={() => handleDelete(i.id)}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M3 6h18M9 6V4h6v2M7 6l1 14h8l1-14" />
+                            </svg>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -517,22 +561,40 @@ export default function SewingInstruction() {
             <label>
               Priority
               <select id="f_priority" value={form.priority} onChange={handleChange} required>
-                <option>High</option><option>Medium</option><option>Low</option>
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
               </select>
             </label>
             <label className="span-2">
               Details
-              <textarea id="f_details" rows="3" value={form.details} onChange={handleChange} placeholder="materials, size, notes" />
+              <textarea
+                id="f_details"
+                rows="3"
+                value={form.details}
+                onChange={handleChange}
+                placeholder="materials, size, notes"
+              />
             </label>
             <label>
               Status
               <select id="f_status" value={form.status} onChange={handleChange} required>
-                <option>In Progress</option><option>Pending</option><option>Quality Check</option><option>Done</option>
+                <option>In Progress</option>
+                <option>Pending</option>
+                <option>Quality Check</option>
+                <option>Done</option>
               </select>
             </label>
           </div>
           <div className="modal-actions">
-            <button type="button" className="btn" onClick={() => { formRef.current?.close(); setEditing(null); }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                formRef.current?.close();
+                setEditing(null);
+              }}
+            >
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">Save</button>
@@ -555,7 +617,13 @@ export default function SewingInstruction() {
             </div>
           )}
           <div className="modal-actions">
-            <button className="btn btn-primary" onClick={() => { viewRef.current?.close(); setViewItem(null); }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                viewRef.current?.close();
+                setViewItem(null);
+              }}
+            >
               Close
             </button>
           </div>

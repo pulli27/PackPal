@@ -159,10 +159,8 @@ export default function App() {
       <Route path="/hiruinventory" element={<HiruInventory />} />
       <Route path="/quality" element={<Quality />} />
       <Route path="/settinghiru" element={<Settinghiru />} />
-
-
-     
+      
       <Route path="*" element={<NotFound />} />
     </Routes>
-  );
+  );  
 }
