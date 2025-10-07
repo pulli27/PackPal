@@ -13,13 +13,21 @@ const money = (n) =>
 
 const nowISO = () => new Date().toISOString().slice(0, 10);
 
-// -------------------- VALIDATION HELPERS --------------------
+/* ===================== VALIDATION HELPERS ===================== */
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+// allow letters (incl. accents), spaces and ',.-  (min 2)
 const nameRe  = /^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$/;
 const cityRe  = /^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$/;
-const zipRe   = /^[A-Za-z0-9 -]{3,10}$/;
+// Sri Lanka postal codes are 5 digits
+const zipRe   = /^\d{5}$/;
 
 const onlyDigits = (s = "") => (s || "").replace(/\D/g, "");
+const trimMultiSpace = (s = "") => s.replace(/\s{2,}/g, " ").trim();
+const cleanName = (s = "") =>
+  trimMultiSpace(s.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ' .-]/g, ""));
+const cleanCity = (s = "") =>
+  trimMultiSpace(s.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ' .-]/g, ""));
+
 const luhnCheck = (num) => {
   const s = onlyDigits(num);
   if (s.length < 12) return false;
@@ -31,6 +39,7 @@ const luhnCheck = (num) => {
   }
   return sum % 10 === 0;
 };
+
 const parseExpiry = (mmYY) => {
   const m = mmYY.match(/^(\d{2})\/?(\d{2})$/);
   if (!m) return null;
@@ -39,19 +48,44 @@ const parseExpiry = (mmYY) => {
   if (month < 1 || month > 12) return null;
   return { month, year };
 };
-const expiryInFuture = (mmYY) => {
-  const parsed = parseExpiry(mmYY);
-  if (!parsed) return false;
-  const { month, year } = parsed;
-  const now = new Date();
-  const exp = new Date(year, month, 0, 23, 59, 59, 999);
-  return exp >= now;
+
+/* -------- Expiry must be >= this month and <= +7 years -------- */
+const MAX_EXP_YEARS = 7;
+
+const mmYY = (d) => {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const y = String(d.getFullYear()).slice(-2);
+  return `${m}/${y}`;
 };
+
+const expiryInRange = (mmYYstr, maxYears = MAX_EXP_YEARS) => {
+  const parsed = parseExpiry(mmYYstr);
+  if (!parsed) return false;
+
+  const { month, year } = parsed;
+  const expEnd = new Date(year, month, 0, 23, 59, 59, 999); // end of expiry month
+
+  const now = new Date();
+  const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const max = new Date(now.getFullYear() + maxYears, now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  return expEnd >= startThisMonth && expEnd <= max;
+};
+
+const allowedExpiryWindowLabel = () => {
+  const now = new Date();
+  const minLabel = mmYY(now);
+  const max = new Date(now.getFullYear() + MAX_EXP_YEARS, now.getMonth(), 1);
+  const maxLabel = mmYY(max);
+  return { minLabel, maxLabel };
+};
+
+/* -------- Sri Lanka phone format/validation -------- */
 const normalizeSLPhonePretty = (raw) => {
   let digits = onlyDigits(raw);
   if (digits.startsWith("0")) digits = "94" + digits.slice(1);
   if (!digits.startsWith("94")) digits = "94" + digits;
-  digits = digits.slice(0, 11);
+  digits = digits.slice(0, 11); // 94 + 9 digits
   const local = digits.slice(2);
   let out = "+94";
   if (local.length > 0) out += " " + local.slice(0, 2);
@@ -64,47 +98,120 @@ const phoneIsValidSL = (pretty) => {
   return digits.length === 11 && digits.startsWith("94");
 };
 
+/* -------- combined validators -------- */
 const validateCustomer = (f) => {
   const e = {};
-  if (!f.email || !emailRe.test(f.email.trim())) e.email = "Enter a valid email.";
-  if (!f.phone || !phoneIsValidSL(f.phone)) e.phone = "Enter a valid Sri Lankan number.";
-  if (!f.firstName || !nameRe.test(f.firstName.trim())) e.firstName = "First name invalid.";
-  if (!f.lastName || !nameRe.test(f.lastName.trim())) e.lastName = "Last name invalid.";
-  if (!f.address || f.address.trim().length < 5) e.address = "Address too short.";
-  if (!f.city || !cityRe.test(f.city.trim())) e.city = "Enter a valid city.";
-  if (!f.zip || !zipRe.test(f.zip.trim())) e.zip = "Postal code invalid.";
+  const email = (f.email || "").trim().toLowerCase();
+  if (!email || !emailRe.test(email)) e.email = "Enter a valid email.";
+
+  if (!f.phone || !phoneIsValidSL(f.phone))
+    e.phone = "Enter a valid Sri Lankan number (e.g., +94 71 234 5678).";
+
+  const fn = cleanName(f.firstName || "");
+  const ln = cleanName(f.lastName || "");
+  if (!fn || !nameRe.test(fn)) e.firstName = "First name can only have letters, spaces, ', . or - (min 2).";
+  if (!ln || !nameRe.test(ln)) e.lastName  = "Last name can only have letters, spaces, ', . or - (min 2).";
+
+  if (!f.address || trimMultiSpace(f.address).length < 5)
+    e.address = "Address must be at least 5 characters.";
+
+  const city = cleanCity(f.city || "");
+  if (!city || !cityRe.test(city))
+    e.city = "City can only have letters, spaces, ', . or - (min 2).";
+
+  const zip = (f.zip || "").trim();
+  if (!zip || !zipRe.test(zip)) e.zip = "Postal code must be 5 digits.";
+
   return e;
 };
+
 const validateCard = (f) => {
   const e = {};
   const rawPan = onlyDigits(f.cardNumber);
-  if (rawPan.length < 13 || rawPan.length > 19 || !luhnCheck(f.cardNumber)) e.cardNumber = "Enter a valid card number.";
-  if (!f.expiryDate || !parseExpiry(f.expiryDate)) e.expiryDate = "Use MM/YY format.";
-  else if (!expiryInFuture(f.expiryDate)) e.expiryDate = "Card is expired.";
+  if (rawPan.length < 13 || rawPan.length > 19 || !luhnCheck(f.cardNumber))
+    e.cardNumber = "Enter a valid card number.";
+
+  if (!f.expiryDate || !parseExpiry(f.expiryDate)) {
+    e.expiryDate = "Use MM/YY format.";
+  } else if (!expiryInRange(f.expiryDate)) {
+    const { minLabel, maxLabel } = allowedExpiryWindowLabel();
+    e.expiryDate = `Expiry must be between ${minLabel} and ${maxLabel}.`;
+  }
+
   const cv = onlyDigits(f.cvv);
-  if (!(cv.length === 3 || cv.length === 4)) e.cvv = "CVV 3–4 digits.";
-  if (!f.cardName || f.cardName.trim().length < 3) e.cardName = "Enter the name on the card.";
+  if (!(cv.length === 3 || cv.length === 4)) e.cvv = "CVV must be 3–4 digits.";
+
+  const nm = cleanName(f.cardName || "");
+  if (!nm || nm.length < 3) e.cardName = "Enter the name on the card.";
+
   return e;
 };
-// ------------------------------------------------------------
+
+/* ===================== INPUT BLOCKING HELPERS ===================== */
+// Block invalid characters at typing time; clean pasted text.
+const allowNameChar = /[A-Za-zÀ-ÖØ-öø-ÿ' .-]/;
+const allowCityChar = allowNameChar;
+const allowZipChar  = /\d/;          // digits only for postal code
+const allowDigits   = /\d/;
+
+const blockIfNot = (re) => (e) => {
+  if (e.inputType === "insertText" && e.data && !re.test(e.data)) {
+    e.preventDefault();
+  }
+};
+
+const onPasteSanitize = (sanitizer) => (e) => {
+  e.preventDefault();
+  const t = e.target;
+  const pasted = (e.clipboardData?.getData("text") || "");
+  const clean = sanitizer(pasted);
+  const { selectionStart: s, selectionEnd: epos, value } = t;
+  const before = value.slice(0, s);
+  const after  = value.slice(epos);
+  const next   = before + clean + after;
+  t.value = next;
+  const pos = before.length + clean.length;
+  t.setSelectionRange?.(pos, pos);
+  const ev = new Event("input", { bubbles: true });
+  t.dispatchEvent(ev);
+};
+/* ================================================================ */
 
 export default function Cart() {
   const [step, setStep] = useState("cart"); // cart -> payment -> success
   const [cart, setCart] = useState([]);
   const [processing, setProcessing] = useState(false);
-  const [showPanel, setShowPanel] = useState(false); // show light-blue panel
+  const [showPanel, setShowPanel] = useState(false);
   const panelRef = useRef(null);
 
   const navigate = useNavigate();
   const location = useLocation();
 
   const [form, setForm] = useState({
-    email: "", phone: "", firstName: "", lastName: "",
-    address: "", city: "", zip: "",
-    cardNumber: "", expiryDate: "", cvv: "", cardName: "",
+    email: "",
+    phone: "",
+    firstName: "",
+    lastName: "",
+    address: "",
+    city: "",
+    zip: "",
+    cardNumber: "",
+    expiryDate: "",
+    cvv: "",
+    cardName: "",
   });
   const [errors, setErrors] = useState({});
-  const change = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const [touched, setTouched] = useState({});
+
+  const change = (k, v) => {
+    let value = v;
+    if (k === "firstName" || k === "lastName") value = cleanName(v);
+    if (k === "city") value = cleanCity(v);
+    if (k === "email") value = v.replace(/\s+/g, "").toLowerCase();
+    if (k === "zip") value = onlyDigits(v).slice(0, 5); // digits only, max 5
+    setForm((f) => ({ ...f, [k]: value }));
+  };
+  const markTouched = (k) => setTouched((t) => ({ ...t, [k]: true }));
 
   // formatters
   const onCardNumber = (e) => {
@@ -117,14 +224,27 @@ export default function Cart() {
     if (v.length >= 3) v = v.slice(0, 2) + "/" + v.slice(2);
     change("expiryDate", v);
   };
-  const onCVV = (e) => change("cvv", e.target.value.replace(/\D/g, "").slice(0, 4));
+  const onCVV = (e) => change("cvv", onlyDigits(e.target.value).slice(0, 4));
   const onPhone = (e) => change("phone", normalizeSLPhonePretty(e.target.value));
 
-  // load cart (and keep layout tidy if your app has sidebars)
+  // live-validate (after field touched)
+  useEffect(() => {
+    const cust = validateCustomer(form);
+    const card = validateCard(form);
+    setErrors((prev) => ({ ...prev, ...cust, ...(showPanel ? card : {}) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, showPanel]);
+
+  // load cart
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      setCart(stored.map((it) => ({ ...it, quantity: Math.max(1, parseInt(it.quantity || 1, 10) || 1) })));
+      setCart(
+        stored.map((it) => ({
+          ...it,
+          quantity: Math.max(1, parseInt(it.quantity || 1, 10) || 1),
+        }))
+      );
     } catch {}
     document.body.classList.add("sidebar-off");
     return () => document.body.classList.remove("sidebar-off");
@@ -136,7 +256,9 @@ export default function Cart() {
     if (!justAdded) return;
     setCart((prev) => {
       const exists = prev.some((x) => String(x.id) === String(justAdded.id));
-      const next = exists ? prev : [...prev, { ...justAdded, quantity: Math.max(1, justAdded.quantity || 1) }];
+      const next = exists
+        ? prev
+        : [...prev, { ...justAdded, quantity: Math.max(1, justAdded.quantity || 1) }];
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
@@ -165,10 +287,14 @@ export default function Cart() {
   const removeItem = (id) => setCart((list) => list.filter((it) => String(it.id) !== String(id)));
   const clearCart = () => setCart([]);
 
-  // ---------- flow handlers ----------
+  /* -------------------- flow handlers -------------------- */
   const onClickCheckout = () => {
     const custErrors = validateCustomer(form);
-    setErrors(custErrors);
+    setTouched({
+      email: true, phone: true, firstName: true, lastName: true,
+      address: true, city: true, zip: true,
+    });
+    setErrors((e) => ({ ...e, ...custErrors }));
     if (Object.keys(custErrors).length) return;
 
     setShowPanel(true);
@@ -177,6 +303,7 @@ export default function Cart() {
 
   const processPayment = async () => {
     const cardErrors = validateCard(form);
+    setTouched((t) => ({ ...t, cardNumber: true, expiryDate: true, cvv: true, cardName: true }));
     setErrors((e) => ({ ...e, ...cardErrors }));
     if (Object.keys(cardErrors).length) return;
     if (!cart.length) { alert("Your cart is empty."); return; }
@@ -195,7 +322,7 @@ export default function Cart() {
         qty: Number(it.quantity || 1),
         unitPrice: Number(it.price || 0),
         discountPerUnit: 0,
-        total: Number(it.price || 0) * Number(it.quantity || 1),
+        total: (Number(it.price) || 0) * (Number(it.quantity) || 1),
         method: "Card",
         status: "Paid",
         notes: `Checkout: ${form.email} / ${form.phone}`,
@@ -210,6 +337,9 @@ export default function Cart() {
       setProcessing(false);
     }
   };
+
+  const invalid = (k) => touched[k] && errors[k];
+  const { minLabel, maxLabel } = allowedExpiryWindowLabel();
 
   return (
     <div className="cart-root">
@@ -288,17 +418,43 @@ export default function Cart() {
                 {/* Contact */}
                 <div className="form-section">
                   <h3>📧 Contact Information</h3>
-                  <div className="form-group">
+
+                  <div className={`form-group ${invalid("email") ? "has-error" : ""}`}>
                     <label htmlFor="email">Email Address</label>
-                    <input id="email" name="email" value={form.email}
-                      onChange={(e)=>change("email", e.target.value)}
-                      placeholder="you@example.com" type="email" required />
+                    <input
+                      id="email"
+                      name="email"
+                      value={form.email}
+                      onChange={(e) => change("email", e.target.value)}
+                      onBlur={() => markTouched("email")}
+                      onBeforeInput={blockIfNot(/[\w.@+-]/)}
+                      onPaste={onPasteSanitize((s)=>s.replace(/\s+/g,"").slice(0,254))}
+                      placeholder="you@example.com"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      aria-invalid={!!invalid("email")}
+                    />
+                    {invalid("email") && <div className="field-error">{errors.email}</div>}
                   </div>
-                  <div className="form-group">
+
+                  <div className={`form-group ${invalid("phone") ? "has-error" : ""}`}>
                     <label htmlFor="phone">Phone Number (Sri Lanka)</label>
-                    <input id="phone" name="phone" value={form.phone}
+                    <input
+                      id="phone"
+                      name="phone"
+                      value={form.phone}
                       onChange={onPhone}
-                      placeholder="+94 71 234 5678" inputMode="tel" required />
+                      onBlur={() => markTouched("phone")}
+                      onBeforeInput={blockIfNot(allowDigits)} // digits only; formatter adds +94 & spaces
+                      onPaste={onPasteSanitize((s)=>s.replace(/\D/g,"").slice(0,11))}
+                      placeholder="+94 71 234 5678"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      required
+                      aria-invalid={!!invalid("phone")}
+                    />
+                    {invalid("phone") && <div className="field-error">{errors.phone}</div>}
                   </div>
                 </div>
 
@@ -306,40 +462,111 @@ export default function Cart() {
                 <div className="form-section">
                   <h3>🚚 Shipping Address</h3>
                   <div className="form-row">
-                    <div className="form-group">
+                    <div className={`form-group ${invalid("firstName") ? "has-error" : ""}`}>
                       <label htmlFor="firstName">First Name</label>
-                      <input id="firstName" name="firstName" value={form.firstName}
-                        onChange={(e)=>change("firstName", e.target.value)} placeholder="John" required />
+                      <input
+                        id="firstName"
+                        name="firstName"
+                        value={form.firstName}
+                        onChange={(e) => change("firstName", e.target.value)}
+                        onBlur={() => markTouched("firstName")}
+                        onBeforeInput={blockIfNot(allowNameChar)}
+                        onPaste={onPasteSanitize(cleanName)}
+                        placeholder="John"
+                        required
+                        inputMode="text"
+                        pattern="[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}"
+                        aria-invalid={!!invalid("firstName")}
+                      />
+                      {invalid("firstName") && <div className="field-error">{errors.firstName}</div>}
                     </div>
-                    <div className="form-group">
+                    <div className={`form-group ${invalid("lastName") ? "has-error" : ""}`}>
                       <label htmlFor="lastName">Last Name</label>
-                      <input id="lastName" name="lastName" value={form.lastName}
-                        onChange={(e)=>change("lastName", e.target.value)} placeholder="Doe" required />
+                      <input
+                        id="lastName"
+                        name="lastName"
+                        value={form.lastName}
+                        onChange={(e) => change("lastName", e.target.value)}
+                        onBlur={() => markTouched("lastName")}
+                        onBeforeInput={blockIfNot(allowNameChar)}
+                        onPaste={onPasteSanitize(cleanName)}
+                        placeholder="Doe"
+                        required
+                        inputMode="text"
+                        pattern="[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}"
+                        aria-invalid={!!invalid("lastName")}
+                      />
+                      {invalid("lastName") && <div className="field-error">{errors.lastName}</div>}
                     </div>
                   </div>
-                  <div className="form-group">
+
+                  <div className={`form-group ${invalid("address") ? "has-error" : ""}`}>
                     <label htmlFor="address">Street Address</label>
-                    <input id="address" name="address" value={form.address}
-                      onChange={(e)=>change("address", e.target.value)} placeholder="123 Main Street" required />
+                    <input
+                      id="address"
+                      name="address"
+                      value={form.address}
+                      onChange={(e) => change("address", e.target.value)}
+                      onBlur={() => markTouched("address")}
+                      /* ESLint fix: removed unnecessary \[ escape in character class */
+                      onBeforeInput={blockIfNot(/[^<>{}[\]^`~]/)}
+                      onPaste={onPasteSanitize((s)=>trimMultiSpace(s.replace(/[<>{}[\]^`~]/g,"")).slice(0,120))}
+                      placeholder="123 Main Street"
+                      required
+                      minLength={5}
+                      aria-invalid={!!invalid("address")}
+                    />
+                    {invalid("address") && <div className="field-error">{errors.address}</div>}
                   </div>
+
                   <div className="form-row">
-                    <div className="form-group">
+                    <div className={`form-group ${invalid("city") ? "has-error" : ""}`}>
                       <label htmlFor="city">City / Town</label>
-                      <input id="city" name="city" value={form.city}
-                        onChange={(e)=>change("city", e.target.value)} placeholder="Colombo" required />
+                      <input
+                        id="city"
+                        name="city"
+                        value={form.city}
+                        onChange={(e) => change("city", e.target.value)}
+                        onBlur={() => markTouched("city")}
+                        onBeforeInput={blockIfNot(allowCityChar)}
+                        onPaste={onPasteSanitize(cleanCity)}
+                        placeholder="Colombo"
+                        required
+                        pattern="[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}"
+                        aria-invalid={!!invalid("city")}
+                      />
+                      {invalid("city") && <div className="field-error">{errors.city}</div>}
                     </div>
-                    <div className="form-group">
+                    <div className={`form-group ${invalid("zip") ? "has-error" : ""}`}>
                       <label htmlFor="zip">Postal Code</label>
-                      <input id="zip" name="zip" value={form.zip}
-                        onChange={(e)=>change("zip", e.target.value)} placeholder="00100" inputMode="numeric" required />
+                      <input
+                        id="zip"
+                        name="zip"
+                        value={form.zip}
+                        onChange={(e) => change("zip", e.target.value)}
+                        onBlur={() => markTouched("zip")}
+                        onBeforeInput={blockIfNot(allowZipChar)}
+                        onPaste={onPasteSanitize((s)=>onlyDigits(s).slice(0,5))}
+                        placeholder="10400"
+                        inputMode="numeric"
+                        maxLength={5}
+                        required
+                        pattern="^\d{5}$"
+                        aria-invalid={!!invalid("zip")}
+                      />
+                      {invalid("zip") && <div className="field-error">{errors.zip}</div>}
                     </div>
                   </div>
                 </div>
 
-                {/* Checkout to reveal blue panel */}
-                <div style={{ textAlign:"center", marginTop: 12 }}>
-                  <button className="btn btn-secondary" onClick={() => setStep("cart")}>⬅️ Back to Cart</button>
-                  <button className="btn btn-success" onClick={onClickCheckout}>✅ Checkout</button>
+                {/* Buttons */}
+                <div style={{ textAlign: "center", marginTop: 12 }}>
+                  <button className="btn btn-secondary" onClick={() => setStep("cart")}>
+                    ⬅️ Back to Cart
+                  </button>
+                  <button className="btn btn-success" onClick={onClickCheckout}>
+                    ✅ Checkout
+                  </button>
                 </div>
 
                 {/* ONE LIGHT-BLUE PANEL: Payment Info first, Summary below */}
@@ -349,30 +576,81 @@ export default function Cart() {
 
                     {/* Payment Info */}
                     <div>
-                      <div className="form-group">
+                      <div className={`form-group ${invalid("cardNumber") ? "has-error" : ""}`}>
                         <label htmlFor="cardNumber">Card Number</label>
-                        <input id="cardNumber" name="cardNumber" value={form.cardNumber}
-                          onChange={onCardNumber} placeholder="1234 5678 9012 3456" maxLength={23} required inputMode="numeric" />
-                        {errors.cardNumber && <div className="field-error">{errors.cardNumber}</div>}
+                        <input
+                          id="cardNumber"
+                          name="cardNumber"
+                          value={form.cardNumber}
+                          onChange={onCardNumber}
+                          onBlur={() => markTouched("cardNumber")}
+                          onBeforeInput={blockIfNot(allowDigits)}
+                          onPaste={onPasteSanitize((s)=>s.replace(/\D/g,"").slice(0,19))}
+                          placeholder="1234 5678 9012 3456"
+                          maxLength={23}
+                          required
+                          inputMode="numeric"
+                          aria-invalid={!!invalid("cardNumber")}
+                        />
+                        {invalid("cardNumber") && <div className="field-error">{errors.cardNumber}</div>}
                       </div>
+
                       <div className="form-row">
-                        <div className="form-group">
+                        <div className={`form-group ${invalid("expiryDate") ? "has-error" : ""}`}>
                           <label htmlFor="expiryDate">Expiry Date</label>
-                          <input id="expiryDate" name="expiryDate" value={form.expiryDate}
-                            onChange={onExp} placeholder="MM/YY" maxLength={5} required inputMode="numeric" />
-                          {errors.expiryDate && <div className="field-error">{errors.expiryDate}</div>}
+                          <input
+                            id="expiryDate"
+                            name="expiryDate"
+                            value={form.expiryDate}
+                            onChange={onExp}
+                            onBlur={() => markTouched("expiryDate")}
+                            onBeforeInput={blockIfNot(allowDigits)} // digits only; slash auto-added
+                            onPaste={onPasteSanitize((s)=>s.replace(/\D/g,"").slice(0,4))}
+                            placeholder="MM/YY"
+                            maxLength={5}
+                            required
+                            inputMode="numeric"
+                            pattern="^(0[1-9]|1[0-2])\/\d{2}$"
+                            title={`Enter MM/YY (from ${minLabel} to ${maxLabel})`}
+                            aria-invalid={!!invalid("expiryDate")}
+                          />
+                          {invalid("expiryDate") && <div className="field-error">{errors.expiryDate}</div>}
                         </div>
-                        <div className="form-group">
+
+                        <div className={`form-group ${invalid("cvv") ? "has-error" : ""}`}>
                           <label htmlFor="cvv">CVV</label>
-                          <input id="cvv" name="cvv" value={form.cvv}
-                            onChange={onCVV} placeholder="123" maxLength={4} required inputMode="numeric" />
-                          {errors.cvv && <div className="field-error">{errors.cvv}</div>}
+                          <input
+                            id="cvv"
+                            name="cvv"
+                            value={form.cvv}
+                            onChange={onCVV}
+                            onBlur={() => markTouched("cvv")}
+                            onBeforeInput={blockIfNot(allowDigits)}
+                            onPaste={onPasteSanitize((s)=>s.replace(/\D/g,"").slice(0,4))}
+                            placeholder="123"
+                            maxLength={4}
+                            required
+                            inputMode="numeric"
+                            aria-invalid={!!invalid("cvv")}
+                          />
+                          {invalid("cvv") && <div className="field-error">{errors.cvv}</div>}
                         </div>
-                        <div className="form-group">
+
+                        <div className={`form-group ${invalid("cardName") ? "has-error" : ""}`}>
                           <label htmlFor="cardName">Name on Card</label>
-                          <input id="cardName" name="cardName" value={form.cardName}
-                            onChange={(e)=>change("cardName", e.target.value)} placeholder="John Doe" required />
-                          {errors.cardName && <div className="field-error">{errors.cardName}</div>}
+                          <input
+                            id="cardName"
+                            name="cardName"
+                            value={form.cardName}
+                            onChange={(e) => change("cardName", e.target.value)}
+                            onBlur={() => markTouched("cardName")}
+                            onBeforeInput={blockIfNot(allowNameChar)}
+                            onPaste={onPasteSanitize(cleanName)}
+                            placeholder="John Doe"
+                            required
+                            aria-invalid={!!invalid("cardName")}
+                          />
+                          {invalid("cardName") && <div className="field-error">{errors.cardName}</div>}
                         </div>
                       </div>
                     </div>
