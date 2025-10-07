@@ -162,15 +162,46 @@ export default function FinanceDashboard() {
       }
     })();
 
-    // REVENUE (KPI all-time fallback only; monthly comes from V2 below)
+    // ===== TOTAL REVENUE — CURRENT MONTH ONLY (e.g., October) =====
     (async () => {
       try {
-        const { data } = await api.get("/transactions/summary");
-        setRev((s) => ({
-          ...s,
-          revenue: num(data.revenue, 0),
-          count: num(data.count, 0),
-        }));
+        // Build current month [YYYY-MM-01 .. YYYY-MM-lastDay]
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = now.getMonth(); // 0..11
+        const start = new Date(y, m, 1);
+        const end   = new Date(y, m + 1, 0);
+        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        const startISO = iso(start);
+        const endISO   = iso(end);
+        const qs = `?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`;
+
+        let revenue = 0;
+        let count = 0;
+
+        // 1) Preferred: summary for the month
+        try {
+          const { data } = await api.get(`/transactions/summary${qs}`);
+          if (data) {
+            revenue = num(data.revenue, 0);
+            count   = num(data.count, 0);
+          }
+        } catch { /* noop */ }
+
+        // 2) Fallback: client-side sum for the month (exclude Refund)
+        if (revenue === 0 && count === 0) {
+          try {
+            const { data: list } = await api.get(`/transactions${qs}&limit=5000&sort=+createdAt`);
+            const arr = Array.isArray(list) ? list : [];
+            for (const t of arr) {
+              if (String(t?.status || "").toLowerCase() === "refund") continue;
+              revenue += num(t?.total, 0);
+            }
+            count = arr.filter(t => String(t?.status || "").toLowerCase() !== "refund").length;
+          } catch { /* noop */ }
+        }
+
+        setRev((s) => ({ ...s, revenue, count }));
       } catch (e) {
         showNotification(e?.response?.data?.message || "Failed to load revenue", "error");
       } finally {
@@ -207,23 +238,61 @@ export default function FinanceDashboard() {
     })();
   }, []);
 
-  /* ===== Use month-aware V2 only to populate chart monthly + override KPIs to THIS MONTH ===== */
+  /* ===== Load monthly series for charts only (ensure last 4 months incl. Sep) ===== */
   useEffect(() => {
     (async () => {
+      // Try dedicated monthly endpoint first
       try {
-        // Transactions V2 (expects {monthly:[{y,m,month,value,count}], currentMonth:{...}})
-        const tx = await api.get("/transactions/summary").catch(() => null);
-        if (tx?.data) {
-          const cm = tx.data.currentMonth || {};
-          const monthlyV2 = Array.isArray(tx.data.monthly) ? tx.data.monthly : [];
-          setRev((s) => ({
-            ...s,
-            revenue: num(cm.revenue ?? s.revenue, s.revenue),
-            count: num(cm.count ?? s.count, s.count),
-            monthly: monthlyV2, // keep y,m for alignment
-          }));
+        const res = await api.get("/transactions/revenue/monthly?months=4");
+        const series = res?.data?.series;
+        if (Array.isArray(series) && series.length) {
+          // Expecting items like { y, m, month, revenue }
+          setRev((s) => ({ ...s, monthly: series }));
+          return; // done
         }
-      } catch {}
+      } catch { /* fall through to client-side bucketing */ }
+
+      // Fallback: compute from raw transactions over the last 4 months
+      try {
+        const now = new Date();
+        const from = new Date(now.getFullYear(), now.getMonth() - (CHART_MONTHS - 1), 1);
+        const to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        const startISO = iso(from);
+        const endISO   = iso(to);
+        const { data: list } = await api.get(`/transactions?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}&limit=5000&sort=+createdAt`);
+        const arr = Array.isArray(list) ? list : [];
+
+        // bucket by local year+month; exclude refunds
+        const buckets = new Map(); // key "y-m" -> {y,m,month,revenue}
+        const put = (y,m,val) => {
+          const key = `${y}-${m}`;
+          const monthName = MONTHS[m - 1];
+          const row = buckets.get(key) || { y, m, month: monthName, revenue: 0 };
+          row.revenue += Number(val || 0);
+          buckets.set(key, row);
+        };
+
+        for (const t of arr) {
+          if (String(t?.status || "").toLowerCase() === "refund") continue;
+          const d = t?.createdAt ? new Date(t.createdAt) : (t?.date ? new Date(t.date) : null);
+          if (!d || Number.isNaN(+d)) continue;
+          const y = d.getFullYear();
+          const m = d.getMonth() + 1;
+          put(y, m, Number(t?.total || 0));
+        }
+
+        // Build complete last-4-month window and fill missing with 0
+        const window4 = buildMonthsWindow(CHART_MONTHS);
+        const filled = window4.map(({ y, m, label }) => {
+          const hit = buckets.get(`${y}-${m}`);
+          return hit ? hit : { y, m, month: label, revenue: 0 };
+        });
+
+        setRev((s) => ({ ...s, monthly: filled }));
+      } catch {
+        // If even this fails, leave monthly empty (chart will step up)
+      }
     })();
 
     (async () => {
@@ -281,7 +350,6 @@ export default function FinanceDashboard() {
     Chart.defaults.color = "#334155";
 
     let revenueChart, expenseChart, cashFlowChart;
-    const toNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
     // fixed 4-month window; e.g. [Jul, Aug, Sep, Oct] this quarter
     const window4 = buildMonthsWindow(CHART_MONTHS);
