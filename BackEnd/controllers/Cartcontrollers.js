@@ -1,6 +1,6 @@
 // BackEnd/controllers/Cartcontrollers.js
 const mongoose = require("mongoose");
-const CartProduct = require("../Model/CartModel");
+const CartProduct = require("../Model/Cartmodel");
 const Transaction = require("../Model/TransactionModel");
 
 const isObjectId = (v) => mongoose.Types.ObjectId.isValid(v);
