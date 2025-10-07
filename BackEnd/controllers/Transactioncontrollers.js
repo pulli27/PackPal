@@ -1,85 +1,53 @@
-// controllers/Transactioncontrollers.js (CommonJS)
+// controllers/Transactioncontrollers.js
 const mongoose = require("mongoose");
 const Transaction = require("../Model/TransactionModel");
 const Product = require("../Model/CartModel");
 
 const isObjectId = (v) => mongoose.Types.ObjectId.isValid(v);
 
-// Build a filter that works with either Mongo _id or a custom string id
-const txFilter = (idOrTxId) =>
-  isObjectId(idOrTxId) ? { _id: idOrTxId } : { id: idOrTxId }; // ensure your schema has `id: String` if you use this
-
-// ===== Get all transactions
 exports.getTransactions = async (req, res) => {
   try {
     const txs = await Transaction.find().sort({ date: -1 });
     return res.json(txs);
   } catch (err) {
-    console.error("getTransactions:", err);
-    return res.status(500).json({
-      ok: false,
-      error: "Failed to fetch transactions",
-      details: err.message,
-    });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 };
 
-// ===== Add transaction
 exports.addTransaction = async (req, res) => {
   try {
     const {
-      productId,
-      qty,
-      customer = "",
-      customerId = "",
-      fmc = true,
-      method = "Cash",
-      status = "Paid",
-      notes = "",
-      date, // optional; e.g., "YYYY-MM-DD"
-      id, // optional custom id from client, else we create one
+      productId, qty,
+      customer = "", customerId = "",
+      fmc = false, method = "Card", status = "Paid",
+      notes = "", date, id,
     } = req.body || {};
 
-    // qty must be >= 1
-    const q = Math.max(1, Number(qty) || 0);
-
-    // productId must be a valid ObjectId for findById
     if (!isObjectId(productId)) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Invalid productId (must be a Mongo ObjectId)" });
+      return res.status(400).json({ ok: false, error: "Invalid productId" });
     }
-
     const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(400).json({ ok: false, error: "Invalid product (not found)" });
-    }
+    if (!product) return res.status(400).json({ ok: false, error: "Product not found" });
 
-    const unitPrice = Number(product.price ?? 0);
-
-    // normalize discount
-    const discountType = product.discountType || "none"; // "none" | "percentage" | "fixed"
-    const discountValue = Number(product.discountValue ?? 0);
+    const q = Math.max(1, Number(qty) || 0);
+    const unitPrice = Number(product.price || 0);
+    const discountType = product.discountType || "none";
+    const discountValue = Number(product.discountValue || 0);
 
     let discountPerUnit = 0;
-    if (discountType === "percentage") {
-      discountPerUnit = unitPrice * (discountValue / 100);
-    } else if (discountType === "fixed") {
-      discountPerUnit = discountValue;
-    }
+    if (discountType === "percentage") discountPerUnit = unitPrice * (discountValue / 100);
+    else if (discountType === "fixed") discountPerUnit = discountValue;
     if (!Number.isFinite(discountPerUnit) || discountPerUnit < 0) discountPerUnit = 0;
 
     const effectiveUnit = Math.max(0, unitPrice - discountPerUnit);
     const total = effectiveUnit * q;
 
-    const txDoc = new Transaction({
-      id: id || `TX-${Date.now()}`, // keep a human-readable id too (optional)
-      date: date || new Date().toISOString().slice(0, 10), // YYYY-MM-DD
-      customer,
-      customerId,
-      fmc: Boolean(fmc),
-      productId, // Mongo ObjectId
-      productName: product.name || "Unknown",
+    const doc = await Transaction.create({
+      id: id || `TX-${Date.now()}`,
+      date: date || new Date().toISOString().slice(0, 10),
+      customer, customerId, fmc,
+      productId,
+      productName: product.name || "",
       qty: q,
       unitPrice,
       discountPerUnit,
@@ -89,96 +57,66 @@ exports.addTransaction = async (req, res) => {
       notes,
     });
 
-    await txDoc.save();
-    return res.json(txDoc);
+    // 👇 bump reorder level by sold qty (only up)
+    await Product.findByIdAndUpdate(productId, { $inc: { reorderLevel: q } });
+
+    return res.json(doc);
   } catch (err) {
-    console.error("addTransaction:", err);
-    return res.status(500).json({
-      ok: false,
-      error: "Failed to add transaction",
-      details: err.message,
-    });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 };
 
-// ===== Update transaction (by _id or custom id)
 exports.updateTransaction = async (req, res) => {
   try {
-    const { id } = req.params; // can be _id or your string id
-    if (!id)
-      return res.status(400).json({ ok: false, error: "Missing id parameter" });
+    const { id } = req.params; // can be _id or custom id if your schema stores "id"
+    // find existing by either field
+    const filter = isObjectId(id) ? { _id: id } : { id };
 
-    const filter = txFilter(id);
-    const updated = await Transaction.findOneAndUpdate(filter, req.body, {
-      new: true,
-    });
+    const before = await Transaction.findOne(filter);
+    if (!before) return res.status(404).json({ ok: false, error: "Transaction not found" });
 
-    if (!updated) {
-      return res.status(404).json({ ok: false, error: "Transaction not found" });
+    const payload = { ...req.body };
+    if (payload.qty !== undefined) payload.qty = Math.max(0, Number(payload.qty) || 0);
+
+    const updated = await Transaction.findOneAndUpdate(filter, payload, { new: true });
+
+    // only increase reorderLevel if qty increased
+    const oldQty = Number(before.qty || 0);
+    const newQty = Number(updated.qty || 0);
+    const delta = Math.max(0, newQty - oldQty);
+
+    if (delta > 0 && isObjectId(updated.productId)) {
+      await Product.findByIdAndUpdate(updated.productId, { $inc: { reorderLevel: delta } });
     }
+
     return res.json(updated);
   } catch (err) {
-    console.error("updateTransaction:", err);
-    return res.status(500).json({
-      ok: false,
-      error: "Failed to update transaction",
-      details: err.message,
-    });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 };
 
-// ===== Delete transaction (by _id or custom id)
 exports.deleteTransaction = async (req, res) => {
   try {
-    const { id } = req.params; // can be _id or your string id
-    if (!id)
-      return res.status(400).json({ ok: false, error: "Missing id parameter" });
+    const { id } = req.params;
+    const filter = isObjectId(id) ? { _id: id } : { id };
+    const del = await Transaction.findOneAndDelete(filter);
+    if (!del) return res.status(404).json({ ok: false, error: "Transaction not found" });
 
-    const filter = txFilter(id);
-    const deleted = await Transaction.findOneAndDelete(filter);
-
-    if (!deleted) {
-      return res.status(404).json({ ok: false, error: "Transaction not found" });
-    }
-    return res.json({
-      ok: true,
-      message: "Transaction deleted",
-      deleted: { _id: deleted._id, id: deleted.id },
-    });
+    // DO NOT decrease reorderLevel — we keep it non-decreasing by design
+    return res.json({ ok: true, message: "Transaction deleted" });
   } catch (err) {
-    console.error("deleteTransaction:", err);
-    return res.status(500).json({
-      ok: false,
-      error: "Failed to delete transaction",
-      details: err.message,
-    });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 };
 
-// ===== Summary: total revenue + count
 exports.getSummary = async (req, res) => {
   try {
     const [agg] = await Transaction.aggregate([
       { $match: { status: { $ne: "Refund" } } },
-      {
-        $group: {
-          _id: null,
-          revenue: { $sum: "$total" },
-          count: { $sum: 1 },
-        },
-      },
+      { $group: { _id: null, revenue: { $sum: "$total" }, count: { $sum: 1 } } },
     ]);
-
-    return res.json({
-      revenue: agg?.revenue || 0,
-      count: agg?.count || 0,
-    });
+    return res.json({ revenue: agg?.revenue || 0, count: agg?.count || 0 });
   } catch (err) {
-    console.error("getSummary:", err);
-    return res.status(500).json({
-      ok: false,
-      error: "Failed to compute revenue",
-      details: err.message,
-    });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 };

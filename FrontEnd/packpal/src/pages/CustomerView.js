@@ -8,7 +8,7 @@ import Header from "../Components/Header/Header";
 import Footer from "../Components/Footer/Footer";
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const URL = `${API_BASE}/api/carts`;
+const URL = `${API_BASE}/api/products`;
 
 const STORAGE_KEY = "packPalCart";
 const WISHLIST_KEY = "packPalWishlist";

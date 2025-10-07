@@ -5,6 +5,8 @@ import "./Cart.css";
 
 const STORAGE_KEY = "packPalCart";
 const TX_URL = "http://localhost:5000/api/transactions";
+// NEW: products endpoint used to bump reorder level after purchase
+const PRODUCTS_URL = "http://localhost:5000/api/products";
 
 const money = (n) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR" }).format(
@@ -312,6 +314,8 @@ export default function Cart() {
     try {
       const date = nowISO();
       const customerName = `${form.firstName} ${form.lastName}`.trim() || form.email;
+
+      // 1) Create transaction rows
       const payloads = cart.map((it) => ({
         date,
         customer: customerName,
@@ -327,7 +331,25 @@ export default function Cart() {
         status: "Paid",
         notes: `Checkout: ${form.email} / ${form.phone}`,
       }));
-      await Promise.all(payloads.map((p) => axios.post(TX_URL, p, { headers: { "Content-Type": "application/json" } })));
+      await Promise.all(payloads.map((p) =>
+        axios.post(TX_URL, p, { headers: { "Content-Type": "application/json" } })
+      ));
+
+      // 2) Bump reorder level for each line item (NEW)
+      //    POST /api/products/:id/sold { qty }
+      await Promise.all(
+        cart.map((it) =>
+          axios.post(
+            `${PRODUCTS_URL}/${encodeURIComponent(String(it.id))}/sold`,
+            { qty: Number(it.quantity || 1) },
+            { headers: { "Content-Type": "application/json" } }
+          ).catch((err) => {
+            // Don’t break checkout if one bump fails; log & continue
+            console.warn("Reorder bump failed:", it.id, err?.response?.data || err.message);
+          })
+        )
+      );
+
       window.dispatchEvent(new Event("tx:changed"));
       setCart([]); try { localStorage.setItem(STORAGE_KEY, "[]"); } catch {}
       setStep("success");

@@ -5,7 +5,7 @@ import "./ProductList.css";
 import Sidebarsa from "../Sidebar/Sidebarsa";
 
 /* ===================== ONE PLACE TO EDIT ===================== */
-const URL = "http://localhost:5000/api/carts";
+const URL = "http://localhost:5000/api/products";
 
 /* ===================== Helpers ===================== */
 const money = (n) =>
@@ -26,8 +26,14 @@ const effectivePrice = (p) => {
 };
 const saving = (p) => Math.max(0, Number(p?.price || 0) - effectivePrice(p));
 
+/**
+ * IMPORTANT:
+ * - Keep `id` for UI (sequence / display).
+ * - Add `realId` that always points to Mongo `_id` so PUT/DELETE work.
+ */
 const toUI = (row) => ({
-  id: String(row?.id ?? row?._id ?? row?.productId ?? Math.random().toString(36).slice(2, 10)),
+  realId: String(row?._id ?? row?.id ?? ""), // <-- use this for API calls
+  id: String(row?.id ?? row?._id ?? Math.random().toString(36).slice(2, 10)), // UI fallback
   name: row?.name ?? "Unnamed",
   category: row?.category ?? "",
   img: row?.img ?? "",
@@ -36,10 +42,13 @@ const toUI = (row) => ({
   rating: Number(row?.rating ?? 0),
   discountType: row?.discountType ?? "none",
   discountValue: Number(row?.discountValue ?? 0),
+  reorderLevel: Number(row?.reorderLevel ?? 20),
 });
 
 const unpackList = (payload) =>
-  Array.isArray(payload) ? payload : payload?.products ?? payload?.items ?? payload?.data ?? [];
+  Array.isArray(payload)
+    ? payload
+    : payload?.products ?? payload?.items ?? payload?.data ?? [];
 
 /* ===================== Validation helpers ===================== */
 const isAcceptableImageRef = (s) => {
@@ -104,10 +113,9 @@ function ProductModal({ open, onClose, onSave, product }) {
   const [touched, setTouched] = useState({});
   const [previewSrc, setPreviewSrc] = useState("");
 
-  // Regexes for input filtering
-  const PRICE_RX = /^\d{0,9}(\.\d{0,2})?$/;          // up to 9 digits + optional . and 2 decimals
-  const STOCK_RX = /^\d{0,9}$/;                      // integers only
-  const RATING_RX = /^(?:[0-4](?:\.\d{0,1})?|5(?:\.0?)?)?$/; // 0–5, one decimal allowed
+  const PRICE_RX = /^\d{0,9}(\.\d{0,2})?$/;
+  const STOCK_RX = /^\d{0,9}$/;
+  const RATING_RX = /^(?:[0-4](?:\.\d{0,1})?|5(?:\.0?)?)?$/;
 
   const syncValidate = (next) => {
     const e = validateProduct(next);
@@ -148,7 +156,6 @@ function ProductModal({ open, onClose, onSave, product }) {
   const errorText = (key) =>
     touched[key] && errors[key] ? <div className="err-text">{errors[key]}</div> : null;
 
-  // Price/Stock/Rating: block invalid typing & paste
   const handlePriceChange = (e) => {
     const v = e.target.value.trim();
     if (v === "" || PRICE_RX.test(v)) setField("price", v);
@@ -243,7 +250,6 @@ function ProductModal({ open, onClose, onSave, product }) {
 
             <div>
               <label>Price (LKR) <span style={{ color: "#b91c1c" }}>*</span></label>
-              {/* Use text + inputMode=decimal for strict control */}
               <input
                 className={fieldClass("price")}
                 type="text"
@@ -252,10 +258,9 @@ function ProductModal({ open, onClose, onSave, product }) {
                 value={form.price}
                 onChange={handlePriceChange}
                 onBlur={() => markTouched("price")}
-                // prevent dropping invalid paste
                 onPaste={(e) => {
                   const v = (e.clipboardData.getData("text") || "").trim();
-                  if (!(v === "" || PRICE_RX.test(v))) e.preventDefault();
+                  if (!(v === "" || /^\d{0,9}(\.\d{0,2})?$/.test(v))) e.preventDefault();
                 }}
               />
               {errorText("price")}
@@ -273,7 +278,7 @@ function ProductModal({ open, onClose, onSave, product }) {
                 onBlur={() => markTouched("stock")}
                 onPaste={(e) => {
                   const v = (e.clipboardData.getData("text") || "").trim();
-                  if (!(v === "" || STOCK_RX.test(v))) e.preventDefault();
+                  if (!(v === "" || /^\d{0,9}$/.test(v))) e.preventDefault();
                 }}
               />
               {errorText("stock")}
@@ -287,11 +292,11 @@ function ProductModal({ open, onClose, onSave, product }) {
                 inputMode="decimal"
                 placeholder="4.5"
                 value={form.rating}
-                onChange={handleRatingChange}
+                onChange={(e) => setField("rating", e.target.value)}
                 onBlur={() => markTouched("rating")}
                 onPaste={(e) => {
                   const v = (e.clipboardData.getData("text") || "").trim();
-                  if (!(v === "" || RATING_RX.test(v))) e.preventDefault();
+                  if (!(v === "" || /^(?:[0-4](?:\.\d{0,1})?|5(?:\.0?)?)?$/.test(v))) e.preventDefault();
                 }}
               />
               {errorText("rating")}
@@ -354,7 +359,12 @@ export default function ProductList() {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+    const onBump = () => fetchAll();
+    window.addEventListener("products:changed", onBump);
+    return () => window.removeEventListener("products:changed", onBump);
+  }, []);
 
   const productsWithSeq = useMemo(
     () => products.map((p, i) => ({ ...p, seq: i + 1 })),
@@ -372,9 +382,11 @@ export default function ProductList() {
   const onSaveModal = async (payload) => {
     try {
       if (!modal.product) {
+        // CREATE
         await axios.post(URL, payload, { headers: { "Content-Type": "application/json" } });
       } else {
-        await axios.put(`${URL}/${modal.product.id}`, payload, {
+        // UPDATE — use realId (Mongo _id)
+        await axios.put(`${URL}/${modal.product.realId}`, payload, {
           headers: { "Content-Type": "application/json" },
         });
       }
@@ -393,6 +405,7 @@ export default function ProductList() {
   const onDelete = async (realId) => {
     if (!window.confirm("Delete this product?")) return;
     try {
+      // DELETE — use realId (Mongo _id)
       await axios.delete(`${URL}/${realId}`);
       await fetchAll();
       window.dispatchEvent(new Event("products:changed"));
@@ -443,15 +456,23 @@ export default function ProductList() {
                   <th className="right">PRICE (LKR)</th>
                   <th className="center">DISC</th>
                   <th className="center">STOCK</th>
+                  <th className="center">REORDER LEVEL</th>
                   <th className="center">RATING</th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {productsWithSeq.map((p) => (
-                  <tr key={p.id}>
+                  <tr key={p.realId || p.id}>
                     <td>{p.seq}</td>
-                    <td><img className="pimg" src={imgSrc(p.img)} alt="" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")} /></td>
+                    <td>
+                      <img
+                        className="pimg"
+                        src={imgSrc(p.img)}
+                        alt=""
+                        onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/64")}
+                      />
+                    </td>
                     <td>{p.name}</td>
                     <td>{p.category || ""}</td>
                     <td className="right">{money(p.price)}</td>
@@ -461,24 +482,24 @@ export default function ProductList() {
                         : "—"}
                     </td>
                     <td className="center">{p.stock || 0}</td>
+                    <td className="center">{p.reorderLevel ?? 20}</td>
                     <td className="center">{(p.rating || 0).toFixed(1)}</td>
                     <td>
                       <div className="actions">
                         <button className="btn" onClick={() => setModal({ open: true, product: p })}>Edit</button>
-                        <button className="btn red" onClick={() => onDelete(p.id)}>Delete</button>
+                        <button className="btn red" onClick={() => onDelete(p.realId)}>Delete</button>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {!loading && !err && productsWithSeq.length === 0 && (
-                  <tr><td colSpan={9} className="muted">No products</td></tr>
+                  <tr><td colSpan={10} className="muted">No products</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </section>
 
-        {/* Active Discounts */}
         {discounted.length > 0 && (
           <section className="section">
             <div className="head"><h3>Active Discounts</h3></div>
@@ -499,7 +520,7 @@ export default function ProductList() {
                     const ep = effectivePrice(p);
                     const sv = saving(p);
                     return (
-                      <tr key={p.id}>
+                      <tr key={p.realId || p.id}>
                         <td>{i + 1}</td>
                         <td>{p.name}</td>
                         <td className="right">{money(p.price)}</td>
