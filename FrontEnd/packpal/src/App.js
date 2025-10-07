@@ -42,7 +42,7 @@ import FinancialReport from "./Components/FinancialReport/FinancialReport";
 import Revenue from "./Components/Revenue/Revenue";
 import Setting from "./Components/Settings/Settingsanu";
 
-//hiru
+/* hiru */
 import Pdashboard from "./Components/Productdashboard/Pdashboard";
 import SewingInstruction from "./Components/SewingInstruction/SewingInstruction";
 import Employee from "./Components/Employee/Employee";
@@ -51,26 +51,23 @@ import Quality from "./Components/Quality/Quality";
 import Settinghiru from "./Components/Setting/Settinghiru";
 import HiruInventory from "./Components/HiruInventory/HiruInventory";
 
-
-//// e.g. src/Components/Totebags/Totebags.js
-import AboutPage from './Components/AboutPage/AboutPage';
-import HandBag from './Components/HandBag/HandBag';
+/* storefront */
+import AboutPage from "./Components/AboutPage/AboutPage";
+import HandBag from "./Components/HandBag/HandBag";
 import Home from "./Components/Home/Home";
 import Accessories from "./Components/Accessories/Accessories";
-import Header from './Components/Header/Header';
-import Clutches from './Components/Clutches/Clutches';
-import KidsBag from './Components/KidsBag/KidsBag';
-import Footer from './Components/Footer/Footer';
-import SizeGuide from './Components/SizeGuide/SizeGuide';
-import Sales from './Components/Sales/Sales';
-import Faq from './Components/Faq/Faq';
+import Header from "./Components/Header/Header"; // if you still use the generic header in some pages
+import Clutches from "./Components/Clutches/Clutches";
+import KidsBag from "./Components/KidsBag/KidsBag";
+import Footer from "./Components/Footer/Footer";
+import SizeGuide from "./Components/SizeGuide/SizeGuide";
+import Sales from "./Components/Sales/Sales";
+import Faq from "./Components/Faq/Faq";
 import Totebags from "./Components/Totebags/Totebags";
 import Feedback from "./Components/Feedback/Feedback";
-import LogoutHeader from "./Components/Header/LogoutHeader";
 
-
-
-
+/* customer-only logout header gate */
+import CustomerLogoutGate from "./Components/Header/CustomerLogoutGate";
 
 /* 404 fallback */
 function NotFound() {
@@ -85,82 +82,87 @@ function NotFound() {
 
 export default function App() {
   return (
-    <Routes>
-      {/* default redirect */}
-      <Route path="/" element={<Navigate to="/home" replace />} />
+    <>
+      {/* This renders LogoutHeader ONLY when a customer is logged in.
+          (It watches localStorage: pp:token + pp:user.role === 'customer') */}
+      <CustomerLogoutGate />
 
-      {/* Auth */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/createaccount" element={<Createaccount />} />
+      <Routes>
+        {/* default redirect */}
+        <Route path="/" element={<Navigate to="/home" replace />} />
 
-      {/* Storefront (no header/footer here; add inside each page if desired) */}
-      <Route path="/home" element={<Home />} />
-      <Route path="/handbag" element={<HandBag />} />
-      <Route path="/aboutpage" element={<AboutPage />} />
-      <Route path="/accessories" element={<Accessories />} />
-      <Route path="/clutches" element={<Clutches />} />
-      <Route path="/kidsbag" element={<KidsBag />} />
-      <Route path="/totebag" element={<Totebags />} />
-      <Route path="/sizeguide" element={<SizeGuide />} />
-      <Route path="/sale" element={<Sales />} />
-      <Route path="/faq" element={<Faq />} />
-      
-      <Route path="/feedback" element={<Feedback />} />
-      
-      
-      <Route path="/customer" element={<CustomerView />} />
-      <Route path="/cart" element={<Cart />} />
-      <Route path="/header" element={<Header />} />
-      <Route path="/logoutheader" element={<LogoutHeader />} />
-      <Route path="/footer" element={<Footer />} />
+        {/* Auth */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/createaccount" element={<Createaccount />} />
 
-      {/* Internal / dashboards */}
-      {/* pulli */}
-      <Route path="/maindashboard" element={<InventoryDashboard />} />
-      <Route path="/iteminventory" element={<ItemInventory />} />
-      <Route path="/supplier" element={<Suppliers />} />
-      <Route path="/purchase" element={<PurchaseItems />} />
-      <Route path="/productinventory" element={<ProductInventory />} />
-      <Route path="/report" element={<Report />} />
-      <Route path="/settingspul" element={<Settingspul />} />
+        {/* Storefront */}
+        <Route path="/home" element={<Home />} />
+        <Route path="/handbag" element={<HandBag />} />
+        <Route path="/aboutpage" element={<AboutPage />} />
+        <Route path="/accessories" element={<Accessories />} />
+        <Route path="/clutches" element={<Clutches />} />
+        <Route path="/kidsbag" element={<KidsBag />} />
+        <Route path="/totebag" element={<Totebags />} />
+        <Route path="/sizeguide" element={<SizeGuide />} />
+        <Route path="/sale" element={<Sales />} />
+        <Route path="/faq" element={<Faq />} />
+        <Route path="/feedback" element={<Feedback />} />
+        <Route path="/customer" element={<CustomerView />} />
+        <Route path="/cart" element={<Cart />} />
 
-      {/* sasangi */}
-      <Route path="/dashboard" element={<CartDashboard />} />
-      <Route path="/products" element={<ProductList />} />
-      <Route path="/discounts" element={<Discounts />} />
-      <Route path="/finance" element={<Finance />} />
-      <Route path="/reports" element={<SalesReports />} />
-      <Route path="/settingssa" element={<Settingssa />} />
+        {/* (Optional standalone) generic header/footer demo routes */}
+        <Route path="/header" element={<Header />} />
+        <Route path="/footer" element={<Footer />} />
 
-      {/* isumi */}
-      <Route path="/isudashboard" element={<Udashboard />} />
-      <Route path="/usermanagement" element={<UserManagement />} />
-      <Route path="/order" element={<Orders />} />
-      <Route path="/settingsis" element={<Settingsis />} />
+        {/* Internal / dashboards */}
+        {/* pulli */}
+        <Route path="/maindashboard" element={<InventoryDashboard />} />
+        <Route path="/iteminventory" element={<ItemInventory />} />
+        <Route path="/supplier" element={<Suppliers />} />
+        <Route path="/purchase" element={<PurchaseItems />} />
+        <Route path="/productinventory" element={<ProductInventory />} />
+        <Route path="/report" element={<Report />} />
+        <Route path="/settingspul" element={<Settingspul />} />
 
-      {/* sanu */}
-      <Route path="/sanudashboard" element={<FinanceDashboard />} />
-      <Route path="/salarycal" element={<SalaryCal />} />
-      <Route path="/epf" element={<EpfManagement />} />
-      <Route path="/financereport" element={<FinancialReport />} />
-      <Route path="/revenue" element={<Revenue />} />
-      <Route path="/settingsanu" element={<Setting />} />
-      <Route path="/finance/employees" element={<SalaryCal />} />
-      <Route path="/finance/attendance" element={<Attendance />} />
-      <Route path="/finance/advance" element={<Advance />} />
-      <Route path="/finance/transfers" element={<SalaryTransfer />} />
-      <Route path="/finance/salary" element={<SalaryManagement />} />
+        {/* sasangi */}
+        <Route path="/dashboard" element={<CartDashboard />} />
+        <Route path="/products" element={<ProductList />} />
+        <Route path="/discounts" element={<Discounts />} />
+        <Route path="/finance" element={<Finance />} />
+        <Route path="/reports" element={<SalesReports />} />
+        <Route path="/settingssa" element={<Settingssa />} />
 
- {/* hiru */}
+        {/* isumi */}
+        <Route path="/isudashboard" element={<Udashboard />} />
+        <Route path="/usermanagement" element={<UserManagement />} />
+        <Route path="/order" element={<Orders />} />
+        <Route path="/settingsis" element={<Settingsis />} />
+
+        {/* sanu */}
+        <Route path="/sanudashboard" element={<FinanceDashboard />} />
+        <Route path="/salarycal" element={<SalaryCal />} />
+        <Route path="/epf" element={<EpfManagement />} />
+        <Route path="/financereport" element={<FinancialReport />} />
+        <Route path="/revenue" element={<Revenue />} />
+        <Route path="/settingsanu" element={<Setting />} />
+        <Route path="/finance/employees" element={<SalaryCal />} />
+        <Route path="/finance/attendance" element={<Attendance />} />
+        <Route path="/finance/advance" element={<Advance />} />
+        <Route path="/finance/transfers" element={<SalaryTransfer />} />
+        <Route path="/finance/salary" element={<SalaryManagement />} />
+
+        {/* hiru */}
         <Route path="/hirudashboard" element={<Pdashboard />} />
-      <Route path="/sewing" element={<SewingInstruction />} />
-      <Route path="/employee" element={<Employee />} />
-      <Route path="/reportshiru" element={<Reportshiru />} />
-      <Route path="/hiruinventory" element={<HiruInventory />} />
-      <Route path="/quality" element={<Quality />} />
-      <Route path="/settinghiru" element={<Settinghiru />} />
-      
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );  
+        <Route path="/sewing" element={<SewingInstruction />} />
+        <Route path="/employee" element={<Employee />} />
+        <Route path="/reportshiru" element={<Reportshiru />} />
+        <Route path="/hiruinventory" element={<HiruInventory />} />
+        <Route path="/quality" element={<Quality />} />
+        <Route path="/settinghiru" element={<Settinghiru />} />
+
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
 }
