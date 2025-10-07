@@ -4,12 +4,13 @@ import { useNavigate, Link } from "react-router-dom";
 import "./Login.css";
 
 export default function Login() {
+  // ------- state -------
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // ui/status
   const [status, setStatus] = useState("idle"); // idle | loading | success | error
   const [errMsg, setErrMsg] = useState("");
+
   const [showPwd, setShowPwd] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
   const [submitted, setSubmitted] = useState(false);
@@ -24,10 +25,9 @@ export default function Login() {
     containerRef.current?.classList.add("mounted");
   }, []);
 
-  // --- validation ---
+  // ------- validation -------
   const emailValid = /^\S+@\S+\.\S+$/.test(email);
   const passwordValid = password.length >= 6;
-
   const errors = {
     email: !emailValid ? "Enter a valid email address." : "",
     password: !passwordValid ? "Password must be at least 6 characters." : "",
@@ -35,7 +35,18 @@ export default function Login() {
   const formValid = Object.values(errors).every((e) => e === "");
   const shouldShow = (field) => (touched[field] || submitted) && errors[field];
 
-  // --- submit ---
+  // ------- role → route fallback (in case backend doesn't send route) -------
+  const roleToRoute = (role = "") => {
+    const r = String(role || "").toLowerCase();
+    if (r.includes("inventory")) return "/maindashboard";
+    if (r.includes("product")) return "/hirudashboard";
+    if (r.includes("cart")) return "/dashboard";
+    if (r.includes("user manager")) return "/isudashboard";
+    if (r.includes("finance")) return "/sanudashboard";
+    return "/home";
+  };
+
+  // ------- submit -------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
@@ -50,7 +61,6 @@ export default function Login() {
     setErrMsg("");
 
     try {
-      // normalize email to avoid casing issues
       const payload = {
         email: email.trim().toLowerCase(),
         password,
@@ -59,19 +69,18 @@ export default function Login() {
       const res = await fetch(LOGIN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // keep if you ever set httpOnly cookies; otherwise harmless
         credentials: "include",
         body: JSON.stringify(payload),
       });
 
-      // Try to parse JSON, but don't crash UI if server returns empty body
       let data = {};
       try {
         data = await res.json();
-      } catch {}
+      } catch {
+        // non-JSON response
+      }
 
       if (!res.ok || data?.success === false) {
-        // Standardize the auth error message (don’t leak which field failed)
         const msg =
           data?.message ||
           (res.status === 401
@@ -80,18 +89,18 @@ export default function Login() {
         throw new Error(msg);
       }
 
-      // Expecting: { success:true, token, user, route? }
+      // Expecting: { success, token, user, route? }
       if (data?.token) localStorage.setItem("pp:token", data.token);
       if (data?.user) localStorage.setItem("pp:user", JSON.stringify(data.user));
 
+      const nextRoute = data?.route || roleToRoute(data?.user?.role);
       setStatus("success");
-      setTimeout(() => navigate(data?.route || "/maindashboard"), 600);
+      setTimeout(() => navigate(nextRoute), 500);
     } catch (err) {
       setStatus("error");
-      // Network/CORS shows up as TypeError/“Failed to fetch” in many browsers
       const msg =
         err?.message === "Failed to fetch"
-          ? "Cannot reach the server. Check that the backend is running and CORS allows your frontend origin."
+          ? "Cannot reach the server. Make sure the backend is running and CORS allows your frontend origin."
           : err?.message || "Invalid email or password.";
       setErrMsg(msg);
     }
@@ -100,13 +109,13 @@ export default function Login() {
   return (
     <div className="login">
       <div className="login-page">
-        {/* background anim (optional) */}
+        {/* optional background animation */}
         <div className="bg-animation">
           <div className="floating-bag" />
         </div>
 
         <div className="login-container" ref={containerRef}>
-          {/* Left panel */}
+          {/* Left/brand side */}
           <div className="brand-side">
             <div className="brand-content">
               <img
@@ -116,7 +125,6 @@ export default function Login() {
                 width="88"
                 height="88"
                 onError={(e) => {
-                  // graceful logo fallback
                   e.currentTarget.style.display = "none";
                   const fallback = document.createElement("div");
                   fallback.textContent = "🛍";
@@ -131,7 +139,7 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Right panel */}
+          {/* Right / form side */}
           <div className="login-side">
             <div className="login-header">
               <h2>Welcome Back</h2>
@@ -189,7 +197,7 @@ export default function Login() {
                 )}
               </div>
 
-              {/* Auth / server messages */}
+              {/* server / auth message */}
               {status === "error" && errMsg && (
                 <div className="helper-text error" role="alert">
                   {errMsg}
@@ -210,11 +218,12 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="divider"><span>OR</span></div>
+            <div className="divider">
+              <span>OR</span>
+            </div>
 
             <div className="signup-section">
-              Don’t have an account?{" "}
-              <Link to="/createaccount">Create Account</Link>
+              Don’t have an account? <Link to="/createaccount">Create Account</Link>
             </div>
           </div>
         </div>
