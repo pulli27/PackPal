@@ -1,13 +1,46 @@
 // src/Components/Header/Header.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FaHome, FaLayerGroup, FaPuzzlePiece, FaTags, FaGift,
   FaChevronDown, FaUser, FaUserPlus, FaShoppingCart,
 } from "react-icons/fa";
-import { NavLink, Link, useNavigate } from "react-router-dom";
+import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import "./Header.css";
 
 const STORAGE_KEY = "packPalCart";
+
+/** Read auth from localStorage and decide if logged-in customer */
+function readAuth() {
+  try {
+    const token = localStorage.getItem("pp:token");
+    const raw = localStorage.getItem("pp:user");
+    const user = raw ? JSON.parse(raw) : null;
+
+    // Fallback if someone still writes pp:role (legacy)
+    const legacyRole = localStorage.getItem("pp:role");
+    const role = String(user?.role || legacyRole || "").trim().toLowerCase();
+
+    return { token, user, role, isCustomer: !!token && role === "customer" };
+  } catch {
+    return { token: null, user: null, role: "", isCustomer: false };
+  }
+}
+
+/** Only render a header on storefront pages (never on dashboards) */
+const STOREFRONT_ALLOW_LIST = [
+  "/home",
+  "/handbag",
+  "/accessories",
+  "/clutches",
+  "/kidsbag",
+  "/totebag",
+  "/sizeguide",
+  "/sale",
+  "/faq",
+  "/aboutpage",
+  "/feedback",
+  "/customer",
+];
 
 export default function Header({
   cartCount: cartCountProp,
@@ -15,40 +48,71 @@ export default function Header({
   onDropdown = () => {},
 }) {
   const navigate = useNavigate();
+  const loc = useLocation();
+
+  const [{ isCustomer }, setAuth] = useState(readAuth());
   const [cartCount, setCartCount] = useState(0);
 
-  const readCount = () => {
-    try {
-      const arr = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      return Array.isArray(arr) ? arr.length : 0;
-    } catch {
-      return 0;
-    }
-  };
+  // Determine if header should show on this route at all (storefront only)
+  const showOnThisPage = useMemo(() => {
+    const path = loc.pathname.toLowerCase();
 
+    // Hide on auth pages
+    if (path === "/login" || path === "/createaccount") return false;
+
+    // Whitelist storefront paths only
+    return STOREFRONT_ALLOW_LIST.some((p) =>
+      path.startsWith(p.toLowerCase())
+    );
+  }, [loc.pathname]);
+
+  // Keep cart count in sync
   useEffect(() => {
-    setCartCount(typeof cartCountProp === "number" ? cartCountProp : readCount());
+    const readCount = () => {
+      try {
+        const arr = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        return Array.isArray(arr) ? arr.length : 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    setCartCount(
+      typeof cartCountProp === "number" ? cartCountProp : readCount()
+    );
 
     const refresh = () => setCartCount(readCount());
-    window.addEventListener("storage", (e) => {
+
+    const storageListener = (e) => {
       if (e.key === STORAGE_KEY) refresh();
-    });
+    };
+
+    window.addEventListener("storage", storageListener);
     window.addEventListener("cart:updated", refresh);
 
     return () => {
+      window.removeEventListener("storage", storageListener);
       window.removeEventListener("cart:updated", refresh);
     };
   }, [cartCountProp]);
 
-  const isCustomer =
-    !!localStorage.getItem("pp:token") &&
-    localStorage.getItem("pp:role") === "customer";
+  // React to login/logout events and route changes
+  useEffect(() => {
+    const updateAuth = () => setAuth(readAuth());
+    window.addEventListener("pp:auth:changed", updateAuth);
+    window.addEventListener("storage", updateAuth);
+    updateAuth(); // also run on mount/route change
+    return () => {
+      window.removeEventListener("pp:auth:changed", updateAuth);
+      window.removeEventListener("storage", updateAuth);
+    };
+  }, [loc.pathname]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("pp:token");
-    localStorage.removeItem("pp:role");
-    navigate("/home", { replace: true });
-  };
+  // If not a storefront route, don't render any header at all
+  if (!showOnThisPage) return null;
+
+  // If user is a logged-in customer, **hide this normal header** so LogoutHeader can render alone
+  if (isCustomer) return null;
 
   return (
     <div className="ppx-header">
@@ -65,7 +129,9 @@ export default function Header({
             <nav className="nav" aria-label="Primary">
               <ul className="nav-list">
                 <li className="nav-item">
-                  <NavLink to="/home" className="nav-link"><FaHome /> Home</NavLink>
+                  <NavLink to="/home" className="nav-link">
+                    <FaHome /> Home
+                  </NavLink>
                 </li>
 
                 <li className="nav-item">
@@ -75,21 +141,45 @@ export default function Header({
                   </NavLink>
 
                   <div className="dropdown" role="menu" aria-label="Collections">
-                    <NavLink to="/kidsbag" className="dropdown-item" onClick={() => onDropdown("Kids Bag")}>
+                    <NavLink
+                      to="/kidsbag"
+                      className="dropdown-item"
+                      onClick={() => onDropdown("Kids Bag")}
+                    >
                       <div className="dropdown-title">Kids Bag</div>
-                      <div className="dropdown-desc">Fun and colorful bags for children</div>
+                      <div className="dropdown-desc">
+                        Fun and colorful bags for children
+                      </div>
                     </NavLink>
-                    <NavLink to="/totebag" className="dropdown-item" onClick={() => onDropdown("Tote Bag")}>
+                    <NavLink
+                      to="/totebag"
+                      className="dropdown-item"
+                      onClick={() => onDropdown("Tote Bag")}
+                    >
                       <div className="dropdown-title">Tote Bag</div>
-                      <div className="dropdown-desc">Spacious and versatile everyday bags</div>
+                      <div className="dropdown-desc">
+                        Spacious and versatile everyday bags
+                      </div>
                     </NavLink>
-                    <NavLink to="/handbag" className="dropdown-item" onClick={() => onDropdown("Handbag")}>
+                    <NavLink
+                      to="/handbag"
+                      className="dropdown-item"
+                      onClick={() => onDropdown("Handbag")}
+                    >
                       <div className="dropdown-title">Handbag</div>
-                      <div className="dropdown-desc">Elegant bags for special occasions</div>
+                      <div className="dropdown-desc">
+                        Elegant bags for special occasions
+                      </div>
                     </NavLink>
-                    <NavLink to="/clutches" className="dropdown-item" onClick={() => onDropdown("Clutch")}>
+                    <NavLink
+                      to="/clutches"
+                      className="dropdown-item"
+                      onClick={() => onDropdown("Clutch")}
+                    >
                       <div className="dropdown-title">Clutch</div>
-                      <div className="dropdown-desc">Compact and stylish evening bags</div>
+                      <div className="dropdown-desc">
+                        Compact and stylish evening bags
+                      </div>
                     </NavLink>
                   </div>
                 </li>
@@ -114,26 +204,26 @@ export default function Header({
               </ul>
             </nav>
 
-            {/* Actions */}
+            {/* Actions for guests / non-customer roles */}
             <div className="header-actions">
-              {!isCustomer ? (
-                <>
-                  <button className="btn" onClick={() => navigate("/login")}>
-                    <FaUser /><span>Login</span>
-                  </button>
-                  <button className="btn btn-primary" onClick={() => navigate("/createaccount")}>
-                    <FaUserPlus /><span>Register</span>
-                  </button>
-                </>
-              ) : (
-                <button className="btn btn-primary" onClick={handleLogout} title="Sign out">
-                  Logout
-                </button>
-              )}
+              <button className="btn" onClick={() => navigate("/login")}>
+                <FaUser />
+                <span>Login</span>
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => navigate("/createaccount")}
+              >
+                <FaUserPlus />
+                <span>Register</span>
+              </button>
 
               <button
                 className="cart-btn"
-                onClick={() => { onCartClick(); navigate("/cart"); }}
+                onClick={() => {
+                  onCartClick();
+                  navigate("/cart");
+                }}
                 aria-label="Open cart"
               >
                 <FaShoppingCart />

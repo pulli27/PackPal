@@ -35,14 +35,14 @@ export default function Login() {
   const formValid = Object.values(errors).every((e) => e === "");
   const shouldShow = (field) => (touched[field] || submitted) && errors[field];
 
-  // ------- role → route fallback (in case backend doesn't send route) -------
+  // ------- role → route fallback (if backend doesn't send route) -------
   const roleToRoute = (role = "") => {
     const r = String(role || "").toLowerCase();
     if (r.includes("inventory")) return "/maindashboard";
-    if (r.includes("product")) return "/hirudashboard";
-    if (r.includes("cart")) return "/dashboard";
+    if (r.includes("product"))   return "/hirudashboard";
+    if (r.includes("cart"))      return "/dashboard";
     if (r.includes("user manager")) return "/isudashboard";
-    if (r.includes("finance")) return "/sanudashboard";
+    if (r.includes("finance"))   return "/sanudashboard";
     return "/home";
   };
 
@@ -73,11 +73,12 @@ export default function Login() {
         body: JSON.stringify(payload),
       });
 
+      // Parse JSON safely
       let data = {};
       try {
         data = await res.json();
       } catch {
-        // non-JSON response
+        // non-JSON response (shouldn't happen)
       }
 
       if (!res.ok || data?.success === false) {
@@ -91,11 +92,14 @@ export default function Login() {
 
       // Expecting: { success, token, user, route? }
       if (data?.token) localStorage.setItem("pp:token", data.token);
-      if (data?.user) localStorage.setItem("pp:user", JSON.stringify(data.user));
+      if (data?.user)  localStorage.setItem("pp:user", JSON.stringify(data.user));
+
+      // 🔔 notify the app that auth changed so AuthHeaderSwitcher re-checks immediately
+      window.dispatchEvent(new Event("pp:auth:changed"));
 
       const nextRoute = data?.route || roleToRoute(data?.user?.role);
       setStatus("success");
-      setTimeout(() => navigate(nextRoute), 500);
+      setTimeout(() => navigate(nextRoute), 400);
     } catch (err) {
       setStatus("error");
       const msg =
@@ -115,7 +119,7 @@ export default function Login() {
         </div>
 
         <div className="login-container" ref={containerRef}>
-          {/* Left/brand side */}
+          {/* Left / brand side */}
           <div className="brand-side">
             <div className="brand-content">
               <img
@@ -223,7 +227,8 @@ export default function Login() {
             </div>
 
             <div className="signup-section">
-              Don’t have an account? <Link to="/createaccount">Create Account</Link>
+              Don’t have an account?{" "}
+              <Link to="/createaccount">Create Account</Link>
             </div>
           </div>
         </div>
