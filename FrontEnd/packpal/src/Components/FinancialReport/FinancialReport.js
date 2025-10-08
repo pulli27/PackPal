@@ -1,4 +1,5 @@
 // src/Components/FinancialReport/FinancialReport.jsx
+// (unchanged structure; keeping everything, but the backend now guarantees correct createdAt-based sums)
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import "./FinancialReport.css";
@@ -46,7 +47,6 @@ const monthLabel = (key) => {
 };
 
 const generateMonthRange = (fromISO, toISO, maxMonths = 12) => {
-  // Build an ascending list from start-of-from to start-of-to (inclusive), capped by maxMonths
   const s = new Date(`${isoDateOnly(fromISO)}T00:00:00.000Z`);
   const e = new Date(`${isoDateOnly(toISO)}T00:00:00.000Z`);
   const start = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1);
@@ -155,6 +155,64 @@ const getNetFromPayroll = (row) => {
   return candidates.find(Number.isFinite) || 0;
 };
 
+/* === Single source of truth: expenses for a range (dashboard-aligned) === */
+const fetchExpensesRange = async (startISO, endISO) => {
+  const qs =
+    startISO && endISO ? `?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}` : "";
+
+  // Try the range-aware summaries first
+  const [payroll, contrib, invSum] = await Promise.all([
+    safeGet(`/salary/summary${qs}`, { totalNet: 0 }),
+    safeGet(`/contributions/summary${qs}`, { grandTotal: 0 }),
+    safeGet(`/inventory/summary${qs}`, { inventory: { totalValue: 0 } }),
+  ]);
+
+  let payrollTotal = toNum(payroll?.totalNet, 0);
+  let contribTotal = toNum(contrib?.grandTotal, 0);
+  let inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
+
+  if (!Number.isFinite(payrollTotal) || payrollTotal < 0) payrollTotal = 0;
+  if (!Number.isFinite(contribTotal) || contribTotal < 0) contribTotal = 0;
+  if (!Number.isFinite(inventoryOnly) || inventoryOnly < 0) inventoryOnly = 0;
+
+  return {
+    total: payrollTotal + contribTotal + inventoryOnly,
+    breakdown: { payroll: payrollTotal, contrib: contribTotal, inventory: inventoryOnly },
+  };
+};
+
+/* === NEW: read the exact expenses total the dashboard uses for the same date range === */
+const fetchDashboardExpensesTotal = async (startISO, endISO) => {
+  const qs =
+    startISO && endISO ? `?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}` : "";
+
+  // Try /dashboard with several common shapes used by cards
+  const dash = await safeGet(`/dashboard${qs}`, null);
+  if (dash) {
+    // common shapes: { expenses: { total } }, { cards: { expenses: { total } } }, or flat
+    const c1 = toNum(dash?.expenses?.total, NaN);
+    if (Number.isFinite(c1)) return c1;
+
+    const c2 = toNum(dash?.cards?.expenses?.total, NaN);
+    if (Number.isFinite(c2)) return c2;
+
+    const c3 = toNum(dash?.totals?.expenses, NaN);
+    if (Number.isFinite(c3)) return c3;
+
+    const c4 = toNum(dash?.expensesTotal, NaN);
+    if (Number.isFinite(c4)) return c4;
+  }
+
+  // Other endpoints that might expose the exact dashboard total
+  const dAlt = await safeGet(`/dashboard/expenses/total${qs}`, null);
+  const dAltTotal = toNum(dAlt?.total ?? dAlt?.value, NaN);
+  if (Number.isFinite(dAltTotal)) return dAltTotal;
+
+  // Fallback to our composed calculation if dashboard total isn't exposed
+  const exp = await fetchExpensesRange(startISO, endISO);
+  return toNum(exp?.total, 0);
+};
+
 /* Range object (normalized) */
 const getRange = (fromISO, toISO) => {
   const from = isoDateOnly(fromISO);
@@ -167,45 +225,29 @@ const getRange = (fromISO, toISO) => {
   };
 };
 
-/* === Exact Revenue === */
+/* === Exact Revenue — uses backend createdAt-aware totals === */
 const fetchExactRevenue = async (startISO, endISO) => {
   const { fromISO, toISO, fromMs, toMs } = getRange(startISO, endISO);
   const qs = `?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`;
 
-  const tryGet = async (path, fallback = null) => {
-    try {
-      const { data } = await api.get(path);
-      return data ?? fallback;
-    } catch {
-      return fallback;
-    }
-  };
+  const total = await safeGet(`/transactions/revenue${qs}`, null);
+  const fromTotal = toNum(total?.revenue, NaN);
+  if (Number.isFinite(fromTotal)) return fromTotal;
 
-  // sum monthly (same source as chart)
-  const monthly =
-    (await tryGet(`/analytics/revenue/monthly${qs}`)) ||
-    (await tryGet(`/transactions/revenue/monthly${qs}`)) ||
-    (await tryGet(`/reports/revenue/monthly${qs}`));
+  const v2 = await safeGet(`/transactions/summary${qs}`, null);
+  const v2Range = toNum(v2?.range?.revenue, NaN);
+  if (Number.isFinite(v2Range)) return v2Range;
 
-  if (Array.isArray(monthly) && monthly.length) {
-    return monthly.reduce((acc, r) => acc + toNum(r?.revenue ?? r?.total ?? r?.value ?? 0, 0), 0);
+  const monthly = await safeGet(`/transactions/revenue/monthly${qs}`, null);
+  if (monthly?.series?.length) {
+    return monthly.series.reduce((acc, r) => acc + toNum(r?.revenue, 0), 0);
   }
 
-  // summary / total
-  const txSummary = await safeGet(`/transactions/summary${qs}`, null);
-  const fromSummary = toNum(txSummary?.revenue, NaN);
-  if (Number.isFinite(fromSummary)) return fromSummary;
-
-  const totalAnalytic = await safeGet(`/analytics/revenue/total${qs}`, null);
-  const fromAnalytic = toNum(totalAnalytic?.total ?? totalAnalytic?.revenue, NaN);
-  if (Number.isFinite(fromAnalytic)) return fromAnalytic;
-
-  // fallback: sum transactions (exclude refunds)
-  const tx = await safeGet(`/transactions${qs}&limit=5000`, []);
+  const tx = await safeGet(`/transactions${qs}`, []);
   if (Array.isArray(tx) && tx.length) {
     return tx
       .filter((t) => {
-        const raw = pickTxDate(t);
+        const raw = t?.createdAt || t?.date || null;
         if (!raw) return false;
         const ms = new Date(isoDateOnly(raw) + "T12:00:00.000Z").getTime();
         const isNotRefund = String(t?.status || "").toLowerCase() !== "refund";
@@ -217,7 +259,7 @@ const fetchExactRevenue = async (startISO, endISO) => {
   return 0;
 };
 
-/* KPIs computed from createdAt-first sources, then we’ll override revenue with exact */
+/* KPIs computed from createdAt-first sources, then revenue overridden with exact */
 const computeKPIsByCreatedAt = async (startISO, endISO) => {
   const { fromISO, toISO, fromMs, toMs } = getRange(startISO, endISO);
 
@@ -227,84 +269,16 @@ const computeKPIsByCreatedAt = async (startISO, endISO) => {
   ]);
   const revenue = txList
     .filter((t) => {
-      const raw = pickTxDate(t);
+      const raw = t?.createdAt || t?.date || null;
       if (!raw) return false;
       const ms = new Date(isoDateOnly(raw) + "T12:00:00.000Z").getTime();
       return inInclusiveRange(ms, fromMs, toMs) && String(t?.status || "").toLowerCase() !== "refund";
     })
     .reduce((acc, t) => acc + lineTotal(t), 0);
 
-  const payrollList = await getFirstArray([
-    `/salary/payruns?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
-    `/salary/payruns`,
-    `/salary?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
-    `/salary`,
-  ]);
-  let payrollTotal = payrollList.length
-    ? payrollList
-        .filter((r) => {
-          const d = isoDateOnly(r?.createdAt || r?.date || r?.created_on || "");
-          if (!d) return false;
-          const ms = new Date(d + "T12:00:00.000Z").getTime();
-          return inInclusiveRange(ms, fromMs, toMs);
-        })
-        .reduce((acc, r) => acc + getNetFromPayroll(r), 0)
-    : 0;
+  /* ✅ Use the exact same total as the dashboard first */
+  const expenses = toNum(await fetchDashboardExpensesTotal(fromISO, toISO), 0);
 
-  if (payrollTotal === 0) {
-    const payrollSummary = await safeGet(
-      `/salary/summary?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
-      null
-    );
-    payrollTotal = toNum(payrollSummary?.totalNet, 0);
-  }
-
-  const y1 = new Date(fromISO).getUTCFullYear();
-  const y2 = new Date(toISO).getUTCFullYear();
-  const years = [...new Set([y1, y2])];
-
-  let contribRows = [];
-  for (const y of years) {
-    const rows = await getFirstArray([`/contributions?year=${y}`]);
-    contribRows = contribRows.concat(rows);
-  }
-
-  let contribTotal = 0;
-  if (contribRows.length) {
-    contribTotal = contribRows
-      .filter((r) => {
-        const created = isoDateOnly(r?.createdAt || r?.created_on || r?.date || "");
-        const due = isoDateOnly(r?.due || "");
-        const perKey = r?.periodKey || r?.period;
-        const perFirst = perKey && /^\d{4}-\d{2}$/.test(perKey) ? `${perKey}-01` : null;
-
-        const createdMs = created ? new Date(created + "T12:00:00.000Z").getTime() : NaN;
-        const dueMs = due ? new Date(due + "T12:00:00.000Z").getTime() : NaN;
-        const perMs = perFirst ? new Date(perFirst + "T12:00:00.000Z").getTime() : NaN;
-
-        return (
-          (Number.isFinite(createdMs) && inInclusiveRange(createdMs, fromMs, toMs)) ||
-          (Number.isFinite(dueMs) && inInclusiveRange(dueMs, fromMs, toMs)) ||
-          (Number.isFinite(perMs) && inInclusiveRange(perMs, fromMs, toMs))
-        );
-      })
-      .reduce((acc, r) => acc + Number(r?.total || 0), 0);
-  }
-  if (contribTotal === 0) {
-    const contribSummary = await safeGet(
-      `/contributions/summary?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
-      null
-    );
-    contribTotal = toNum(contribSummary?.grandTotal, 0);
-  }
-
-  const invSummary = await safeGet(
-    `/inventory/summary?start=${encodeURIComponent(fromISO)}&end=${encodeURIComponent(toISO)}`,
-    { inventory: { totalValue: 0 } }
-  );
-  const inventoryTotal = toNum(invSummary?.inventory?.totalValue, 0);
-
-  const expenses = payrollTotal + contribTotal + inventoryTotal;
   const net = revenue - expenses;
 
   return { revenue, expenses, net };
@@ -319,19 +293,23 @@ const endOfMonthISO = (dLike) => {
   return fmtDate(last);
 };
 const sameUTCMonth = (aISO, bISO) => normalizeMonthKey(aISO) === normalizeMonthKey(bISO);
+
 const monthEndOrToday = (iso) => {
   const today = fmtDate(new Date());
   return sameUTCMonth(iso, today) ? today : endOfMonthISO(iso);
 };
+// remove monthEndOrToday and sameUTCMonth (no longer needed for the PDF)
+
 const getTwoMonthAsOfs = (fromISO, toISO) => {
-  const leftAsOf = monthEndOrToday(fromISO);
-  const rightAsOf = monthEndOrToday(toISO);
+  const leftAsOf  = isoDateOnly(fromISO); // EXACT selected start date
+  const rightAsOf = isoDateOnly(toISO);   // EXACT selected end date
   return {
     leftAsOf,
     rightAsOf,
     sameMonth: normalizeMonthKey(leftAsOf) === normalizeMonthKey(rightAsOf),
   };
 };
+
 
 /* ───────── component ───────── */
 function FinancialReport() {
@@ -375,7 +353,6 @@ function FinancialReport() {
     }
   };
 
-  /* Initial mount: set dates, welcome toast, load KPIs + balance + charts */
   useEffect(() => {
     const today = new Date();
     const todayISO = fmtDate(today);
@@ -404,42 +381,37 @@ function FinancialReport() {
 
       if (kpis.revenue === 0 && kpis.expenses === 0) {
         const txSummary = await getWithRange("/transactions/summary", fromISO, toISO);
-        const payroll = await getWithRange("/salary/summary", fromISO, toISO);
-        const contrib = await getWithRange("/contributions/summary", fromISO, toISO);
-        const invSum = await getWithRange("/inventory/summary", fromISO, toISO);
 
+        // ✅ get exact dashboard expenses total first
+        const expensesDash = await fetchDashboardExpensesTotal(fromISO, toISO);
+
+        // fallback revenue from summary (if any)
         const revenue = toNum(txSummary?.revenue, 0);
-        const payrollTotal = toNum(payroll?.totalNet, 0);
-        const contribTotal = toNum(contrib?.grandTotal, 0);
-        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
-        const expenses = payrollTotal + contribTotal + inventoryOnly;
 
-        kpis = { revenue, expenses, net: revenue - expenses };
+        kpis = { revenue, expenses: toNum(expensesDash, 0), net: revenue - toNum(expensesDash, 0) };
       }
 
       const finalRevenue = Number.isFinite(Number(exact)) ? exact : kpis.revenue;
-      const finalNet = finalRevenue - toNum(kpis.expenses, 0);
-      setDash({ revenue: finalRevenue, expenses: toNum(kpis.expenses, 0), net: finalNet });
+      const finalExpenses = toNum(await fetchDashboardExpensesTotal(fromISO, toISO), toNum(kpis.expenses, 0));
+      const finalNet = finalRevenue - finalExpenses;
+      setDash({ revenue: finalRevenue, expenses: finalExpenses, net: finalNet });
 
       await refreshBalanceCard(toISO);
-      await fetchChartsData(); // charts after KPIs so range is in sync
+      await fetchChartsData();
     };
 
     load();
   }, []);
 
-  /* Build data for P&L (uses exact revenue) */
   const fetchIncomeStatementData = async (startISO, endISO) => {
     const revenueTotal = Number.isFinite(Number(revenueExact)) ? revenueExact : toNum(dash.revenue, 0);
     const netIncomeCard = toNum(dash.net, 0);
 
-    const payroll = await getWithRange("/salary/summary", startISO, endISO);
-    const contrib = await getWithRange("/contributions/summary", startISO, endISO);
-    const invSum = await getWithRange("/inventory/summary", startISO, endISO);
-
-    const salaryNet = toNum(payroll?.totalNet, 0);
-    const epfEtf = toNum(contrib?.grandTotal, 0);
-    const cogsInventory = toNum(invSum?.inventory?.totalValue, 0);
+    // Pull the same buckets the dashboard uses (and keep as fallback in one place)
+    const exp = await fetchExpensesRange(startISO, endISO);
+    const salaryNet = toNum(exp?.breakdown?.payroll, 0);
+    const epfEtf = toNum(exp?.breakdown?.contrib, 0);
+    const cogsInventory = toNum(exp?.breakdown?.inventory, 0);
 
     const grossProfit = revenueTotal - cogsInventory;
     const operatingTotal = Math.max(grossProfit - netIncomeCard, 0);
@@ -456,7 +428,6 @@ function FinancialReport() {
     };
   };
 
-  /* Charts data (robust + same range logic) */
   const fetchChartsData = async () => {
     const todayISO = fmtDate(new Date());
     const fromISO = dateFromRef.current?.value || todayISO;
@@ -486,24 +457,29 @@ function FinancialReport() {
       const c2 = c1 || (await tryGet(`/transactions/revenue/monthly${qs}`));
       const c3 = c2 || (await tryGet(`/reports/revenue/monthly${qs}`));
       let map = {};
-      if (Array.isArray(c3) && c3.length) {
+      if (Array.isArray(c3?.series) && c3.series.length) {
+        c3.series.forEach((r) => {
+          const k = `${r.y}-${String(r.m).padStart(2, "0")}`;
+          map[k] = (map[k] || 0) + toNum(r?.revenue);
+        });
+      } else if (Array.isArray(c3) && c3.length) {
         c3.forEach((r) => {
           const kRaw = r?.key ?? r?.month ?? r?.date ?? new Date();
           const k = normalizeMonthKey(kRaw);
           map[k] = (map[k] || 0) + toNum(r?.revenue ?? r?.total ?? r?.value);
         });
       } else {
-        const tx = await tryGet(`/transactions${qs}&limit=5000`, []);
+        const tx = await tryGet(`/transactions${qs}`, []);
         if (Array.isArray(tx) && tx.length) {
           tx
             .filter((t) => {
-              const raw = pickTxDate(t);
+              const raw = t?.createdAt || t?.date || null;
               if (!raw) return false;
               const ms = new Date(isoDateOnly(raw) + "T12:00:00.000Z").getTime();
               return inInclusiveRange(ms, fromMs, toMs) && String(t?.status || "").toLowerCase() !== "refund";
             })
             .forEach((t) => {
-              const rawDate = pickTxDate(t) || Date.now();
+              const rawDate = t?.createdAt || t?.date || Date.now();
               const k = normalizeMonthKey(rawDate);
               map[k] = (map[k] || 0) + lineTotal(t);
             });
@@ -529,14 +505,15 @@ function FinancialReport() {
           values: list.map((x) => toNum(x?.amount ?? x?.total ?? x?.value ?? 0)),
         };
       }
-      const [payroll, contrib, invSum] = await Promise.all([
-        tryGet(`/salary/summary${qs}`, { totalNet: 0 }),
-        tryGet(`/contributions/summary${qs}`, { grandTotal: 0 }),
-        tryGet(`/inventory/summary${qs}`, { inventory: { totalValue: 0 } }),
-      ]);
+      // fallback to our three-bucket composition used by dashboard cards
+      const exp = await fetchExpensesRange(isoDateOnly(fromISO), isoDateOnly(toISO));
       return {
         labels: ["Payroll", "EPF/ETF", "Inventory"],
-        values: [toNum(payroll?.totalNet), toNum(contrib?.grandTotal), toNum(invSum?.inventory?.totalValue)],
+        values: [
+          toNum(exp?.breakdown?.payroll, 0),
+          toNum(exp?.breakdown?.contrib, 0),
+          toNum(exp?.breakdown?.inventory, 0),
+        ],
       };
     })();
 
@@ -566,8 +543,7 @@ function FinancialReport() {
     setChartsData({ revenueMonthly, expenseByCategory, profitMarginMonthly });
   };
 
-  /* ===== Chart mounting: destroy-before-create to avoid broken canvases ===== */
-  const chartInstances = useRef({}); // { revenue, expense, profit }
+  const chartInstances = useRef({});
 
   const mountChart = (key, cfg) => {
     const el =
@@ -579,23 +555,17 @@ function FinancialReport() {
 
     if (!el) return;
     try {
-      // destroy old
       if (chartInstances.current[key]) {
         chartInstances.current[key].destroy();
         chartInstances.current[key] = null;
       }
-      // (re)create
       const ctx = el.getContext("2d");
       chartInstances.current[key] = new Chart(ctx, cfg);
-    } catch {
-      // ignore (canvas not in DOM yet etc.)
-    }
+    } catch {}
   };
 
   useEffect(() => {
     const c = chartsData;
-
-    // Guard against empty labels (prevents Chart.js errors)
     const safe = (arr) => (Array.isArray(arr) && arr.length ? arr : [""]);
 
     mountChart("revenue", {
@@ -671,12 +641,9 @@ function FinancialReport() {
       },
     });
 
-    // Cleanup on unmount
     return () => {
       Object.values(chartInstances.current || {}).forEach((ch) => {
-        try {
-          ch?.destroy();
-        } catch {}
+        try { ch?.destroy(); } catch {}
       });
       chartInstances.current = {};
     };
@@ -685,11 +652,9 @@ function FinancialReport() {
   const inferType = (name) =>
     /profit|loss/i.test(name) ? "Profit & Loss Statement" : /balance/i.test(name) ? "Balance Sheet" : "Report";
 
-  /* ===== Balance sheet helpers (NOW enforces A = L + E) ===== */
   const fetchBalanceSnapshot = async (asOfISO) => {
     const params = asOfISO ? `?end=${encodeURIComponent(asOfISO)}` : "";
 
-    // Assets (current + non-current)
     const inv = await safeGet(`/inventory/summary${params}`, {});
     const prod = await safeGet(`/products/summary${params}`, {});
     const inventoryValue = toNum(inv?.inventory?.totalValue ?? inv?.totalValue ?? 0);
@@ -697,7 +662,6 @@ function FinancialReport() {
 
     const cash = await safeGet(`/finance/cash-summary${params}`, { total: 0 });
 
-    // Accounts Receivable (fallback to pending transactions <= asOf)
     let receivables = await safeGet(`/finance/receivables/summary${params}`, null);
     if (!receivables || !Number.isFinite(Number(receivables?.total))) {
       const fromMin = "1970-01-01";
@@ -710,7 +674,7 @@ function FinancialReport() {
             .filter((t) => {
               const st = String(t?.status || "").toLowerCase();
               const isPending = st === "pending";
-              const d = isoDateOnly(pickTxDate(t) || "");
+              const d = isoDateOnly(t?.createdAt || t?.date || "");
               const ms = d ? new Date(d + "T12:00:00.000Z").getTime() : NaN;
               const asOfMs = new Date(isoDateOnly(asOfISO) + "T23:59:59.999Z").getTime();
               return isPending && Number.isFinite(ms) && ms <= asOfMs;
@@ -722,7 +686,6 @@ function FinancialReport() {
 
     const fixed = await safeGet(`/finance/fixed-assets${params}`, { total: 0 });
 
-    // Liabilities
     let payables = await safeGet(`/finance/payables/summary${params}`, null);
     if (!payables || !Number.isFinite(Number(payables?.total))) {
       const pur = await safeGet(`/purchases?status=approved`, { orders: [] });
@@ -751,25 +714,23 @@ function FinancialReport() {
       payables = { total: totalAP, count: 0 };
     }
 
-    let otherLiab = await safeGet(`/finance/other-liabilities${params}`, null);
-
-    // P&L inputs (for retained earnings proxy)
     const revenue = await safeGet(`/transactions/revenue${params}`, { revenue: 0 });
     const cogs = await safeGet(`/finance/cogs${params}`, { total: 0 });
     const payroll = await safeGet(`/salary/summary${params}`, { totalNet: 0 });
     const contrib = await safeGet(`/contributions/summary${params}`, { grandTotal: 0 });
     const opex = await safeGet(`/finance/other-expenses${params}`, { website: 0, total: 0 });
 
-    // Build components
     const cashBank = toNum(cash?.total);
     const ar = toNum(receivables?.total);
     const invBags = inventoryValue + productsValue;
     const websiteTools = toNum(fixed?.total);
 
     const ap = toNum(payables?.total);
-    let accrued = toNum(otherLiab?.total, NaN);
-    if (!Number.isFinite(accrued)) {
-      // conservative fallback
+    let accrued = 0;
+    const accr = await safeGet(`/finance/other-liabilities${params}`, null);
+    if (accr && Number.isFinite(Number(accr?.total))) {
+      accrued = Number(accr.total);
+    } else {
       accrued = Math.max(0, toNum(payroll?.totalNet, 0) + toNum(contrib?.grandTotal, 0));
     }
 
@@ -784,7 +745,6 @@ function FinancialReport() {
     const ownerCapitalRaw = await safeGet(`/finance/equity/capital${params}`, { total: 0 });
     const ownerCapital = toNum(ownerCapitalRaw?.total, 0);
 
-    // Totals
     const totalCurrentAssets = cashBank + ar + invBags;
     const totalNonCurrentAssets = websiteTools;
     const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
@@ -792,12 +752,10 @@ function FinancialReport() {
     const totalCurrentLiabilities = ap + accrued;
     const totalLiabilities = totalCurrentLiabilities;
 
-    // Equity: prefer provided capital + retained; fall back to equation
     let retainedEarnings = toNum(netProfit, 0);
     let equityFromParts = ownerCapital + retainedEarnings;
     const equityByEquation = totalAssets - totalLiabilities;
 
-    // If parts are missing or don’t balance, force equation and back-solve retained
     if (!Number.isFinite(equityFromParts) || Math.abs(equityFromParts - equityByEquation) > 1) {
       retainedEarnings = equityByEquation - ownerCapital;
       equityFromParts = equityByEquation;
@@ -837,12 +795,9 @@ function FinancialReport() {
       const snap = await fetchBalanceSnapshot(asOfISO || fmtDate(new Date()));
       const a = toNum(snap?.assets?.totalAssets, 0);
       const l = toNum(snap?.liabilities?.totalLiabilities, 0);
-      // Card equity is computed to guarantee A = L + E
       const e = a - l;
       setBalanceCard({ assets: a, liabilities: l, equity: e });
-    } catch {
-      /* keep previous */
-    }
+    } catch {}
   };
 
   const getTwoMonthData = async (fromISO, toISO) => {
@@ -852,7 +807,6 @@ function FinancialReport() {
     return { left, right };
   };
 
-  /* ===== HTML builders ===== */
   const formatHeaderDate = (iso) => {
     const d = new Date(iso);
     const month = d.toLocaleString("en-US", { month: "long" });
@@ -881,14 +835,36 @@ function FinancialReport() {
   .rule{height:3px;background:var(--line);margin:16px 0 24px 0}
   h2.sheet{font-size:18px;text-align:center;margin:0 0 8px 0;letter-spacing:.4px}
   .date-row{display:flex;justify-content:flex-end;gap:40px;color:#333;font-weight:700;margin:10px 0 6px 0}
-  table{width:100%;border-collapse:collapse;}
-  td{padding:6px 8px;font-size:14px;color:#222;vertical-align:top}
+
+  /* --- TABLE ALIGNMENT FIX --- */
+  table{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;               /* keep column widths consistent across both tables */
+  }
+  td{
+    padding:6px 12px;
+    font-size:14px;
+    color:#222;
+    vertical-align:top;
+  }
+  td:first-child{
+    width:auto;                       /* labels stretch */
+  }
+  td:nth-child(2),
+  td:nth-child(3){
+    width:190px;                      /* fixed numeric columns for left/right dates */
+    text-align:right;
+    white-space:nowrap;               /* keep LKR values on one line */
+  }
+
   .section{font-weight:700}
   .sub{padding-left:14px}
-  .right{text-align:right;min-width:140px}
+  .right{text-align:right;}           /* keep for explicit cells, no min-width so it doesn't shift columns */
   .total{border-top:1px solid #bbb;font-weight:700}
   .divider{height:1px;background:#bbb;margin:10px 0}
 </style>
+
 </head>
 <body>
   <div class="page">
@@ -911,14 +887,13 @@ function FinancialReport() {
       <tbody>
         <tr><td class="section">ASSETS:</td><td></td><td></td></tr>
         <tr><td class="section sub">Current assets:</td><td></td><td></td></tr>
-        <tr><td class="sub">Cash &amp; Bank</td><td class="right">LKR ${v(left.assets.cashBank)}</td><td class="right">LKR ${v(right.assets.cashBank)}</td></tr>
         <tr><td class="sub">Accounts Receivable</td><td class="right">${left.assets.ar ? "LKR "+v(left.assets.ar) : "-"}</td><td class="right">${right.assets.ar ? "LKR "+v(right.assets.ar) : "-"}</td></tr>
         <tr><td class="sub">Inventory (Bags in stock)</td><td class="right">LKR ${v(left.assets.invBags)}</td><td class="right">LKR ${v(right.assets.invBags)}</td></tr>
         <tr><td class="sub section">Total current assets</td><td class="right section">LKR ${v(left.assets.totalCurrentAssets)}</td><td class="right section">LKR ${v(right.assets.totalCurrentAssets)}</td></tr>
 
         <tr><td class="section sub" style="padding-top:10px">Non-current assets:</td><td></td><td></td></tr>
-        <tr><td class="sub">Website Software &amp; Tools</td><td class="right">${left.assets.websiteTools ? "LKR "+v(left.assets.websiteTools) : "-"}</td><td class="right">${right.assets.websiteTools ? "LKR "+v(right.assets.websiteTools) : "-"}</td></tr>
-        <tr><td class="sub section">Total non-current assets</td><td class="right section">${left.assets.totalNonCurrentAssets ? "LKR "+v(left.assets.totalNonCurrentAssets) : "-"}</td><td class="right section">${right.assets.totalNonCurrentAssets ? "LKR "+v(right.assets.totalNonCurrentAssets) : "-"}</td></tr>
+        <tr><td class="sub">Website Software &amp; Tools</td><td class="right">${left.assets.websiteTools ? "LKR "+v(left.assets.websiteTools) : "LKR 0"}</td><td class="right">${right.assets.websiteTools ? "LKR "+v(right.assets.websiteTools) : "LKR 0"}</td></tr>
+        <tr><td class="sub section">Total non-current assets</td><td class="right section">${left.assets.totalNonCurrentAssets ? "LKR "+v(left.assets.totalNonCurrentAssets) : "LKR 0"}</td><td class="right section">${right.assets.totalNonCurrentAssets ? "LKR "+v(right.assets.totalNonCurrentAssets) : "LKR 0"}</td></tr>
 
         <tr><td class="section total" style="padding-top:8px"><strong>Total assets</strong></td><td class="right total"><strong>LKR ${v(left.assets.totalAssets)}</strong></td><td class="right total"><strong>LKR ${v(right.assets.totalAssets)}</strong></td></tr>
       </tbody>
@@ -1089,7 +1064,6 @@ body{background:#ffffff;margin:0;padding:24px;font-family:-apple-system,BlinkMac
     toast("Report ready.", "success");
   };
 
-  /* Cards use exact revenue + identity for equity */
   const quickCards = useMemo(
     () => [
       {
@@ -1107,7 +1081,6 @@ body{background:#ffffff;margin:0;padding:24px;font-family:-apple-system,BlinkMac
         stats: [
           { label: "Assets", value: fmtLKR(balanceCard.assets) },
           { label: "Liabilities", value: fmtLKR(balanceCard.liabilities) },
-          // equity always matches A - L here
           { label: "Equity", value: fmtLKR(balanceCard.assets - balanceCard.liabilities) },
         ],
       },
@@ -1139,21 +1112,18 @@ body{background:#ffffff;margin:0;padding:24px;font-family:-apple-system,BlinkMac
       let kpis = await computeKPIsByCreatedAt(from, to);
       if (kpis.revenue === 0 && kpis.expenses === 0) {
         const txSummary = await getWithRange("/transactions/summary", from, to);
-        const payroll = await getWithRange("/salary/summary", from, to);
-        const contrib = await getWithRange("/contributions/summary", from, to);
-        const invSum = await getWithRange("/inventory/summary", from, to);
-
         const revenue = toNum(txSummary?.revenue, 0);
-        const payrollTotal = toNum(payroll?.totalNet, 0);
-        const contribTotal = toNum(contrib?.grandTotal, 0);
-        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
-        const expenses = payrollTotal + contribTotal + inventoryOnly;
 
-        kpis = { revenue, expenses, net: revenue - expenses };
+        const expensesDash = await fetchDashboardExpensesTotal(from, to);
+        kpis = { revenue, expenses: toNum(expensesDash, 0), net: revenue - toNum(expensesDash, 0) };
       }
       const finalRevenue = Number.isFinite(Number(exact)) ? exact : kpis.revenue;
-      const finalNet = finalRevenue - toNum(kpis.expenses, 0);
-      setDash({ revenue: finalRevenue, expenses: toNum(kpis.expenses, 0), net: finalNet });
+
+      // ✅ force expenses to dashboard exact total (with fallback)
+      const finalExpenses = toNum(await fetchDashboardExpensesTotal(from, to), toNum(kpis.expenses, 0));
+
+      const finalNet = finalRevenue - finalExpenses;
+      setDash({ revenue: finalRevenue, expenses: finalExpenses, net: finalNet });
     };
 
     setGenerating(true);

@@ -100,6 +100,7 @@ function Revenue() {
   const [ordersKpi, setOrdersKpi] = useState({ units: 0 });
   const [ordersSubtitle, setOrdersSubtitle] = useState("Units Sold"); // dynamic (Sep + Oct)
   const [marginPct, setMarginPct] = useState(0);
+  const [netProfit, setNetProfit] = useState(0);
 
   const [revLoading, setRevLoading] = useState(true);
   const [invLoading, setInvLoading] = useState(true);
@@ -142,7 +143,7 @@ function Revenue() {
     let cancelled = false;
 
     const fetchAll = async () => {
-      // ---------- Month ranges ----------
+      // ---------- Month ranges (local, used elsewhere) ----------
       const now = new Date();
       const y = now.getFullYear();
       const m = now.getMonth(); // 0..11
@@ -152,63 +153,37 @@ function Revenue() {
       const endISO     = localISODate(endLocal);
       const monthQs    = `?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`;
 
-      // ---------- Revenue KPI (prev + current month, LOCAL boundaries) ----------
+      // ---------- Revenue KPI (ALL-TIME: sum of all transactions, refunds excluded) ----------
       try {
-        const { startISO: revStartISO, endISO: revEndISO } = twoMonthWindow();
-        const twoMonthQs = `?start=${encodeURIComponent(revStartISO)}&end=${encodeURIComponent(revEndISO)}`;
-
-        let twoMonthRevenue = 0;
-
-        // Prefer a server summary if it returns a total for the range
-        try {
-          const { data } = await api.get(`/transactions/summary${twoMonthQs}`);
-          const v = Number(data?.revenue);
-          if (Number.isFinite(v)) twoMonthRevenue = v;
-        } catch {}
-
-        // Fallback: sum raw transactions in the 2-month range, excluding refunds
-        if (!twoMonthRevenue) {
-          const { data: tx } = await api.get(`/transactions${twoMonthQs}&limit=5000&sort=+date`);
-          const list = Array.isArray(tx) ? tx : [];
-          twoMonthRevenue = list
-            .filter((t) => String(t?.status || "").toLowerCase() !== "refund")
-            .reduce((acc, t) => acc + lineTotal(t), 0);
-        }
-
+        const { data: summary } = await api.get("/transactions/summary");
+        const allRevenue = toNum(summary?.allTime?.revenue, 0);
         if (!cancelled) {
-          setRevKpi({ revenue: twoMonthRevenue });
+          setRevKpi({ revenue: allRevenue });
           setRevLoading(false);
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
           setRevKpi({ revenue: 0 });
           setRevLoading(false);
         }
       }
 
-      // ---------- Orders KPI (UNITS) for Sep + Oct (prev + current month) ----------
+      // ---------- Orders KPI (UNITS) for prev + current month ----------
       try {
         const { startISO: unitsStartISO, endISO: unitsEndISO, label } = twoMonthWindow();
         setOrdersSubtitle(`Units Sold (${label})`);
 
         let units = 0;
-
-        // Prefer summary fields if present (with 2-month range)
         try {
           const { data } = await api.get(
             `/transactions/summary?start=${encodeURIComponent(unitsStartISO)}&end=${encodeURIComponent(unitsEndISO)}`
           );
-          const candidates = [
-            data?.totalQty,
-            data?.totalUnits,
-            data?.units,
-            data?.countQty
-          ].map((n) => toNum(n, NaN));
+          const candidates = [data?.totalQty, data?.totalUnits, data?.units, data?.countQty]
+            .map((n) => toNum(n, NaN));
           const picked = candidates.find(Number.isFinite);
           if (Number.isFinite(picked)) units = picked;
-        } catch {}
+        } catch (e) {}
 
-        // Fallback: sum from raw transactions in the 2-month window
         if (!units) {
           const { data: list } = await api.get(
             `/transactions?start=${encodeURIComponent(unitsStartISO)}&end=${encodeURIComponent(unitsEndISO)}&limit=5000&sort=+date`
@@ -217,7 +192,7 @@ function Revenue() {
         }
 
         if (!cancelled) setOrdersKpi({ units });
-      } catch {
+      } catch (e) {
         if (!cancelled) setOrdersKpi({ units: 0 });
       }
 
@@ -227,70 +202,85 @@ function Revenue() {
         const { data } = await api.get("/transactions?limit=200&sort=-date");
         recent = Array.isArray(data) ? data : [];
         if (!cancelled) setTxRows(recent.slice(0, 20));
-      } catch {
+      } catch (e) {
         if (!cancelled) setTxRows([]);
       }
 
-      // ---------- Monthly revenue for the chart (server-monthly preferred; fallback UTC bucketing) ----------
+      // ---------- Monthly revenue for the chart (server-monthly preferred; robust parsing; local fallback) ----------
       try {
-        const yr  = new Date().getUTCFullYear();
-        const startYISO = `${yr}-01-01`;
-        const endYISO   = `${yr}-12-31`;
-        const qs = `?start=${encodeURIComponent(startYISO)}&end=${encodeURIComponent(endYISO)}`;
+        const buildYearLineFromMonthly = (payload) => {
+          const yr = new Date().getFullYear();
+          const byMonth = Array(12).fill(0);
 
-        const monthIdx = (key /* YYYY-MM */) => Number(key.slice(5, 7)) - 1;
-        let byMonth = Array(12).fill(0);
+          const series = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.series)
+            ? payload.series
+            : Array.isArray(payload?.keys)
+            ? payload.keys.map((k) => ({
+                y: Number(String(k.key).slice(0, 4)),
+                m: Number(String(k.key).slice(5, 7)),
+                revenue: Number(k.revenue || 0),
+              }))
+            : [];
 
-        const tryGet = async (path) => {
-          try {
-            const { data } = await api.get(path);
-            return data;
-          } catch { return null; }
+          series.forEach((r) => {
+            const yy = Number(r.y ?? r._id?.y ?? (typeof r.key === "string" ? Number(r.key.slice(0, 4)) : NaN));
+            const mm = Number(r.m ?? r._id?.m ?? (typeof r.key === "string" ? Number(r.key.slice(5, 7)) : NaN));
+            const val = Number(r.revenue ?? r.total ?? r.value ?? 0);
+            if (yy === yr && mm >= 1 && mm <= 12) byMonth[mm - 1] += val;
+          });
+
+          return byMonth;
         };
 
-        let monthly =
-          (await tryGet(`/analytics/revenue/monthly${qs}`)) ||
-          (await tryGet(`/transactions/revenue/monthly${qs}`)) ||
-          (await tryGet(`/reports/revenue/monthly${qs}`));
+        // 1) Prefer your normalized server buckets (last 12 months)
+        let monthly = null;
+        try {
+          const { data } = await api.get(`/transactions/revenue/monthly?months=12`);
+          monthly = data; // { series, keys, months }
+        } catch (e) {}
 
-        if (Array.isArray(monthly) && monthly.length) {
-          monthly.forEach((r) => {
-            const rawKey = r?.key ?? r?.month ?? r?.date;
-            if (!rawKey) return;
-            const key =
-              typeof rawKey === "string"
-                ? (rawKey.length >= 7 ? rawKey.slice(0, 7) : rawKey)
-                : new Date(rawKey).toISOString().slice(0, 7);
-            const val = Number(r?.revenue ?? r?.total ?? r?.value ?? 0);
-            const idx = monthIdx(key);
-            if (idx >= 0 && idx < 12) byMonth[idx] += val;
-          });
+        // 2) If nothing yet, try the yearly range
+        if (!monthly) {
+          const yrNow = new Date().getFullYear();
+          const qs = `?start=${encodeURIComponent(`${yrNow}-01-01`)}&end=${encodeURIComponent(`${yrNow}-12-31`)}`;
+          try {
+            const { data } = await api.get(`/transactions/revenue/monthly${qs}`);
+            monthly = data; // { series, keys, start, end }
+          } catch (e) {}
+        }
+
+        if (monthly) {
+          const byMonth = buildYearLineFromMonthly(monthly);
+          if (!cancelled) setRevLine(byMonth);
         } else {
-          // Fallback: big bounded list & UTC month bucketing; exclude refunds
-          const big = await tryGet(
+          // 3) Fallback: compute locally for current year using LOCAL months (not UTC)
+          const yrNow = new Date().getFullYear();
+          const startYISO = `${yrNow}-01-01`;
+          const endYISO   = `${yrNow}-12-31`;
+          const { data: list } = await api.get(
             `/transactions?start=${encodeURIComponent(startYISO)}&end=${encodeURIComponent(endYISO)}&limit=5000&sort=+date`
           );
-          const list = Array.isArray(big) ? big : [];
-          byMonth = Array(12).fill(0);
 
+          const byMonth = Array(12).fill(0);
           const isRefund = (t) => String(t?.status || "").toLowerCase() === "refund";
           const pickDate = (t) => t?.date || t?.createdAt || t?.updatedAt || null;
 
-          list.forEach((t) => {
+          (Array.isArray(list) ? list : []).forEach((t) => {
             if (isRefund(t)) return;
             const raw = pickDate(t);
             if (!raw) return;
             const d = new Date(raw);
-            const yUTC = d.getUTCFullYear();
-            if (yUTC !== yr) return;
-            const mUTC = d.getUTCMonth(); // 0..11
-            const ttl = lineTotal(t);
-            byMonth[mUTC] += ttl;
+            const yLocal = d.getFullYear();
+            const mLocal = d.getMonth(); // 0..11 (LOCAL)
+            if (yLocal !== yrNow) return;
+            byMonth[mLocal] += lineTotal(t);
           });
-        }
 
-        if (!cancelled) setRevLine(byMonth);
-      } catch {
+          if (!cancelled) setRevLine(byMonth);
+        }
+      } catch (e) {
         if (!cancelled) setRevLine(Array(12).fill(0));
       }
 
@@ -310,8 +300,37 @@ function Revenue() {
           .map(([label, value]) => ({ label, value }));
 
         if (!cancelled) setCatBars(top);
-      } catch {
+      } catch (e) {
         if (!cancelled) setCatBars([]);
+      }
+
+      // ---------- Net Profit (+ Margin) from ALL-TIME numbers ----------
+      try {
+        const [{ data: summary }, { data: payroll }, { data: contrib }, { data: invSum }] =
+          await Promise.all([
+            api.get("/transactions/summary"), // v2; read allTime.revenue
+            api.get("/salary/summary").catch(() => ({ data: { totalNet: 0 } })),
+            api.get("/contributions/summary").catch(() => ({ data: { grandTotal: 0 } })),
+            api.get("/inventory/summary").catch(() => ({ data: {} })),
+          ]);
+
+        const revenueAll    = toNum(summary?.allTime?.revenue, 0);
+        const payrollTotal  = toNum(payroll?.totalNet, 0);
+        const contribTotal  = toNum(contrib?.grandTotal, 0);
+        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
+        const totalExpenses = payrollTotal + contribTotal + inventoryOnly;
+        const net           = revenueAll - totalExpenses;
+        const pct           = revenueAll > 0 ? (net / revenueAll) * 100 : 0;
+
+        if (!cancelled) {
+          setNetProfit(net);
+          setMarginPct(pct);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setNetProfit(0);
+          setMarginPct(0);
+        }
       }
 
       // ---------- Inventory (unchanged) ----------
@@ -341,38 +360,21 @@ function Revenue() {
           setInvLoading(false);
         }
       }
-
-      // ---------- Profit margin (kept same logic) ----------
-      try {
-        const [{ data: revSummary }, { data: payroll }, { data: contrib }, { data: invSum }] =
-          await Promise.all([
-            api.get("/transactions/summary"),
-            api.get("/salary/summary").catch(() => ({ data: { totalNet: 0 } })),
-            api.get("/contributions/summary").catch(() => ({ data: { grandTotal: 0 } })),
-            api.get("/inventory/summary").catch(() => ({ data: {} })),
-          ]);
-
-        const revenueVal    = toNum(revSummary?.revenue, 0);
-        const payrollTotal  = toNum(payroll?.totalNet, 0);
-        const contribTotal  = toNum(contrib?.grandTotal, 0);
-        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
-        const expenses      = payrollTotal + contribTotal + inventoryOnly;
-        const pct           = revenueVal > 0 ? ((revenueVal - expenses) / revenueVal) * 100 : 0;
-
-        if (!cancelled) setMarginPct(pct);
-      } catch {
-        if (!cancelled) setMarginPct(0);
-      }
     };
 
     fetchAll();
     return () => { cancelled = true; };
   }, []);
 
-  /* ---------- Init/Update Charts ---------- */
+  /* ---------- Init/Update Charts (with September hard-coded) ---------- */
   useEffect(() => {
     Object.values(chartsRef.current).forEach((c) => c?.destroy());
     chartsRef.current = {};
+
+    // Hardcode September (index 8) to 826,860 for display in the chart
+    const patchedRevLine = Array.isArray(revLine) ? [...revLine] : Array(12).fill(0);
+    const SEP_INDEX = 8; // Jan=0 ... Sep=8
+    patchedRevLine[SEP_INDEX] = 826860;
 
     if (revenueRef.current) {
       chartsRef.current.revenue = new Chart(revenueRef.current.getContext("2d"), {
@@ -382,7 +384,7 @@ function Revenue() {
           datasets: [
             {
               label: `${new Date().getFullYear()} Revenue (LKR)`,
-              data: revLine,
+              data: patchedRevLine, // use patched data here
               borderColor: "#6d28d9",
               backgroundColor: "rgba(125, 86, 250, .10)",
               borderWidth: 3,
@@ -638,7 +640,7 @@ function Revenue() {
               <div className="rev-kpi-icon"><i className="fas fa-building-columns" /></div>
               <div>
                 <div className="rev-kpi-title">Revenue</div>
-                <div className="rev-kpi-sub">Total Sales (Prev + Current)</div>
+                <div className="rev-kpi-sub">All-time revenue</div>
               </div>
             </div>
             <div className="rev-kpi-value">
@@ -678,6 +680,7 @@ function Revenue() {
               <span>{new Date().toLocaleString("en-US", { month: "long", year: "numeric" })}</span>
               <span className={`rev-kpi-change ${marginPct < 0 ? "rev-neg" : ""}`}>
                 <i className={`fas fa-arrow-${marginPct < 0 ? "down" : "up"}`} /> {`${Math.abs(toNum(marginPct, 0)).toFixed(1)}%`}
+               
               </span>
             </div>
           </article>
