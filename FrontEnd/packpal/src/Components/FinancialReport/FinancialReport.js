@@ -892,8 +892,8 @@ function FinancialReport() {
         <tr><td class="sub section">Total current assets</td><td class="right section">LKR ${v(left.assets.totalCurrentAssets)}</td><td class="right section">LKR ${v(right.assets.totalCurrentAssets)}</td></tr>
 
         <tr><td class="section sub" style="padding-top:10px">Non-current assets:</td><td></td><td></td></tr>
-        <tr><td class="sub">Website Software &amp; Tools</td><td class="right">${left.assets.websiteTools ? "LKR "+v(left.assets.websiteTools) : "-"}</td><td class="right">${right.assets.websiteTools ? "LKR "+v(right.assets.websiteTools) : "-"}</td></tr>
-        <tr><td class="sub section">Total non-current assets</td><td class="right section">${left.assets.totalNonCurrentAssets ? "LKR "+v(left.assets.totalNonCurrentAssets) : "-"}</td><td class="right section">${right.assets.totalNonCurrentAssets ? "LKR "+v(right.assets.totalNonCurrentAssets) : "-"}</td></tr>
+        <tr><td class="sub">Website Software &amp; Tools</td><td class="right">${left.assets.websiteTools ? "LKR "+v(left.assets.websiteTools) : "LKR 0"}</td><td class="right">${right.assets.websiteTools ? "LKR "+v(right.assets.websiteTools) : "LKR 0"}</td></tr>
+        <tr><td class="sub section">Total non-current assets</td><td class="right section">${left.assets.totalNonCurrentAssets ? "LKR "+v(left.assets.totalNonCurrentAssets) : "LKR 0"}</td><td class="right section">${right.assets.totalNonCurrentAssets ? "LKR "+v(right.assets.totalNonCurrentAssets) : "LKR 0"}</td></tr>
 
         <tr><td class="section total" style="padding-top:8px"><strong>Total assets</strong></td><td class="right total"><strong>LKR ${v(left.assets.totalAssets)}</strong></td><td class="right total"><strong>LKR ${v(right.assets.totalAssets)}</strong></td></tr>
       </tbody>
