@@ -1,9 +1,11 @@
-// src/App.js
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 
-/* pulli */
+/* ONE header controller for the whole app */
+import AuthHeaderSwitcher from "./Components/Header/AuthHeaderSwitcher";
+
+/* your existing imports (unchanged) */
 import InventoryDashboard from "./Components/Dashboard/InventoryDashboard";
 import ItemInventory from "./Components/ItemInventory/ItemInventory";
 import Suppliers from "./Components/Suppliers/Suppliers";
@@ -12,7 +14,6 @@ import ProductInventory from "./Components/ProductInventory/ProductInventory";
 import Report from "./Components/Report/Report";
 import Settingspul from "./Components/Settings/Settingspul";
 
-/* sasangi */
 import CartDashboard from "./Components/Dashboard/CartDashboard";
 import ProductList from "./Components/Product/ProductList";
 import Discounts from "./Components/Discounts/Discounts";
@@ -22,7 +23,6 @@ import Settingssa from "./Components/Settings/Settingssa";
 import CustomerView from "./pages/CustomerView";
 import Cart from "./pages/Cart";
 
-/* isumi */
 import Udashboard from "./Components/Dashboard/Udashboard";
 import Login from "./Components/Login/Login";
 import UserManagement from "./Components/UserManagement/UserManagement";
@@ -30,7 +30,6 @@ import Createaccount from "./Components/CreateAccount/Createaccount";
 import Orders from "./Components/Orders/Order";
 import Settingsis from "./Components/Settings/Settingsis";
 
-/* sanu */
 import FinanceDashboard from "./Components/Dashboard/FinanceDashboard";
 import SalaryCal from "./Components/SalaryCal/SalaryCal";
 import Attendance from "./Components/Attendance/Attendance";
@@ -42,7 +41,6 @@ import FinancialReport from "./Components/FinancialReport/FinancialReport";
 import Revenue from "./Components/Revenue/Revenue";
 import Setting from "./Components/Settings/Settingsanu";
 
-/* hiru */
 import Pdashboard from "./Components/Productdashboard/Pdashboard";
 import SewingInstruction from "./Components/SewingInstruction/SewingInstruction";
 import Employee from "./Components/Employee/Employee";
@@ -51,12 +49,10 @@ import Quality from "./Components/Quality/Quality";
 import Settinghiru from "./Components/Setting/Settinghiru";
 import HiruInventory from "./Components/HiruInventory/HiruInventory";
 
-/* storefront */
 import AboutPage from "./Components/AboutPage/AboutPage";
 import HandBag from "./Components/HandBag/HandBag";
 import Home from "./Components/Home/Home";
 import Accessories from "./Components/Accessories/Accessories";
-import Header from "./Components/Header/Header"; // if you still use the generic header in some pages
 import Clutches from "./Components/Clutches/Clutches";
 import KidsBag from "./Components/KidsBag/KidsBag";
 import Footer from "./Components/Footer/Footer";
@@ -65,9 +61,6 @@ import Sales from "./Components/Sales/Sales";
 import Faq from "./Components/Faq/Faq";
 import Totebags from "./Components/Totebags/Totebags";
 import Feedback from "./Components/Feedback/Feedback";
-
-/* customer-only logout header gate */
-import CustomerLogoutGate from "./Components/Header/CustomerLogoutGate";
 
 /* 404 fallback */
 function NotFound() {
@@ -83,19 +76,20 @@ function NotFound() {
 export default function App() {
   return (
     <>
-      {/* This renders LogoutHeader ONLY when a customer is logged in.
-          (It watches localStorage: pp:token + pp:user.role === 'customer') */}
-      <CustomerLogoutGate />
+      {/* Shows header ONLY on storefront pages:
+          - Logged in customer → LogoutHeader
+          - Others / guests   → Header
+          - Dashboards        → no header */}
+      <AuthHeaderSwitcher />
 
       <Routes>
-        {/* default redirect */}
         <Route path="/" element={<Navigate to="/home" replace />} />
 
         {/* Auth */}
         <Route path="/login" element={<Login />} />
         <Route path="/createaccount" element={<Createaccount />} />
 
-        {/* Storefront */}
+        {/* Storefront (header shows via switcher) */}
         <Route path="/home" element={<Home />} />
         <Route path="/handbag" element={<HandBag />} />
         <Route path="/aboutpage" element={<AboutPage />} />
@@ -109,13 +103,9 @@ export default function App() {
         <Route path="/feedback" element={<Feedback />} />
         <Route path="/customer" element={<CustomerView />} />
         <Route path="/cart" element={<Cart />} />
-
-        {/* (Optional standalone) generic header/footer demo routes */}
-        <Route path="/header" element={<Header />} />
         <Route path="/footer" element={<Footer />} />
 
-        {/* Internal / dashboards */}
-        {/* pulli */}
+        {/* Dashboards (no header) */}
         <Route path="/maindashboard" element={<InventoryDashboard />} />
         <Route path="/iteminventory" element={<ItemInventory />} />
         <Route path="/supplier" element={<Suppliers />} />
@@ -124,7 +114,6 @@ export default function App() {
         <Route path="/report" element={<Report />} />
         <Route path="/settingspul" element={<Settingspul />} />
 
-        {/* sasangi */}
         <Route path="/dashboard" element={<CartDashboard />} />
         <Route path="/products" element={<ProductList />} />
         <Route path="/discounts" element={<Discounts />} />
@@ -132,13 +121,11 @@ export default function App() {
         <Route path="/reports" element={<SalesReports />} />
         <Route path="/settingssa" element={<Settingssa />} />
 
-        {/* isumi */}
         <Route path="/isudashboard" element={<Udashboard />} />
         <Route path="/usermanagement" element={<UserManagement />} />
         <Route path="/order" element={<Orders />} />
         <Route path="/settingsis" element={<Settingsis />} />
 
-        {/* sanu */}
         <Route path="/sanudashboard" element={<FinanceDashboard />} />
         <Route path="/salarycal" element={<SalaryCal />} />
         <Route path="/epf" element={<EpfManagement />} />
@@ -151,7 +138,6 @@ export default function App() {
         <Route path="/finance/transfers" element={<SalaryTransfer />} />
         <Route path="/finance/salary" element={<SalaryManagement />} />
 
-        {/* hiru */}
         <Route path="/hirudashboard" element={<Pdashboard />} />
         <Route path="/sewing" element={<SewingInstruction />} />
         <Route path="/employee" element={<Employee />} />
@@ -160,7 +146,6 @@ export default function App() {
         <Route path="/quality" element={<Quality />} />
         <Route path="/settinghiru" element={<Settinghiru />} />
 
-        {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

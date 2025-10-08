@@ -1,33 +1,60 @@
 // src/Components/Header/LogoutHeader.js
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
-  FaHome,
-  FaLayerGroup,
-  FaPuzzlePiece,
-  FaTags,
-  FaGift,
-  FaChevronDown,
-  FaShoppingCart,
+  FaHome, FaLayerGroup, FaPuzzlePiece, FaTags, FaGift,
+  FaChevronDown, FaShoppingCart,
 } from "react-icons/fa";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import "./Header.css";
 
+const STORAGE_KEY = "packPalCart";
+
 export default function LogoutHeader({
-  cartCount = 0,
+  cartCount: cartCountProp,   // optional override
   onCartClick = () => {},
   onDropdown = () => {},
 }) {
   const navigate = useNavigate();
+  const [cartCount, setCartCount] = useState(0);
+
+  // read cart count from localStorage
+  const readCount = () => {
+    try {
+      const arr = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      return Array.isArray(arr) ? arr.length : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  useEffect(() => {
+    // initialize
+    setCartCount(
+      typeof cartCountProp === "number" ? cartCountProp : readCount()
+    );
+
+    const refresh = () => {
+      setCartCount(readCount());
+    };
+
+    // react to localStorage/cart updates
+    const storageListener = (e) => {
+      if (e.key === STORAGE_KEY) refresh();
+    };
+
+    window.addEventListener("storage", storageListener);
+    window.addEventListener("cart:updated", refresh);
+
+    return () => {
+      window.removeEventListener("storage", storageListener);
+      window.removeEventListener("cart:updated", refresh);
+    };
+  }, [cartCountProp]);
 
   const handleLogout = () => {
-    // Clear the correct auth keys
     localStorage.removeItem("pp:token");
     localStorage.removeItem("pp:user");
-
-    // Notify same-tab listeners (e.g., a gate component) to re-render
-    window.dispatchEvent(new Event("pp:auth:changed"));
-
-    // Navigate away
+    window.dispatchEvent(new Event("pp:auth:changed")); // notify switcher
     navigate("/home", { replace: true });
   };
 
@@ -42,7 +69,7 @@ export default function LogoutHeader({
               <div className="logo-text">PackPal</div>
             </Link>
 
-            {/* Primary Nav */}
+            {/* Primary Nav (storefront only) */}
             <nav className="nav" aria-label="Primary">
               <ul className="nav-list">
                 <li className="nav-item">
@@ -52,11 +79,11 @@ export default function LogoutHeader({
                 </li>
 
                 <li className="nav-item has-dropdown">
-                  <NavLink to="/collection" className="nav-link">
-                    <FaLayerGroup /> Collection{" "}
-                    <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
-                  </NavLink>
-
+                  <NavLink to="" className="nav-link">
+                                      <FaLayerGroup /> Collection{" "}
+                                      <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
+                                    </NavLink>
+                  
                   <div className="dropdown" role="menu" aria-label="Collections">
                     <NavLink
                       to="/kidsbag"
@@ -126,11 +153,16 @@ export default function LogoutHeader({
 
               <button
                 className="cart-btn"
-                onClick={onCartClick}
+                onClick={() => {
+                  onCartClick();
+                  navigate("/cart");
+                }}
                 aria-label="Open cart"
               >
                 <FaShoppingCart />
-                <div className="cart-badge" aria-live="polite">{cartCount}</div>
+                <div className="cart-badge" aria-live="polite">
+                  {typeof cartCountProp === "number" ? cartCountProp : cartCount}
+                </div>
               </button>
             </div>
           </div>
