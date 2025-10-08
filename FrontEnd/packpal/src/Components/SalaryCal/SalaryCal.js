@@ -93,11 +93,19 @@ export default function SalaryCal() {
 
   useEffect(() => {
     const onSlash = (e) => {
-      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
+      // only handle plain "/" presses
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // allow typing "/" inside the EPF fields only
+      const t = e.target;
+      const isEPFField = t && (t.id === "epfAdd" || t.id === "epfEdit");
+      if (isEPFField) return; // do NOT preventDefault; let "/" be typed
+
+      // otherwise: act as the shortcut
+      e.preventDefault();
+      searchRef.current?.focus();
     };
+
     window.addEventListener("keydown", onSlash);
     return () => window.removeEventListener("keydown", onSlash);
   }, []);
@@ -174,7 +182,7 @@ export default function SalaryCal() {
       EmpId: editing.EmpId,
       Emp_Name: sanitizeLettersOnly(editing.Emp_Name),
       Designation: sanitizeLettersOnly(editing.Designation),
-      Epf_No: editing.Epf_No,
+      Epf_No: editing.Epf_No, // keep slashes if user typed them
       Base_Sal:
         editing.Base_Sal === ""
           ? ""
@@ -266,17 +274,7 @@ export default function SalaryCal() {
           </div>
 
           {/* ======= PRETTY SEARCH (above) ======= */}
-          <div
-            className="pretty-search"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginTop: 14,
-              marginBottom: 6,
-              flexWrap: "wrap",
-            }}
-          >
+          <div className="pretty-search" style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, marginBottom: 6, flexWrap: "wrap" }}>
             <div
               style={{
                 flex: "1 1 360px",
@@ -308,14 +306,7 @@ export default function SalaryCal() {
               <div style={{ position: "relative", flex: 1 }}>
                 <i
                   className="fa fa-hashtag"
-                  style={{
-                    position: "absolute",
-                    left: 10,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    opacity: 0.6,
-                    fontSize: 14,
-                  }}
+                  style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", opacity: 0.6, fontSize: 14 }}
                 />
                 <input
                   ref={searchRef}
@@ -356,13 +347,7 @@ export default function SalaryCal() {
                 )}
               </div>
               <div
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  background: "#F3F4F6",
-                  fontSize: 12,
-                  color: "#111827",
-                }}
+                style={{ padding: "6px 10px", borderRadius: 999, background: "#F3F4F6", fontSize: 12, color: "#111827" }}
                 title="Matches"
               >
                 {loading ? "…" : `${showing}/${total}`}
@@ -382,7 +367,6 @@ export default function SalaryCal() {
               + Add Employee Details
             </button>
           </div>
-          {/* full-width divider line under the row */}
           <div className="section-divider" />
 
           {addOpen && (
@@ -427,10 +411,11 @@ export default function SalaryCal() {
                   </select>
                 </div>
 
-                {/* 4. EPF No */}
+                {/* 4. EPF No (allow slashes) */}
                 <div className="form-group">
                   <label>EPF No</label>
                   <input
+                    id="epfAdd"
                     type="text"
                     value={form.Epf_No}
                     onChange={(e) => handleAddChange("Epf_No", e.target.value)}
@@ -523,7 +508,6 @@ export default function SalaryCal() {
                 filteredRows.map((r) => (
                   <tr key={r._id}>
                     <td>
-                      {/* subtle highlight if matches */}
                       <span
                         style={{
                           background: q && norm(r.EmpId).includes(norm(q)) ? "#FEF3C7" : "transparent",
@@ -583,7 +567,6 @@ export default function SalaryCal() {
             </div>
 
             <div className="modal-body">
-              {/* Ordered fields: EmpId, Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No */}
               <div className="form-grid two-col">
                 {/* 1. EmpId */}
                 <div className="form-group">
@@ -623,10 +606,11 @@ export default function SalaryCal() {
                   </select>
                 </div>
 
-                {/* 4. EPF No */}
+                {/* 4. EPF No (allow slashes) */}
                 <div className="form-group">
                   <label>EPF No</label>
                   <input
+                    id="epfEdit"
                     type="text"
                     value={editing?.Epf_No ?? ""}
                     onChange={(e) => handleEditChange("Epf_No", e.target.value)}

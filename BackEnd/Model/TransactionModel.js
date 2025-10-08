@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema(
   {
+    id: { type: String },
+
     customer: { type: String, required: true },
     customerId: String,
     fmc: { type: Boolean, default: false },
@@ -19,13 +21,21 @@ const transactionSchema = new mongoose.Schema(
     status: { type: String, enum: ["Paid", "Pending", "Refund"], default: "Paid" },
     notes: String,
 
-    // Important: keep as Date so range queries/aggregations work well
+    // Keep as Date so range queries/aggregations work well
     date: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-// normalize totals
+// Coerce string date ("YYYY-MM-DD") into a Date at 00:00:00Z.
+transactionSchema.pre("validate", function (next) {
+  if (typeof this.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(this.date)) {
+    this.date = new Date(`${this.date}T00:00:00.000Z`);
+  }
+  next();
+});
+
+// Normalize numeric fields and compute total when not provided or invalid.
 transactionSchema.pre("save", function (next) {
   this.qty = Number(this.qty || 0);
   this.unitPrice = Number(this.unitPrice || 0);
@@ -48,5 +58,11 @@ transactionSchema.pre("save", function (next) {
 
   next();
 });
+
+// Helpful indexes
+transactionSchema.index({ createdAt: 1 });
+transactionSchema.index({ date: 1 });
+transactionSchema.index({ status: 1, createdAt: 1 });
+transactionSchema.index({ id: 1 });
 
 module.exports = mongoose.model("Transaction", transactionSchema);
