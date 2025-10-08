@@ -51,7 +51,7 @@ export default function ItemInventory() {
   const editingIndexRef = useRef(-1);
 
   useEffect(() => {
-    const SAFETY_STOCK = 40;
+    const SAFETY_STOCK = 20;
     const $ = (id) => document.getElementById(id);
     const toNum = (v) => Number(v) || 0;
     const asLKR = (n) => `LKR ${Number(n || 0).toLocaleString()}`;
@@ -217,7 +217,7 @@ export default function ItemInventory() {
           totalValue,
           avgUnitPrice: avgUnit,
           lowStockCount: lowStockItems.length,
-          fixedSafetyStock: 40,
+          fixedSafetyStock: 20,
           reportDate: new Date().toLocaleString(),
         },
         inventory: inventoryWithCalcs,
@@ -893,7 +893,7 @@ export default function ItemInventory() {
               <div>
                 <div className="form-title" id="formTitle">Add New Item</div>
                 <div className="hint">
-                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (40)</b> + <b>Dynamic Adj</b>.
+                  Reorder Level = <b>Avg Daily Usage × Lead Time</b> + <b>Safety Stock (20)</b> + <b>Dynamic Adj</b>.
                   <br/>Dynamic Adj changes automatically when stock is deducted (Hiru) or delivered (Purchases).
                   <br/><br/><b>Total price</b> is calculated automatically.
                 </div>
@@ -963,7 +963,7 @@ export default function ItemInventory() {
 
                 <div className="form-group">
                   <label htmlFor="safetyStock">Safety Stock (fixed)</label>
-                  <input id="safetyStock" type="number" defaultValue="40" disabled style={{ background: "#f3f4f6", cursor: "not-allowed" }} title="Safety Stock is fixed at 40" />
+                  <input id="safetyStock" type="number" defaultValue="20" disabled style={{ background: "#f3f4f6", cursor: "not-allowed" }} title="Safety Stock is fixed at 20" />
                 </div>
 
                 <div className="form-group">
