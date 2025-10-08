@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./SewingInstruction.css";
 import Sidebarhiru from "../Sidebar/Sidebarhiru";
 import { api } from "../../lib/api2";
@@ -23,7 +23,7 @@ const toDateInput = (d) => {
   }
 };
 
-// Only letters and spaces are allowed for Sewing Person
+// Only letters and spaces are allowed for Sewing Person (validation)
 const PERSON_RE = /^[A-Za-z ]+$/;
 const sanitizePerson = (v) => v.replace(/[^A-Za-z ]+/g, "").replace(/\s{2,}/g, " ");
 
@@ -66,6 +66,14 @@ export default function SewingInstruction() {
 
   const [personError, setPersonError] = useState("");
   const [logoData, setLogoData] = useState(null); // holds data URL for /public/logo.png
+
+  // SEARCH (Bag Type prefix only)
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 200);
+    return () => clearTimeout(id);
+  }, [search]);
 
   // preload logo once
   useEffect(() => {
@@ -294,6 +302,13 @@ export default function SewingInstruction() {
     }
   };
 
+  /* ---------- Derived: filter by Bag Type prefix only ---------- */
+  const filteredItems = useMemo(() => {
+    const q = debouncedSearch;
+    if (!q) return items;
+    return items.filter((i) => (i.bag ?? "").toString().toLowerCase().startsWith(q));
+  }, [items, debouncedSearch]);
+
   /* ---------- PDF export (branded header) ---------- */
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
@@ -445,9 +460,33 @@ export default function SewingInstruction() {
         <main className="container">
           <section className="section-head">
             <h2>Sewing Instructions</h2>
-            <button className="btn btn-primary" onClick={openCreate}>
-              <span className="icon" aria-hidden="true">➕</span> Add Instruction
-            </button>
+
+            {/* Search (Bag Type prefix only) + Add */}
+            <div className="searchbar">
+              <span className="search-icon" aria-hidden="true">🔎</span>
+              <input
+                className="search-input"
+                type="text"
+                placeholder="  Filter by bag type"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Filter by bag type prefix"
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="search-clear"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                  title="Clear"
+                >
+                  ✕
+                </button>
+              )}
+              <button className="btn btn-primary" onClick={openCreate}>
+                <span className="icon" aria-hidden="true">➕</span> Add Instruction
+              </button>
+            </div>
           </section>
 
           <section className="card">
@@ -464,7 +503,7 @@ export default function SewingInstruction() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((i) => (
+                  {filteredItems.map((i) => (
                     <tr key={i.id}>
                       <td>
                         <p className="bag-title">{i.bag}</p>
@@ -508,10 +547,10 @@ export default function SewingInstruction() {
                       </td>
                     </tr>
                   ))}
-                  {items.length === 0 && (
+                  {filteredItems.length === 0 && (
                     <tr>
                       <td colSpan="6" style={{ textAlign: "center", padding: "16px" }}>
-                        No instructions yet.
+                        {search ? "No bag types starting with that text." : "No instructions yet."}
                       </td>
                     </tr>
                   )}

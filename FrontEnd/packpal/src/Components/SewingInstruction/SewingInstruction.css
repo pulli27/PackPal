@@ -122,6 +122,81 @@
   box-shadow: 0 20px 60px rgba(0,0,0,.25);
 }
 
+/* Search bar */
+/* Search bar */
+.searchbar{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto; /* sits on the right of the section head */
+}
+.search-input{
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 36px 10px 34px; /* room for icon + clear */
+  min-width: 300px;
+  outline: none;
+}
+.search-input:focus{ border-color: #cbd5e1 }
+.search-icon{
+  margin-left: 8px;
+  position: relative;
+  left: 340px; /* visually inside the input */
+  pointer-events: none;
+}
+.search-clear{
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  margin-left: -40px; /* overlay on right edge of input */
+  padding: 6px;
+}
+@media (max-width: 640px){
+  .searchbar{ width: 100%; flex-wrap: wrap; gap: 8px }
+  .search-input{ flex: 1 1 100%; min-width: 0; width: 100% }
+  .search-icon{ left: 28px }
+  .search-clear{ margin-left: -36px }
+}
+
+/* =========================
+   Modal dialogs — centered
+   ========================= */
+.sew .modal{
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  z-index: 1000;
+}
+
+.sew .modal[open]{
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  height: 100dvh;
+  padding: 24px;
+}
+
+.sew .modal::backdrop{ background: rgba(0,0,0,.35) }
+
+.sew .modal-card{
+  position: static;
+  transform: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  width: min(720px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  margin: 0;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+
+
 .sew .grid{
   display: grid;
   grid-template-columns: 1fr 1fr;

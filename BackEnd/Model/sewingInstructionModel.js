@@ -27,4 +27,5 @@ const sewingInstructionSchema = new Schema(
 sewingInstructionSchema.index({ status: 1, deadline: 1 });
 sewingInstructionSchema.index({ createdAt: -1 });
 
+//exports model name "SewingInstruction"
 module.exports = mongoose.model("SewingInstruction", sewingInstructionSchema, "sewing_instructions");
