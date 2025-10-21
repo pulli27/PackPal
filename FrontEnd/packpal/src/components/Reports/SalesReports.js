@@ -2,11 +2,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./SalesReports.css";
 import Sidebarsa from "../Sidebar/Sidebarsa";
-import { api } from "../../lib/api"; // ✅ use shared axios instance
+import { api } from "../../lib/api";              // ✅ shared axios instance
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+/* ===================== Branding / Assets ===================== */
+const COMPANY = {
+  name: "PackPal (Pvt) Ltd",
+  address1: "No. 123, Galle Road, Colombo 04, Sri Lanka",
+  phone: "+94 77 123 4567",
+  email: "hello@packpal.com",
+};
+const LOGO_URL = "/logo.png";           // optional (public/logo.png)
+const SIGNATURE_URL = "/signature.png"; // optional (public/signature.png)
 
 /* ===================== Helpers ===================== */
 const money = (n) =>
-  "LKR" +
+  "LKR " +
   Number(n || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -17,6 +29,12 @@ const unpackList = (payload) =>
     ? payload
     : payload?.transactions ?? payload?.items ?? payload?.data ?? [];
 
+/* ===== SVG chart helpers ===== */
+const scale = (val, min, max) => (max === min ? 0 : (val - min) / (max - min));
+const BLUE_PALETTE   = ["#2563eb", "#60a5fa", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444"];
+const ORANGE_PALETTE = ["#ea580c", "#fb923c", "#fdba74", "#f97316", "#fb923c", "#c2410c"];
+
+/* ===== Row normalizer ===== */
 const toTx = (row) => ({
   id: String(
     row?.id ??
@@ -36,43 +54,6 @@ const toTx = (row) => ({
   status: (row?.status ?? "pending").toLowerCase(), // pending | paid | refund
 });
 
-/* ===== Print / PDF ===== */
-const openPrintable = (innerHtml, opts = {}) => {
-  const { title = "Report", pageSize = "A4", orientation = "portrait" } = opts;
-  const w = window.open("", "_blank");
-  w.document.write(`<!DOCTYPE html>
-  <html><head><meta charset="utf-8"/>
-  <title>${title}</title>
-  <style>
-    @page { size:${pageSize} ${orientation}; margin:12mm; }
-    body{font-family:Arial, sans-serif; color:#111827; margin:0}
-    h1,h2,h3{margin:0 0 8px}
-    .muted{color:#637087}
-    .stats{display:grid; gap:12px}
-    @media(min-width:900px){.stats{grid-template-columns:repeat(4,1fr)}}
-    .card{border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:#fff}
-    .v{font-weight:800; font-size:18px}
-    .l{text-transform:uppercase; font-size:11px; color:#637087; letter-spacing:.04em}
-    table{width:100%; border-collapse:collapse; margin-top:8px}
-    thead th{background:#f3f4f6}
-    th,td{border:1px solid #e5e7eb; padding:8px; text-align:left}
-    .right{text-align:right}
-    .section{margin:12px 0}
-    .page-break{page-break-before:always}
-    .header{margin-bottom:8px}
-  </style></head><body>${innerHtml}</body></html>`);
-  w.document.close();
-  setTimeout(() => {
-    w.focus();
-    w.print();
-  }, 100);
-};
-
-/* ===================== Tiny chart utils (SVG) ===================== */
-const scale = (val, min, max) => (max === min ? 0 : (val - min) / (max - min));
-const BLUE_PALETTE = ["#2563eb", "#60a5fa", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444"];
-const ORANGE_PALETTE = ["#ea580c", "#fb923c", "#fdba74", "#f97316", "#fb923c", "#c2410c"];
-
 /* ===== Helper: try multiple API paths and pick the one that works ===== */
 async function getTxWithFallbacks(paths) {
   let lastErr;
@@ -90,10 +71,31 @@ async function getTxWithFallbacks(paths) {
   throw lastErr || new Error("All endpoints failed");
 }
 
+/* ===== Small utility: load image -> dataURL for jsPDF (safe to fail) ===== */
+const imageToDataUrl = (src) =>
+  new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+
 /* ===================== Component ===================== */
 export default function SalesReport() {
   const [txs, setTxs] = useState([]);
-  const [txBase, setTxBase] = useState("transactions"); // keep detected path
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -104,14 +106,12 @@ export default function SalesReport() {
     setLoading(true);
     setErr("");
     try {
-      // Try relative first (works with baseURL that already has /api), then absolute.
-      const { path, data } = await getTxWithFallbacks([
+      const { data } = await getTxWithFallbacks([
         "transactions",
         "api/transactions",
         "/transactions",
         "/api/transactions",
       ]);
-      setTxBase(path);
       setTxs(unpackList(data).map(toTx));
     } catch (e) {
       const url = e?.config ? (e.config.baseURL || "") + (e.config.url || "") : "";
@@ -147,17 +147,17 @@ export default function SalesReport() {
     });
   }, [txs, range]);
 
-  /* -------- Analytics -------- */
+  /* -------- Analytics + Series for Charts -------- */
   const analytics = useMemo(() => {
     const norm = (s) => (s || "").toLowerCase();
-    const paid = rowsInRange.filter((t) => norm(t.status) === "paid");
+    const paid    = rowsInRange.filter((t) => norm(t.status) === "paid");
     const pending = rowsInRange.filter((t) => norm(t.status) === "pending");
-    const refund = rowsInRange.filter((t) => norm(t.status) === "refund");
+    const refund  = rowsInRange.filter((t) => norm(t.status) === "refund");
 
     const paidRevenue = paid.reduce((s, t) => s + (Number(t.total) || 0), 0);
-    const pendingAmt = pending.reduce((s, t) => s + (Number(t.total) || 0), 0);
-    const refundAmt = refund.reduce((s, t) => s + (Number(t.total) || 0), 0);
-    const aov = paid.length ? paidRevenue / paid.length : 0;
+    const pendingAmt  = pending.reduce((s, t) => s + (Number(t.total) || 0), 0);
+    const refundAmt   = refund.reduce((s, t) => s + (Number(t.total) || 0), 0);
+    const aov         = paid.length ? paidRevenue / paid.length : 0;
 
     // Revenue over time (paid only)
     const byDateMap = new Map();
@@ -214,90 +214,205 @@ export default function SalesReport() {
       uniqueCustomers: new Set(
         rowsInRange.map((t) => t.customer || t.customerId).filter(Boolean)
       ).size,
-      byDate,
+      byDate,          // <-- series for LineChart
       byProductAll,
       byCustomer,
     };
   }, [rowsInRange]);
 
-  /* -------- Build report HTML (for export) -------- */
-  const buildReportHtml = () => {
-    const statsHtml =
-      `<div class="stats">` +
-      [
-        ["Paid Revenue", money(analytics.paidRevenue)],
-        ["Pending Amount", money(analytics.pendingAmt)],
-        ["Refund Amount", money(analytics.refundAmt)],
-        ["Avg Order Value", money(analytics.aov)],
-      ]
-        .map(
-          ([k, v]) =>
-            `<div class="card"><div class="v">${v}</div><div class="l">${k}</div></div>`
-        )
-        .join("") +
-      `</div>`;
+  /* ===================== PDF Export (jsPDF) ===================== */
+  const exportPdf = async () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4", compress: true }); // 595.28 x 841.89
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 36; // 0.5 inch
 
-    const productTable = `<div class="section page-break">
-         <h3>Analysis — Sales by Product (Paid)</h3>
-         <table>
-           <thead>
-             <tr>
-               <th>Product</th><th class="right">Orders</th><th class="right">Qty</th>
-               <th class="right">Avg Price</th><th class="right">Discount Total</th><th class="right">Revenue</th>
-             </tr>
-           </thead>
-           <tbody>
-             ${analytics.byProductAll
-               .map(
-                 (r) => `
-               <tr>
-                 <td>${r.product}</td>
-                 <td class="right">${r.orders}</td>
-                 <td class="right">${r.qty}</td>
-                 <td class="right">${money(r.avgPrice)}</td>
-                 <td class="right">${money(r.discountTotal)}</td>
-                 <td class="right">${money(r.revenue)}</td>
-               </tr>`
-               )
-               .join("")}
-           </tbody>
-         </table>
-       </div>`;
+    // Try to embed images (silently skip if not available)
+    const logoData = await imageToDataUrl(LOGO_URL);
+    const signData = await imageToDataUrl(SIGNATURE_URL);
 
-    const customerTable = `<div class="section page-break">
-         <h3>Top Customers (Paid)</h3>
-         <table>
-           <thead><tr><th>Customer</th><th class="right">Orders</th><th class="right">Revenue</th></tr></thead>
-           <tbody>
-             ${analytics.byCustomer
-               .map(
-                 (r) =>
-                   `<tr><td>${r.customer}</td><td class="right">${r.orders}</td><td class="right">${money(
-                     r.revenue
-                   )}</td></tr>`
-               )
-               .join("")}
-           </tbody>
-         </table>
-       </div>`;
+    /* ----- Header ----- */
+    let y = margin;
+    if (logoData) {
+      const logoH = 38;
+      const logoW = 38;
+      doc.addImage(logoData, "PNG", margin, y, logoW, logoH);
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text(COMPANY.name, margin + (logoData ? 46 : 0), y + 14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(80);
+    const addr = `${COMPANY.address1}`;
+    const contact = `Phone: ${COMPANY.phone}  |  Email: ${COMPANY.email}`;
+    doc.text(addr, margin + (logoData ? 46 : 0), y + 28);
+    doc.text(contact, margin + (logoData ? 46 : 0), y + 42);
 
-    const header = `<div class="header">
-         <h2>Sales Report</h2>
-         <div class="muted">Generated: ${generatedAt || new Date().toLocaleString()}</div>
-       </div>`;
+    // Report title + generated at (right)
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    const title = "Sales Report";
+    doc.text(title, pageW - margin, y + 16, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(90);
+    doc.text(
+      `Generated: ${generatedAt || new Date().toLocaleString()}`,
+      pageW - margin,
+      y + 32,
+      { align: "right" }
+    );
 
-    return `${header}<div class="section">${statsHtml}</div>${productTable}${customerTable}`;
-  };
+    // Divider
+    y += 56;
+    doc.setDrawColor(0);
+    doc.setLineWidth(1);
+    doc.line(margin, y, pageW - margin, y);
+    y += 16;
 
-  const exportPdf = () => {
-    openPrintable(buildReportHtml(), {
-      title: "Sales Report",
-      pageSize: "A4",
-      orientation: "portrait",
+    /* ----- KPI “cards” ----- */
+    const kpis = [
+      { label: "Paid Revenue", value: money(analytics.paidRevenue) },
+      { label: "Pending Amount", value: money(analytics.pendingAmt) },
+      { label: "Refund Amount", value: money(analytics.refundAmt) },
+      { label: "Avg Order Value", value: money(analytics.aov) },
+      { label: "Paid Orders", value: String(analytics.paidCount) },
+      { label: "Orders (All)", value: String(analytics.allCount) },
+      { label: "Unique Customers", value: String(analytics.uniqueCustomers) },
+      { label: "Generated", value: generatedAt || "—" },
+    ];
+
+    const cardW = (pageW - margin * 2 - 24) / 2; // 2 per row
+    const cardH = 54;
+    doc.setFontSize(11);
+    for (let i = 0; i < kpis.length; i++) {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = margin + col * (cardW + 24);
+      const yy = y + row * (cardH + 12);
+
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.6);
+      doc.roundedRect(x, yy, cardW, cardH, 6, 6);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(17, 24, 39);
+      doc.text(kpis[i].value, x + 12, yy + 22);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(99, 110, 135);
+      doc.text(kpis[i].label.toUpperCase(), x + 12, yy + 38);
+    }
+    y += Math.ceil(kpis.length / 2) * (cardH + 12) + 12;
+
+    /* ----- Table: Sales by Product (Paid) ----- */
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Analysis — Sales by Product (Paid)", margin, y);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      styles: { font: "helvetica", fontSize: 10, cellPadding: 4 },
+      headStyles: { fillColor: [243, 244, 246], textColor: 0 },
+      columnStyles: {
+        1: { halign: "right" },
+        2: { halign: "right" },
+        3: { halign: "right" },
+        4: { halign: "right" },
+        5: { halign: "right" },
+      },
+      head: [["Product", "Orders", "Qty", "Avg Price", "Discount Total", "Revenue"]],
+      body: analytics.byProductAll.map((r) => [
+        r.product || "—",
+        r.orders,
+        r.qty,
+        money(r.avgPrice),
+        money(r.discountTotal),
+        money(r.revenue),
+      ]),
+      didDrawPage: (data) => drawFooter(doc),
     });
+    y = doc.lastAutoTable?.finalY || y;
+
+    /* ----- Table: Top Customers (Paid) ----- */
+    y += 18;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Top Customers (Paid)", margin, y);
+    y += 8;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      styles: { font: "helvetica", fontSize: 10, cellPadding: 4 },
+      headStyles: { fillColor: [243, 244, 246], textColor: 0 },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+      head: [["Customer", "Orders", "Revenue"]],
+      body: analytics.byCustomer.map((r) => [r.customer || "—", r.orders, money(r.revenue)]),
+      didDrawPage: () => drawFooter(doc),
+    });
+    y = doc.lastAutoTable?.finalY || y;
+
+    /* ----- Signature Section on the last page ----- */
+    y += 36;
+    if (y + 110 > pageH - margin) {
+      doc.addPage();
+      y = margin + 8;
+      drawFooter(doc);
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Authorization", margin, y);
+    y += 18;
+
+    // Left: signature line
+    doc.setDrawColor(0);
+    doc.line(margin, y + 32, margin + 220, y + 32);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Authorized Signature", margin, y + 48);
+
+    // Right: optional signature image
+    if (SIGNATURE_URL) {
+      const signData = await imageToDataUrl(SIGNATURE_URL);
+      if (signData) {
+        doc.addImage(signData, "PNG", pageW - margin - 160, y, 160, 60);
+        doc.setFontSize(9);
+        doc.text("Signed by: Finance Manager", pageW - margin - 160, y + 74);
+      }
+    }
+
+    drawFooter(doc);
+
+    const filename = `Sales_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+    doc.save(filename);
   };
 
-  /* -------- Chart components (accept a colors palette) -------- */
+  const drawFooter = (doc) => {
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 36;
+    const pageNumber = doc.internal.getNumberOfPages();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(
+      `© ${new Date().getFullYear()} ${COMPANY.name} • ${COMPANY.email}`,
+      margin,
+      pageH - 18
+    );
+    doc.text(`Page ${pageNumber}`, pageW - margin, pageH - 18, { align: "right" });
+  };
+
+  /* ===================== Tiny SVG Charts ===================== */
   const ChartCard = ({ title, titleColor, children }) => (
     <div className="card" style={{ padding: 12 }}>
       <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: titleColor }}>
@@ -312,7 +427,7 @@ export default function SalesReport() {
     const min = Math.min(...values, 0);
     const max = Math.max(...values, 1);
     const innerW = w - pad * 2;
-       const innerH = h - pad * 2;
+    const innerH = h - pad * 2;
 
     const points = data.map((d, i) => {
       const x = pad + (innerW * i) / Math.max(1, data.length - 1);
@@ -338,7 +453,7 @@ export default function SalesReport() {
         {data.map((d, i) => {
           const x = pad + (innerW * i) / Math.max(1, data.length - 1);
           const y = y0 + 14;
-          const label = d.date.slice(5);
+          const label = (d.date || "").slice(5);
           return (
             <text key={i} x={x} y={y} fontSize="10" textAnchor="middle" fill="#637087">
               {label}
@@ -407,17 +522,14 @@ export default function SalesReport() {
     );
   };
 
-  /* -------- UI -------- */
+  /* ===================== UI ===================== */
   return (
-    /* === PAGE WRAP START === */
     <div className="page-wrap reports-page">
-      {/* Left: Sidebar */}
       <Sidebarsa />
 
-      {/* Right: Main */}
       <main className="content reports-page">
         <h1 className="page-title">Sales Report</h1>
-        <p className="muted">Range-aware analytics with charts &amp; tables.</p>
+        <p className="muted">Range-aware analytics with official PDF export.</p>
 
         {loading && <div className="muted">Loading…</div>}
         {err && (
@@ -443,14 +555,12 @@ export default function SalesReport() {
                 </select>
               </div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
-                <button className="btn" onClick={fetchTx}>
-                  Reload
-                </button>
+                <button className="btn" onClick={fetchTx}>Reload</button>
                 <button className="btn primary" onClick={() => setGeneratedAt(new Date().toLocaleString())}>
                   Generate
                 </button>
                 <button className="btn" onClick={exportPdf}>
-                  Export PDF
+                  Export PDF (Official)
                 </button>
               </div>
             </div>
@@ -464,82 +574,52 @@ export default function SalesReport() {
           </div>
           <div className="body">
             <div className="stats">
-              <div className="card stat">
-                <div className="v">{money(analytics.paidRevenue)}</div>
-                <div className="l">Paid Revenue</div>
-              </div>
-              <div className="card stat">
-                <div className="v">{money(analytics.pendingAmt)}</div>
-                <div className="l">Pending Amount</div>
-              </div>
-              <div className="card stat">
-                <div className="v">{money(analytics.refundAmt)}</div>
-                <div className="l">Refund Amount</div>
-              </div>
-              <div className="card stat">
-                <div className="v">{money(analytics.aov)}</div>
-                <div className="l">Avg Order Value</div>
-              </div>
+              <div className="card stat"><div className="v">{money(analytics.paidRevenue)}</div><div className="l">Paid Revenue</div></div>
+              <div className="card stat"><div className="v">{money(analytics.pendingAmt)}</div><div className="l">Pending Amount</div></div>
+              <div className="card stat"><div className="v">{money(analytics.refundAmt)}</div><div className="l">Refund Amount</div></div>
+              <div className="card stat"><div className="v">{money(analytics.aov)}</div><div className="l">Avg Order Value</div></div>
             </div>
             <div className="stats" style={{ marginTop: 12 }}>
-              <div className="card stat">
-                <div className="v">{analytics.paidCount}</div>
-                <div className="l">Paid Orders</div>
-              </div>
-              <div className="card stat">
-                <div className="v">{analytics.allCount}</div>
-                <div className="l">Orders (All)</div>
-              </div>
-              <div className="card stat">
-                <div className="v">{analytics.uniqueCustomers}</div>
-                <div className="l">Unique Customers</div>
-              </div>
-              <div className="card stat">
-                <div className="v">{generatedAt || "—"}</div>
-                <div className="l">Generated</div>
-              </div>
+              <div className="card stat"><div className="v">{analytics.paidCount}</div><div className="l">Paid Orders</div></div>
+              <div className="card stat"><div className="v">{analytics.allCount}</div><div className="l">Orders (All)</div></div>
+              <div className="card stat"><div className="v">{analytics.uniqueCustomers}</div><div className="l">Unique Customers</div></div>
+              <div className="card stat"><div className="v">{generatedAt || "—"}</div><div className="l">Generated</div></div>
             </div>
           </div>
         </section>
 
-        {/* Analysis charts */}
+        {/* ===== Analysis Charts (TWO GRAPHS) ===== */}
         <section className="section analysis">
           <div className="head">
             <h3>Analysis Charts</h3>
           </div>
           <div className="body">
-            <div className="grid" style={{ display: "grid", gap: 12 }}>
-              <div
-                className="grid"
-                style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 12 }}
-              >
-                <ChartCard title="Revenue Over Time (Paid)" titleColor="#9a3412">
-                  {analytics.byDate.length === 0 ? (
-                    <div className="muted">No paid transactions in this range.</div>
-                  ) : (
-                    <LineChart data={analytics.byDate} colors={ORANGE_PALETTE} />
-                  )}
-                </ChartCard>
-                <ChartCard title="Status Breakdown (Amount)" titleColor="#9a3412">
-                  <DonutChart
-                    series={[
-                      { label: "Paid", value: analytics.paidRevenue },
-                      { label: "Pending", value: analytics.pendingAmt },
-                      { label: "Refund", value: analytics.refundAmt },
-                    ]}
-                    colors={ORANGE_PALETTE}
-                  />
-                </ChartCard>
-              </div>
+            <div className="grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 12 }}>
+              <ChartCard title="Revenue Over Time (Paid)" titleColor="#9a3412">
+                {analytics.byDate.length === 0 ? (
+                  <div className="muted">No paid transactions in this range.</div>
+                ) : (
+                  <LineChart data={analytics.byDate} colors={ORANGE_PALETTE} />
+                )}
+              </ChartCard>
+
+              <ChartCard title="Status Breakdown (Amount)" titleColor="#1e3a8a">
+                <DonutChart
+                  series={[
+                    { label: "Paid",    value: analytics.paidRevenue },
+                    { label: "Pending", value: analytics.pendingAmt },
+                    { label: "Refund",  value: analytics.refundAmt },
+                  ]}
+                  colors={BLUE_PALETTE}
+                />
+              </ChartCard>
             </div>
           </div>
         </section>
 
         {/* Sales by Product */}
         <section className="section">
-          <div className="head">
-            <h3>Analysis — Sales by Product (Paid)</h3>
-          </div>
+          <div className="head"><h3>Analysis — Sales by Product (Paid)</h3></div>
           <div className="body">
             {analytics.byProductAll.length === 0 ? (
               <p className="muted">No paid transactions in this range.</p>
@@ -584,9 +664,7 @@ export default function SalesReport() {
 
         {/* Top Customers */}
         <section className="section">
-          <div className="head">
-            <h3>Top Customers (Paid)</h3>
-          </div>
+          <div className="head"><h3>Top Customers (Paid)</h3></div>
           <div className="body">
             {analytics.byCustomer.length === 0 ? (
               <p className="muted">No paid transactions in this range.</p>
@@ -621,6 +699,5 @@ export default function SalesReport() {
         </section>
       </main>
     </div>
-    /* === PAGE WRAP END === */
   );
 }

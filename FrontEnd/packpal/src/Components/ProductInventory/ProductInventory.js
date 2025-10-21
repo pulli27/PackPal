@@ -85,7 +85,7 @@ function ProductInventory() {
     const stock = Number(item.stock ?? item.quantity ?? 0);
     const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
     const createdAt = item.createdAt || "";
-    const updatedAt = item.updatedAt || "";
+       const updatedAt = item.updatedAt || "";
     const createdAtTs = createdAt ? new Date(createdAt).getTime() : 0;
 
     return {
@@ -98,7 +98,7 @@ function ProductInventory() {
       rating: item.rating ?? null,
       discountType: item.discountType || "",
       discountValue: item.discountValue ?? null,
-      reorderLevel: item.reorderLevel ?? null, // used for Low Stock PDF table if present
+      reorderLevel: item.reorderLevel ?? null, // used for Low Stock logic and new column
       createdAt,
       updatedAt,
       createdAtTs,
@@ -112,7 +112,8 @@ function ProductInventory() {
 
   function getFilteredProducts() {
     return products.filter((p) => {
-      const status = p.stock === 0 ? "out-of-stock" : p.stock <= 20 ? "low-stock" : "in-stock";
+      const rl = p.reorderLevel == null ? 20 : Number(p.reorderLevel);
+      const status = p.stock === 0 ? "out-of-stock" : p.stock <= rl ? "low-stock" : "in-stock";
       const matchesSearch =
         !currentFilters.search ||
         p.name.toLowerCase().includes(currentFilters.search) ||
@@ -127,11 +128,12 @@ function ProductInventory() {
   function generateTableRow(product) {
     const unitAfterDiscount = discountedUnitPrice(product);
     const totalValue = product.stock * unitAfterDiscount;
+    const rl = product.reorderLevel == null ? 20 : Number(product.reorderLevel);
 
     let status = "in-stock";
     let statusText = "In Stock";
     if (product.stock === 0) { status = "out-of-stock"; statusText = "Out of Stock"; }
-    else if (product.stock <= 20) { status = "low-stock"; statusText = "Low Stock"; }
+    else if (product.stock <= rl) { status = "low-stock"; statusText = "Low Stock"; }
 
     const actionsHtml = READ_ONLY
       ? `<div class="action-buttons">
@@ -148,6 +150,7 @@ function ProductInventory() {
         <td><span class="product-name">${product.name}</span></td>
         <td><span class="category-tag category-${product.category.replace(/\s+/g,'').toLowerCase()}">${product.category}</span></td>
         <td><span class="stock-amount">${product.stock} units</span></td>
+        <td><span class="reorder-level">${rl}</span></td>
         <td><span class="unit-price">${money(unitAfterDiscount)}</span></td>
         <td><span class="value-amount">${money(totalValue)}</span></td>
         <td><span class="status ${status}">${statusText}</span></td>
@@ -171,7 +174,10 @@ function ProductInventory() {
     $("#totalProductsStat").textContent = totalProducts;
     $("#totalUnitsStat").textContent = totalUnits;
     $("#totalValueStat").textContent = money(totalValue);
-    $("#lowStockStat").textContent = products.filter((p) => p.stock > 0 && p.stock <= 20).length;
+    $("#lowStockStat").textContent = products.filter((p) => {
+      const rl = p.reorderLevel == null ? 20 : Number(p.reorderLevel);
+      return p.stock > 0 && p.stock <= rl;
+    }).length;
     $("#totalCount").textContent = totalProducts;
   }
 
@@ -252,8 +258,10 @@ function ProductInventory() {
         case 0: av = a.name.toLowerCase();     bv = b.name.toLowerCase(); break;
         case 1: av = a.category.toLowerCase(); bv = b.category.toLowerCase(); break;
         case 2: av = a.stock;                  bv = b.stock; break;
-        case 3: av = discountedUnitPrice(a);   bv = discountedUnitPrice(b); break;
-        case 4: av = a.stock * discountedUnitPrice(a); bv = b.stock * discountedUnitPrice(b); break;
+        case 3: av = (a.reorderLevel == null ? 20 : Number(a.reorderLevel));
+                bv = (b.reorderLevel == null ? 20 : Number(b.reorderLevel)); break;
+        case 4: av = discountedUnitPrice(a);   bv = discountedUnitPrice(b); break;
+        case 5: av = a.stock * discountedUnitPrice(a); bv = b.stock * discountedUnitPrice(b); break;
         default: return 0;
       }
       if (dir === "asc") return av > bv ? 1 : -1;
@@ -290,8 +298,9 @@ function ProductInventory() {
     const unitAfterDiscount = discountedUnitPrice(p);
     const totalValue = p.stock * unitAfterDiscount;
     let status = "In Stock";
+    const rl = p.reorderLevel == null ? 20 : Number(p.reorderLevel);
     if (p.stock === 0) status = "Out of Stock";
-    else if (p.stock <= 20) status = "Low Stock";
+    else if (p.stock <= rl) status = "Low Stock";
 
     const ratingLine = p.rating != null
       ? `<div class="detail-item"><div class="detail-label">Rating</div><div class="detail-value">${p.rating}</div></div>`
@@ -324,6 +333,7 @@ function ProductInventory() {
       <div class="detail-item"><div class="detail-label">Product Name</div><div class="detail-value">${p.name}</div></div>
       <div class="detail-item"><div class="detail-label">Category</div><div class="detail-value">${p.category}</div></div>
       <div class="detail-item"><div class="detail-label">Current Stock</div><div class="detail-value">${p.stock} units</div></div>
+      <div class="detail-item"><div class="detail-label">Reorder Level</div><div class="detail-value">${rl}</div></div>
       ${priceLine}
       <div class="detail-item"><div class="detail-label">Total Value</div><div class="detail-value">${money(totalValue)}</div></div>
       ${ratingLine}
@@ -344,126 +354,125 @@ function ProductInventory() {
   function addProduct() {}
   function deleteProduct() {}
 
-  /* --------------- Export PDF (custom layout that matches your screenshot) --------------- */
+  /* --------------- Export PDF --------------- */
   async function exportPdf() {
-    try {
-      const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-      const autoTable = autoTableMod.default || autoTableMod;
+  try {
+    const [{ jsPDF }, autoTableMod] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+    const autoTable = autoTableMod.default || autoTableMod; // ← declare ONCE here
 
-      const doc = new jsPDF("p", "pt", "a4");
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-      const marginX = 36;
-      let cursorY = 24;
+    const doc = new jsPDF("p", "pt", "a4");
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const marginX = 36;
+    let cursorY = 24;
 
-      // ---------- Header ----------
-      // left: logo + title
-      const logoSize = 26;
-      try {
-        // you can use a base64 here if your logo isn't publicly reachable
-        doc.addImage(LOGO_URL, "PNG", marginX, cursorY, logoSize, logoSize);
-      } catch (_) {
-        // ignore if image can't be loaded
-      }
+    // ---------- Header ----------
+    const logoSize = 26;
+    try { doc.addImage(LOGO_URL, "PNG", marginX, cursorY, logoSize, logoSize); } catch {}
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Inventory Management Report", marginX + logoSize + 10, cursorY + 14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(120);
+    doc.text(`Generated on ${new Date().toLocaleString()}`, marginX + logoSize + 10, cursorY + 30);
+
+    // right: company info
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    const rightX = pageW - marginX;
+    doc.text(COMPANY.name, rightX, cursorY + 5, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(COMPANY.address, rightX, cursorY + 20, { align: "right" });
+    doc.setTextColor(37, 99, 235);
+    doc.text(COMPANY.email, rightX, cursorY + 35, { align: "right" });
+    doc.setTextColor(0);
+
+    cursorY += 48;
+    doc.setDrawColor(220);
+    doc.line(marginX, cursorY, pageW - marginX, cursorY);
+    cursorY += 14;
+
+    // ---------- KPI boxes ----------
+    const totalProducts = products.length;
+    const totalUnits = products.reduce((s, p) => s + p.stock, 0);
+    const totalValue = products.reduce((s, p) => s + p.stock * discountedUnitPrice(p), 0);
+    const lowStock = products.filter((p) => {
+      const rl = p.reorderLevel == null ? 20 : Number(p.reorderLevel);
+      return p.stock > 0 && p.stock <= rl;
+    }).length;
+    const avgUnit = products.length
+      ? products.reduce((s, p) => s + discountedUnitPrice(p), 0) / products.length
+      : 0;
+
+    const kpis = [
+      { label: "TOTAL ITEMS", value: String(totalProducts), color: [37, 99, 235] },
+      { label: "TOTAL QUANTITY", value: totalUnits.toLocaleString(), color: [37, 99, 235] },
+      { label: "TOTAL VALUE", value: money(totalValue), color: [37, 99, 235] },
+      { label: "LOW STOCK ITEMS", value: String(lowStock), color: [239, 68, 68], danger: true },
+      { label: "AVG UNIT PRICE", value: money(avgUnit.toFixed(2)), color: [37, 99, 235] },
+      { label: "SAFETY STOCK", value: "—", color: [37, 99, 235] },
+    ];
+
+    const boxW = (pageW - marginX * 2 - 20) / 3;
+    const boxH = 54;
+    const gap = 10;
+
+    doc.setFontSize(11);
+    const drawBox = (x, y, w, h, label, value, stroke, isDanger = false) => {
+      doc.setLineWidth(1.6);
+      doc.setDrawColor(...stroke);
+      doc.roundedRect(x, y, w, h, 8, 8);
+      const valY = y + 20;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text("Inventory Management Report", marginX + logoSize + 10, cursorY + 14);
+      doc.setFontSize(14);
+      if (isDanger) doc.setTextColor(239, 68, 68);
+      else doc.setTextColor(37, 99, 235);
+      doc.text(value, x + 12, valY + 4);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.setTextColor(120);
-      doc.text(`Generated on ${new Date().toLocaleString()}`, marginX + logoSize + 10, cursorY + 30);
-
-      // right: company info
+      doc.setFontSize(9);
+      doc.setTextColor(110);
+      doc.text(label, x + 12, y + h - 12);
       doc.setTextColor(0);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      const rightX = pageW - marginX;
-      doc.text(COMPANY.name, rightX, cursorY + 5, { align: "right" });
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.text(COMPANY.address, rightX, cursorY + 20, { align: "right" });
-      doc.setTextColor(37, 99, 235);
-      doc.text(COMPANY.email, rightX, cursorY + 35, { align: "right" });
-      doc.setTextColor(0);
+    };
 
-      cursorY += 48;
-      doc.setDrawColor(220);
-      doc.line(marginX, cursorY, pageW - marginX, cursorY);
-      cursorY += 14;
+    for (let i = 0; i < kpis.length; i++) {
+      const row = Math.floor(i / 3);
+      const col = i % 3;
+      const x = marginX + col * (boxW + gap);
+      const y = cursorY + row * (boxH + gap);
+      drawBox(x, y, boxW, boxH, kpis[i].label, kpis[i].value, kpis[i].color, !!kpis[i].danger);
+    }
+    cursorY += 2 * (boxH + gap) + 6;
 
-      // ---------- KPI boxes (3 per row) ----------
-      const totalProducts = products.length;
-      const totalUnits = products.reduce((s, p) => s + p.stock, 0);
-      const totalValue = products.reduce((s, p) => s + p.stock * discountedUnitPrice(p), 0);
-      const lowStock = products.filter((p) => p.stock > 0 && p.stock <= 20).length;
-      const avgUnit = products.length
-        ? products.reduce((s, p) => s + discountedUnitPrice(p), 0) / products.length
-        : 0;
+    // ---------- Low Stock Alert ----------
+    const lowStocks = products.filter((p) => {
+      const rl = p.reorderLevel == null ? null : Number(p.reorderLevel);
+      return rl != null && p.stock > 0 && p.stock <= rl;
+    });
 
-      const kpis = [
-        { label: "TOTAL ITEMS", value: String(totalProducts), color: [37, 99, 235] },
-        { label: "TOTAL QUANTITY", value: totalUnits.toLocaleString(), color: [37, 99, 235] },
-        { label: "TOTAL VALUE", value: money(totalValue), color: [37, 99, 235] },
-        { label: "LOW STOCK ITEMS", value: String(lowStock), color: [239, 68, 68], danger: true },
-        { label: "AVG UNIT PRICE", value: money(avgUnit.toFixed(2)), color: [37, 99, 235] },
-        { label: "SAFETY STOCK", value: "—", color: [37, 99, 235] }, // put your logic here if you track it
-      ];
+    cursorY += 10;
+    doc.setDrawColor(255, 159, 10);
+    doc.setFillColor(255, 159, 10);
+    doc.circle(marginX + 6, cursorY - 2, 6, "F");
+    doc.setTextColor(255, 159, 10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Low Stock Alert", marginX + 20, cursorY);
+    doc.setTextColor(0);
+    doc.setDrawColor(230);
+    doc.line(marginX, cursorY + 8, pageW - marginX, cursorY + 8);
+    cursorY += 16;
 
-      const boxW = (pageW - marginX * 2 - 20) / 3; // 3 columns, 10px gaps each side
-      const boxH = 54;
-      const gap = 10;
-
-      doc.setFontSize(11);
-      const drawBox = (x, y, w, h, label, value, stroke, isDanger = false) => {
-        doc.setLineWidth(1.6);
-        doc.setDrawColor(...stroke);
-        doc.roundedRect(x, y, w, h, 8, 8);
-
-        // value
-        const valY = y + 20;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        if (isDanger) doc.setTextColor(239, 68, 68);
-        else doc.setTextColor(37, 99, 235);
-        doc.text(value, x + 12, valY + 4);
-
-        // label
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(110);
-        doc.text(label, x + 12, y + h - 12);
-        doc.setTextColor(0);
-      };
-
-      for (let i = 0; i < kpis.length; i++) {
-        const row = Math.floor(i / 3);
-        const col = i % 3;
-        const x = marginX + col * (boxW + gap);
-        const y = cursorY + row * (boxH + gap);
-        drawBox(x, y, boxW, boxH, kpis[i].label, kpis[i].value, kpis[i].color, !!kpis[i].danger);
-      }
-      cursorY += 2 * (boxH + gap) + 6; // two rows + a little spacing
-
-      // ---------- Low Stock Alert ----------
-      const lowStocks = products.filter((p) => {
-        const rl = p.reorderLevel == null ? 20 : Number(p.reorderLevel);
-        return p.stock > 0 && p.stock <= rl;
-      });
-
-      // section header with alert icon
-      cursorY += 10;
-      doc.setDrawColor(255, 159, 10);
-      doc.setFillColor(255, 159, 10);
-      doc.circle(marginX + 6, cursorY - 2, 6, "F");
-      doc.setTextColor(255, 159, 10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Low Stock Alert", marginX + 20, cursorY);
-      doc.setTextColor(0);
-      doc.setDrawColor(230);
-      doc.line(marginX, cursorY + 8, pageW - marginX, cursorY + 8);
-      cursorY += 16;
-
-      const lowBody = lowStocks.map((p) => {
+    // (use the same autoTable variable we declared above)
+    autoTable(doc, {
+      startY: cursorY,
+      head: [["ITEM ID", "ITEM NAME", "CURRENT QTY", "REORDER LEVEL", "SHORTAGE", "UNIT PRICE"]],
+      body: lowStocks.map((p) => {
         const rl = p.reorderLevel == null ? null : Number(p.reorderLevel);
         const shortage = rl == null ? null : Math.max(0, rl - p.stock);
         return [
@@ -474,125 +483,108 @@ function ProductInventory() {
           shortage == null ? "—" : shortage,
           money(discountedUnitPrice(p)),
         ];
-      });
+      }),
+      styles: { fontSize: 10, cellPadding: 6 },
+      headStyles: { fillColor: [244, 67, 54], halign: "center" },
+      columnStyles: {
+        0: { cellWidth: 70 },
+        1: { cellWidth: 170 },
+        2: { cellWidth: 80, halign: "right" },
+        3: { cellWidth: 90, halign: "right" },
+        4: { cellWidth: 70, halign: "right" },
+        5: { cellWidth: 90, halign: "right" },
+      },
+      margin: { left: marginX, right: marginX },
+      didDrawPage: () => {
+        const page = doc.internal.getNumberOfPages();
+        doc.setFontSize(9);
+        doc.setTextColor(120);
+        doc.text(`Page ${page}`, pageW - marginX, pageH - 10, { align: "right" });
+      },
+    });
 
-      autoTable(doc, {
-        startY: cursorY,
-        head: [["ITEM ID", "ITEM NAME", "CURRENT QTY", "REORDER LEVEL", "SHORTAGE", "UNIT PRICE"]],
-        body: lowBody,
-        styles: { fontSize: 10, cellPadding: 6 },
-        headStyles: { fillColor: [244, 67, 54], halign: "center" },
-        columnStyles: {
-          0: { cellWidth: 70 },
-          1: { cellWidth: 170 },
-          2: { cellWidth: 80, halign: "right" },
-          3: { cellWidth: 90, halign: "right" },
-          4: { cellWidth: 70, halign: "right" },
-          5: { cellWidth: 90, halign: "right" },
-        },
-        margin: { left: marginX, right: marginX },
-        didDrawPage: (data) => {
-          // footer
-          const page = doc.internal.getNumberOfPages();
-          doc.setFontSize(9);
-          doc.setTextColor(120);
-          doc.text(
-            `Page ${page}`,
-            pageW - marginX,
-            pageH - 10,
-            { align: "right" }
-          );
-        },
-      });
+    cursorY = doc.lastAutoTable.finalY + 16;
 
-      cursorY = doc.lastAutoTable.finalY + 16;
+    // ---------- Complete Inventory ----------
+    doc.setTextColor(33, 150, 243);
+    doc.setFont("helvetica", "bold");
+    doc.text("☑︎ Complete Inventory", marginX + 4, cursorY);
+    doc.setTextColor(0);
+    doc.setDrawColor(230);
+    doc.line(marginX, cursorY + 8, pageW - marginX, cursorY + 8);
+    cursorY += 16;
 
-      // ---------- Complete Inventory ----------
-      // section header
-      doc.setFillColor(255);
-      doc.setTextColor(33, 150, 243);
-      doc.setFont("helvetica", "bold");
-      doc.text("☑︎ Complete Inventory", marginX + 4, cursorY);
-      doc.setTextColor(0);
-      doc.setDrawColor(230);
-      doc.line(marginX, cursorY + 8, pageW - marginX, cursorY + 8);
-      cursorY += 16;
-
-      const body = getFilteredProducts().map((p) => {
+    autoTable(doc, {
+      startY: cursorY,
+      head: [["ITEM", "CATEGORY", "QUANTITY", "REORDER LEVEL", "UNIT PRICE", "TOTAL VALUE", "STATUS"]],
+      body: getFilteredProducts().map((p) => {
         const unitAfterDiscount = discountedUnitPrice(p);
-        const status = p.stock === 0 ? "Out of Stock" : p.stock <= 20 ? "Low Stock" : "In Stock";
+        const rl = p.reorderLevel == null ? 20 : Number(p.reorderLevel);
+        const status = p.stock === 0 ? "Out of Stock" : p.stock <= rl ? "Low Stock" : "In Stock";
         return [
           p.name,
           p.category,
           p.stock,
+          rl,
           money(unitAfterDiscount),
           money(p.stock * unitAfterDiscount),
           status,
         ];
-      });
-
-      autoTable(doc, {
-        startY: cursorY,
-        head: [["ITEM", "CATEGORY", "QUANTITY", "UNIT PRICE", "TOTAL VALUE", "STATUS"]],
-        body,
-        styles: { fontSize: 10, cellPadding: 6 },
-        headStyles: { fillColor: [33, 150, 243] },
-        columnStyles: {
-          0: { cellWidth: 160 },
-          1: { cellWidth: 110 },
-          2: { cellWidth: 70, halign: "right" },
-          3: { cellWidth: 90, halign: "right" },
-          4: { cellWidth: 100, halign: "right" },
-          5: { cellWidth: 70 },
-        },
-        margin: { left: marginX, right: marginX },
-        didDrawPage: (data) => {
-          // header (repeat on pages after the first)
-          if (data.pageNumber > 1) {
-            const yTop = 24;
-            try { doc.addImage(LOGO_URL, "PNG", marginX, yTop, 18, 18); } catch {}
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "bold");
-            doc.text("Inventory Management Report", marginX + 24, yTop + 12);
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(9);
-            doc.setTextColor(120);
-            doc.text(COMPANY.name, pageW - marginX, yTop + 8, { align: "right" });
-            doc.setTextColor(0);
-            doc.setDrawColor(220);
-            doc.line(marginX, yTop + 22, pageW - marginX, yTop + 22);
-          }
-          // footer
-          const page = doc.internal.getNumberOfPages();
+      }),
+      styles: { fontSize: 10, cellPadding: 6 },
+      headStyles: { fillColor: [33, 150, 243] },
+      columnStyles: {
+        0: { cellWidth: 140 },
+        1: { cellWidth: 110 },
+        2: { cellWidth: 70, halign: "right" },
+        3: { cellWidth: 80, halign: "right" },
+        4: { cellWidth: 90, halign: "right" },
+        5: { cellWidth: 100, halign: "right" },
+        6: { cellWidth: 70 },
+      },
+      margin: { left: marginX, right: marginX },
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) {
+          const yTop = 24;
+          try { doc.addImage(LOGO_URL, "PNG", marginX, yTop, 18, 18); } catch {}
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.text("Inventory Management Report", marginX + 24, yTop + 12);
+          doc.setFont("helvetica", "normal");
           doc.setFontSize(9);
           doc.setTextColor(120);
-          doc.text(
-            `Page ${data.pageNumber} of ${page}`,
-            pageW - marginX,
-            pageH - 10,
-            { align: "right" }
-          );
-        },
-      });
+          doc.text(COMPANY.name, pageW - marginX, yTop + 8, { align: "right" });
+          doc.setTextColor(0);
+          doc.setDrawColor(220);
+          doc.line(marginX, yTop + 22, pageW - marginX, yTop + 22);
+        }
+        const page = doc.internal.getNumberOfPages();
+        doc.setFontSize(9);
+        doc.setTextColor(120);
+        doc.text(`Page ${data.pageNumber} of ${page}`, pageW - marginX, pageH - 10, { align: "right" });
+      },
+    });
 
-      const fileName = `product-inventory-${new Date().toISOString().split("T")[0]}.pdf`;
-      doc.save(fileName);
-      showNotification("PDF exported successfully!", "success");
-    } catch (err) {
-      console.error("PDF export error:", err);
-      showNotification("Error exporting PDF. Check jsPDF installation.", "error");
-    }
+    const fileName = `product-inventory-${new Date().toISOString().split("T")[0]}.pdf`;
+    doc.save(fileName);
+    showNotification("PDF exported successfully!", "success");
+  } catch (err) {
+    console.error("PDF export error:", err);
+    showNotification("Error exporting PDF. Check jsPDF installation.", "error");
   }
+}
+
 
   function exportCsv() {
-    const header = "Product Name,Category,Stock,Unit Price (after discount),Total Value (after discount),Status\n";
+    const header = "Product Name,Category,Stock,Reorder Level,Unit Price (after discount),Total Value (after discount),Status\n";
     const csvEscape = (s) => `"${String(s).replace(/"/g, '""')}"`;
     const rows = getFilteredProducts().map((p) => {
       const unitAfterDiscount = discountedUnitPrice(p);
       const totalValue = p.stock * unitAfterDiscount;
+      const rl = p.reorderLevel == null ? 20 : Number(p.reorderLevel);
       let status = "In Stock";
-      if (p.stock === 0) status = "Out of Stock"; else if (p.stock <= 20) status = "Low Stock";
-      return [csvEscape(p.name), csvEscape(p.category), p.stock, unitAfterDiscount, totalValue, csvEscape(status)].join(",");
+      if (p.stock === 0) status = "Out of Stock"; else if (p.stock <= rl) status = "Low Stock";
+      return [csvEscape(p.name), csvEscape(p.category), p.stock, rl, unitAfterDiscount, totalValue, csvEscape(status)].join(",");
     }).join("\n");
     const csv = "data:text/csv;charset=utf-8," + header + rows;
     const link = document.createElement("a");
@@ -728,8 +720,9 @@ function ProductInventory() {
                     <th onClick={() => sortTable(0)} style={{ cursor: "pointer" }}>Product</th>
                     <th onClick={() => sortTable(1)} style={{ cursor: "pointer" }}>Category</th>
                     <th onClick={() => sortTable(2)} style={{ cursor: "pointer" }}>Stock</th>
-                    <th onClick={() => sortTable(3)} style={{ cursor: "pointer" }}>Unit Price</th>
-                    <th onClick={() => sortTable(4)} style={{ cursor: "pointer" }}>Value</th>
+                    <th onClick={() => sortTable(3)} style={{ cursor: "pointer" }}>Reorder Level</th>
+                    <th onClick={() => sortTable(4)} style={{ cursor: "pointer" }}>Unit Price</th>
+                    <th onClick={() => sortTable(5)} style={{ cursor: "pointer" }}>Value</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>

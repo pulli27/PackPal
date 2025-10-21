@@ -39,7 +39,7 @@
   flex: 1 1 auto;
   min-width: 0;                   /* avoid overflow */
   padding: 20px;
-   margin-left: 270px;
+  margin-left: 270px;
 }
 
 /* Header */
@@ -67,7 +67,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* Cards / stats */
+/* Cards / stats grid */
 .cart-main .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0,1fr));
@@ -80,8 +80,30 @@
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-.cart-main .stat .v { font-size: 20px; color: var(--ink); }
-.cart-main .stat .l { font-size: 11px; color: var(--muted); }
+
+/* ===== Dark Blue KPI Cards ======================================= */
+.cart-main .card.stat{
+  /* gradient dark blue; swap with solid #1e3a8a if you prefer flat */
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+  border-color: #1d4ed8;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(29, 78, 216, 0.25);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.cart-main .card.stat .v { 
+  font-size: 20px; 
+  color: #fff; 
+}
+.cart-main .card.stat .l { 
+  font-size: 11px; 
+  color: rgba(255,255,255,.85); 
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.cart-main .card.stat:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(29, 78, 216, 0.35);
+}
 
 /* Table wrapper */
 .cart-main .table-wrap {
@@ -167,7 +189,12 @@
 }
 @media (max-width: 768px) {
   .cart-page { flex-direction: column; }
-  .cart-page .sidebar { width: 100%; flex: 0 0 auto; border-right: 0; border-bottom: 1px solid var(--border); }
-  .cart-main { padding: 16px; }
+  .cart-page .sidebar { 
+    width: 100%; 
+    flex: 0 0 auto; 
+    border-right: 0; 
+    border-bottom: 1px solid var(--border); 
+  }
+  .cart-main { padding: 16px; margin-left: 0; }
   .cart-main table { min-width: 760px; }
 }

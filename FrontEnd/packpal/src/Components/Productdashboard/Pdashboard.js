@@ -244,6 +244,7 @@ export default function Pdashboard() {
             Welcome back! Track production, check quality, and export reports.
           </p>
 
+  {/* search */}
           <div className="toolbar-right">
             <div className="search">
               <span className="icon">🔎</span>

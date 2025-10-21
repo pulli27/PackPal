@@ -2,12 +2,72 @@
 import React, { useMemo, useState, useEffect } from "react";
 import "./UserManagement.css";
 import Sidebar from "../Sidebar/Sidebaris";
-
-// ✅ jsPDF + autotable
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+/* =========================
+   API base
+   ========================= */
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const USERS_URL = `${API_BASE}/api/users`;
+
+/* =========================
+   Company / PDF header config
+   ========================= */
+const COMPANY = {
+  name: "PackPal (Pvt) Ltd",
+  address: "No. 42, Elm Street, Colombo",
+  email: "hello@packpal.lk",
+  // Use same-origin image path or a Base64 data URL for reliability
+  logo: "/new logo.png",
+};
+
+// Draws the header on the current jsPDF page (we call this ONLY on page 1)
+function drawHeader(doc, { title }) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginX = 22;
+  const rightX = pageW - 22;
+
+  // Left: logo
+  try {
+    doc.addImage(COMPANY.logo, "PNG", marginX - 2, 14, 22, 22);
+  } catch {}
+
+  // Left: title + generated date
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(0);
+  doc.text(String(title || "Report"), marginX + 26, 24);
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120);
+  doc.setFontSize(10);
+  doc.text(`Generated on ${new Date().toLocaleString()}`, marginX + 26, 38);
+
+  // Right block
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(COMPANY.name, rightX, 20, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(80);
+  doc.text(COMPANY.address, rightX, 32, { align: "right" });
+
+  doc.setTextColor(34, 87, 215);
+  doc.textWithLink(COMPANY.email, rightX, 44, {
+    align: "right",
+    url: `mailto:${COMPANY.email}`,
+  });
+
+  // Divider
+  doc.setDrawColor(220);
+  doc.setLineWidth(0.6);
+  doc.line(marginX, 52, rightX, 52);
+
+  doc.setTextColor(0);
+}
 
 /* =========================
    Name helpers / validation
@@ -16,7 +76,7 @@ const NAME_DISALLOWED_RE = /[^A-Za-zÀ-ÖØ-öø-ÿ' .-]/g;
 const NAME_PATTERN = "^[A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,}$";
 
 function sanitizeName(value = "") {
-  return value.replace(NAME_DISALLOWED_RE, "").replace(/\s{2,}/g, " ").trimStart();
+  return value.replace(NAME_DISALLOWED_RE, "").replace(/\s{2,}/g, " ").trim();
 }
 
 function slugify(s = "") {
@@ -44,7 +104,7 @@ function genPassword(first, last) {
   return `${upper}${lower}${num}${sym}${pad}`;
 }
 
-// 👉 helper: push customers to localStorage so Orders page can read them
+// Save only customers to localStorage for Orders page (optional)
 function syncCustomersToLocalStorage(users = []) {
   try {
     const customers = users
@@ -62,24 +122,6 @@ function syncCustomersToLocalStorage(users = []) {
   }
 }
 
-// ====== Company branding (used in PDF header) ======
-const COMPANY = {
-  name: "PackPal (Pvt) Ltd",
-  address: "No. 42, Elm Street, Colombo",
-  email: "hello@packpal.lk",
-};
-
-// Load an image from /public as data URL (works for jsPDF)
-async function fetchImageAsDataURL(src) {
-  const res = await fetch(src);
-  const blob = await res.blob();
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.readAsDataURL(blob);
-  });
-}
-
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [q, setQ] = useState("");
@@ -87,9 +129,6 @@ export default function UserManagement() {
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // cache logo as data URL for PDF header
-  const [logoDataURL, setLogoDataURL] = useState(null);
 
   const [newUser, setNewUser] = useState({
     firstName: "",
@@ -103,32 +142,35 @@ export default function UserManagement() {
 
   const isLocked = (u) => (u?.role || "").toLowerCase() === "customer";
 
+  // Load users
   useEffect(() => {
-    async function loadUsers() {
+    let abort = false;
+    (async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${API_BASE}/users`);
-        const data = await res.json();
-        if (res.ok) {
-          setUsers(data.users || []);
-        } else {
-          console.error("Fetch users failed:", data);
+        const res = await fetch(USERS_URL, { credentials: "include" });
+        const data = await res.json().catch(() => ({}));
+        if (!abort) {
+          if (res.ok) setUsers(data.users || []);
+          else console.error("Fetch users failed:", data?.message || res.statusText);
         }
       } catch (err) {
-        console.error("Network error fetching users:", err);
+        if (!abort) console.error("Network error fetching users:", err);
       } finally {
-        setLoading(false);
+        if (!abort) setLoading(false);
       }
-    }
-    loadUsers();
+    })();
+    return () => {
+      abort = true;
+    };
   }, []);
 
-  // cache customers in localStorage for Orders
+  // Orders page mirror
   useEffect(() => {
     syncCustomersToLocalStorage(users);
   }, [users]);
 
-  // generate email/password live while adding
+  // Auto-generate email/password in Add modal
   useEffect(() => {
     if (!adding) return;
     const { firstName, lastName } = newUser;
@@ -143,81 +185,76 @@ export default function UserManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newUser.firstName, newUser.lastName, adding, emailTouched, pwdTouched]);
 
-  // preload logo once
-  useEffect(() => {
-    const src = `${process.env.PUBLIC_URL || ""}/logo.png`;
-    fetchImageAsDataURL(src)
-      .then((d) => setLogoDataURL(d))
-      .catch(() => setLogoDataURL(null));
-  }, []);
-
+  // filters / stats
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     return users.filter((u) => {
       const hay = (u.firstName + " " + u.lastName + " " + u.email).toLowerCase();
       const byText = !t || hay.includes(t);
-      const byRole =
-        role === "All" || (u.role || "").toLowerCase() === role.toLowerCase();
+      const byRole = role === "All" || (u.role || "").toLowerCase() === role.toLowerCase();
       return byText && byRole;
     });
   }, [users, q, role]);
 
   const today = new Date().toISOString().slice(0, 10);
   const statTotal = users.length;
-  const statNew = users.filter((u) => u.createdAt?.slice(0, 10) === today).length;
+  const statNew = users.filter((u) => String(u.createdAt || "").slice(0, 10) === today).length;
   const statPending = users.filter((u) => (u.status || "").toLowerCase() === "pending").length;
 
+  // Pills
   function pill(status = "") {
     const s = (status || "").toLowerCase();
     const cls = s === "active" ? "active" : s === "pending" ? "pending" : "suspended";
-    return <span className={`pill ${cls}`}>{status}</span>;
+    return <span className={`pill ${cls}`}>{status || "active"}</span>;
   }
 
+  // Edit
   function openEdit(u) {
-    if (isLocked(u)) return;
-    setEditing({ ...u });
+    if (!isLocked(u)) setEditing({ ...u });
   }
   function closeEdit() {
     setEditing(null);
   }
-
   async function saveEdit(e) {
     e.preventDefault();
     if (isLocked(editing)) return;
     try {
-      const res = await fetch(`${API_BASE}/users/${editing._id}`, {
+      const res = await fetch(`${USERS_URL}/${editing._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(editing),
       });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.user) {
         setUsers((prev) => prev.map((u) => (u._id === data.user._id ? data.user : u)));
         closeEdit();
       } else {
-        alert("Update failed: " + (data.message || res.statusText));
+        alert("Update failed: " + (data?.message || res.statusText));
       }
     } catch (err) {
       console.error("Update error:", err);
     }
   }
 
+  // Delete
   async function del(id) {
     const user = users.find((u) => u._id === id);
     if (isLocked(user)) return;
     if (!window.confirm("Delete this user?")) return;
     try {
-      const res = await fetch(`${API_BASE}/users/${id}`, { method: "DELETE" });
+      const res = await fetch(`${USERS_URL}/${id}`, { method: "DELETE", credentials: "include" });
       if (res.ok) setUsers((prev) => prev.filter((u) => u._id !== id));
       else {
-        const data = await res.json();
-        alert("Delete failed: " + (data.message || res.statusText));
+        const data = await res.json().catch(() => ({}));
+        alert("Delete failed: " + (data?.message || res.statusText));
       }
     } catch (err) {
       console.error("Delete error:", err);
     }
   }
 
+  // Add
   function openAdd() {
     setNewUser({
       firstName: "",
@@ -236,130 +273,88 @@ export default function UserManagement() {
   async function saveAdd(e) {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/users`, {
+      const res = await fetch(USERS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(newUser),
       });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.user) {
         setUsers((prev) => [...prev, data.user]);
         closeAdd();
       } else {
-        alert("Add failed: " + (data.message || res.statusText));
+        alert("Add failed: " + (data?.message || res.statusText));
       }
     } catch (err) {
       console.error("Add error:", err);
     }
   }
 
-  // CSV export (unchanged)
+  // --- CSV export ---
   function exportCsv() {
-    const cols = ["firstName", "lastName", "email", "role", "createdAt", "status"];
-    const csv = [cols.join(",")]
-      .concat(
-        filtered.map((u) =>
-          cols.map((k) => `"${(u[k] ?? "").toString().replace(/"/g, '""')}"`).join(",")
-        )
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const columns = ["First Name", "Last Name", "Email", "Role", "Status", "Created"];
+    const rows = filtered.map((u) => [
+      u.firstName || "",
+      u.lastName || "",
+      u.email || "",
+      u.role || "",
+      u.status || "active",
+      (u.createdAt || "").slice(0, 10),
+    ]);
+
+    const esc = (s) => `"${String(s).replace(/"/g, '""')}"`;
+    const csv =
+      [columns.map(esc).join(",")]
+        .concat(rows.map((r) => r.map(esc).join(",")))
+        .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = "users.csv";
     document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
     a.remove();
+    URL.revokeObjectURL(url);
   }
 
-  // ✅ PDF export with branded header (logo + title + datetime + company block)
-  async function exportPdf() {
+  // --- PDF export: header only on the first page ---
+  function exportPdf() {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-    const pageW = doc.internal.pageSize.getWidth();
-    const marginX = 40;
+    const title = "User Management Report";
 
-    // --- Header ---
-    // Logo (left)
-    const logoW = 42; // pt
-    const logoH = 42;
-    const logoX = marginX;
-    const logoY = 28;
+    // draw header ONLY once (first page)
+    drawHeader(doc, { title });
 
-    if (logoDataURL) {
-      try {
-        doc.addImage(logoDataURL, "PNG", logoX, logoY, logoW, logoH);
-      } catch {
-        // ignore if addImage fails
-      }
-    }
-
-    // Title + generated datetime (left, next to logo)
-    const textLeftX = logoX + logoW + 12;
-    const titleY = logoY + 18; // vertically aligned with logo
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text("User Details Report", textLeftX, titleY);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.setTextColor(90);
-    const generated = `Generated on ${new Date().toLocaleString()}`;
-    doc.text(generated, textLeftX, titleY + 22);
-
-    // Company block (right)
-    const rightBlockX = pageW - marginX - 260; // width ~260
-    const rightY = logoY + 4;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(20);
-    doc.text(COMPANY.name, rightBlockX, rightY);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.setTextColor(90);
-    doc.text(COMPANY.address, rightBlockX, rightY + 20);
-    doc.text(COMPANY.email, rightBlockX, rightY + 40);
-
-    // subtle divider line
-    doc.setDrawColor(200);
-    doc.setLineWidth(1);
-    doc.line(marginX, logoY + 56, pageW - marginX, logoY + 56);
-
-    // --- Table ---
-    const columns = [
-      { header: "First Name", dataKey: "firstName" },
-      { header: "Last Name", dataKey: "lastName" },
-      { header: "Email", dataKey: "email" },
-      { header: "Role", dataKey: "role" },
-      { header: "Created", dataKey: "createdAt" },
-      { header: "Status", dataKey: "status" },
-    ];
-
-    const rows = filtered.map((u) => ({
-      firstName: u.firstName || "",
-      lastName: u.lastName || "",
-      email: u.email || "",
-      role: u.role || "",
-      createdAt: (u.createdAt || "").slice(0, 10),
-      status: (u.status || "").toLowerCase(),
-    }));
+    const head = ["First Name", "Last Name", "Email", "Role", "Status", "Created"];
+    const rows = filtered.map((u) => [
+      u.firstName || "",
+      u.lastName || "",
+      u.email || "",
+      u.role || "",
+      u.status || "active",
+      (u.createdAt || "").slice(0, 10),
+    ]);
 
     autoTable(doc, {
-      columns,
+      head: [head],
       body: rows,
-      startY: logoY + 70, // push table below header
+      startY: 70,
+      margin: { top: 24 },
       styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
-      headStyles: { fillColor: [53, 79, 197], textColor: 255 },
+      headStyles: { fillColor: [25, 118, 210] },
       didDrawPage: (data) => {
-        const pageCount = doc.internal.getNumberOfPages();
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
         doc.setTextColor(120);
         doc.text(
-          `Page ${data.pageNumber} of ${pageCount}`,
-          doc.internal.pageSize.getWidth() - 100,
-          doc.internal.pageSize.getHeight() - 20
+          `Page ${data.pageNumber} of ${doc.internal.getNumberOfPages()}`,
+          pageW - 22,
+          pageH - 16,
+          { align: "right" }
         );
       },
     });
@@ -377,15 +372,19 @@ export default function UserManagement() {
         <section className="um-stats">
           <article className="um-stat">
             <p className="um-stat__label">Total Users</p>
-            <div className="um-stat__value">{statTotal}</div>
+            <div className="um-stat__value">{users.length}</div>
           </article>
           <article className="um-stat">
             <p className="um-stat__label">New Today</p>
-            <div className="um-stat__value">{statNew}</div>
+            <div className="um-stat__value">
+              {users.filter((u) => String(u.createdAt || "").slice(0, 10) === new Date().toISOString().slice(0, 10)).length}
+            </div>
           </article>
           <article className="um-stat">
             <p className="um-stat__label">Pending Approval</p>
-            <div className="um-stat__value">{statPending}</div>
+            <div className="um-stat__value">
+              {users.filter((u) => (u.status || "").toLowerCase() === "pending").length}
+            </div>
           </article>
         </section>
 
@@ -441,7 +440,7 @@ export default function UserManagement() {
                         <td>{u.lastName}</td>
                         <td>{u.email}</td>
                         <td>{u.role}</td>
-                        <td>{u.createdAt?.slice(0, 10)}</td>
+                        <td>{String(u.createdAt || "").slice(0, 10)}</td>
                         <td>{pill(u.status)}</td>
                         <td>
                           <button
@@ -593,14 +592,7 @@ export default function UserManagement() {
                 </div>
                 <div className="um-field">
                   <label>Email</label>
-                  {/* 🔒 Email is read-only & disabled in edit mode */}
-                  <input
-                    type="email"
-                    value={editing.email}
-                    readOnly
-                    disabled
-                    title="Email cannot be changed"
-                  />
+                  <input type="email" value={editing.email} readOnly disabled title="Email cannot be changed" />
                 </div>
                 <div className="um-field">
                   <label>Role</label>

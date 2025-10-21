@@ -1,5 +1,6 @@
+// src/Components/Createaccount/Createaccount.jsx
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import "./Createaccount.css";
 
 export default function Createaccount() {
@@ -12,12 +13,12 @@ export default function Createaccount() {
   const [tos, setTos] = useState(false);
 
   // UI state
-  const [showPwd, setShowPwd] = useState(false);
-  const [status, setStatus] = useState({ type: "", msg: "" });
+  const [showPwd, setShowPwd]       = useState(false);
+  const [status, setStatus]         = useState({ type: "", msg: "" }); // "good" | "bad" | ""
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted]   = useState(false);
 
-  // validation states
+  // touched state
   const [touched, setTouched] = useState({
     firstName: false,
     lastName: false,
@@ -29,103 +30,78 @@ export default function Createaccount() {
 
   const navigate = useNavigate();
   const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const REGISTER_URL = `${API_BASE}/api/auth/register`;
 
   // --- Validators ---
   const validEmail = /^\S+@\S+\.\S+$/.test(email);
-  const pwdRules = {
-    len: password.length >= 8,
-    up: /[A-Z]/.test(password),
-    low: /[a-z]/.test(password),
-    num: /[0-9]/.test(password),
-    sym: /[!@#$%^&*()[\]{};:'",.<>/?\\|`~\-_=+]/.test(password),
-  };
-  const strongPwd = Object.values(pwdRules).every(Boolean);
+  const strongPwd =
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[!@#$%^&*(),.?":{}|<>_\-\\/~`]/.test(password);
 
   const errors = {
     firstName: firstName.trim().length >= 2 ? "" : "Please enter your first name.",
-    lastName: lastName.trim().length >= 2 ? "" : "Please enter your last name.",
-    email: validEmail ? "" : "Enter a valid email address.",
-    password: strongPwd ? "" : "Use 8+ chars, upper, lower, number, symbol.",
-    confirm: confirm === password ? "" : "Passwords do not match.",
-    tos: tos ? "" : "You must accept the Terms.",
+    lastName:  lastName.trim().length >= 2 ? "" : "Please enter your last name.",
+    email:     validEmail ? "" : "Enter a valid email address.",
+    password:  strongPwd ? "" : "Use 8+ chars incl. upper, lower, number & symbol.",
+    confirm:   confirm === password ? "" : "Passwords do not match.",
+    tos:       tos ? "" : "You must accept the Terms.",
   };
 
   const formValid = Object.values(errors).every((e) => e === "");
-  const shouldShow = (f) => (touched[f] || submitted) && errors[f];
+  const shouldShow = (field) => (touched[field] || submitted) && errors[field];
 
-  // --- Submit Handler ---
+  // --- Submit ---
   const submit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
+
     if (!formValid || submitting) {
       setStatus({ type: "bad", msg: "Please fix the highlighted fields." });
       return;
     }
 
-    try {
-      setSubmitting(true);
-      setStatus({ type: "", msg: "" });
+    setSubmitting(true);
+    setStatus({ type: "", msg: "" });
 
-      const res = await fetch(`${API_BASE}/users`, {
+    try {
+      const payload = {
+        firstName: firstName.trim(),
+        lastName : lastName.trim(),
+        email    : email.trim().toLowerCase(),
+        password,
+      };
+
+      const res = await fetch(REGISTER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, password }),
+        credentials: "include", // harmless if you don't use cookies
+        body: JSON.stringify(payload),
       });
 
-      // Try reading server response
-      let text = "";
+      // Try to parse JSON (in case backend returns helpful message)
       let data = {};
-      try {
-        text = await res.clone().text();
-        data = JSON.parse(text);
-      } catch {
-        data = {};
-      }
-
-      const message =
-        data?.message ||
-        data?.error ||
-        text ||
-        `Failed: ${res.status} ${res.statusText}`;
-
-      // Detect invalid credentials even if status is 200
-      if (
-        /invalid email|invalid password/i.test(message) ||
-        res.status === 401 ||
-        res.status === 403
-      ) {
-        throw new Error("Invalid email or invalid password.");
-      }
+      try { data = await res.json(); } catch {}
 
       if (!res.ok) {
-        throw new Error(message);
+        // Friendly messages
+        const msg =
+          data?.message ||
+          (res.status === 409
+            ? "Email already registered."
+            : `Registration failed (${res.status}).`);
+        throw new Error(msg);
       }
 
-      // success
-      setStatus({ type: "good", msg: "Account created! Redirecting to login..." });
-
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setPassword("");
-      setConfirm("");
-      setTos(false);
-      setTouched({
-        firstName: false,
-        lastName: false,
-        email: false,
-        password: false,
-        confirm: false,
-        tos: false,
-      });
-      setSubmitted(false);
-
-      navigate("/login");
+      setStatus({ type: "good", msg: "Account created! Redirecting to login…" });
+      setTimeout(() => navigate("/login"), 900);
     } catch (err) {
       const msg =
-        err.message === "Failed to fetch"
-          ? "Could not reach the server. Check backend and CORS settings."
-          : err.message;
+        err?.message === "Failed to fetch"
+          ? "Could not reach the server. Check backend URL and CORS."
+          : err?.message || "Could not create account.";
       setStatus({ type: "bad", msg });
     } finally {
       setSubmitting(false);
@@ -141,20 +117,18 @@ export default function Createaccount() {
           {/* Left brand panel */}
           <aside className="auth-left">
             <div className="brand-col">
-              <div />
               <div className="brand-center">
                 <img
                   src={`${process.env.PUBLIC_URL || ""}/new logo.png`}
                   alt="PackPal logo"
                   className="brand-logo"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
                 />
                 <h1 className="brand-name">PackPal</h1>
                 <p className="brand-copy">
-                  Where fabric meets purpose, and style meets endurance — welcome
-                  to a new era of bags.
+                  Where fabric meets purpose, and style meets endurance.
                 </p>
               </div>
-              <div />
             </div>
           </aside>
 
@@ -192,164 +166,120 @@ export default function Createaccount() {
                 <div className="grid-2">
                   <label className="field">
                     <span className="label">First Name</span>
-                    <div className="input-shell">
-                      <input
-                        id="firstName"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        onBlur={() =>
-                          setTouched((t) => ({ ...t, firstName: true }))
-                        }
-                        placeholder="Enter first name"
-                        autoComplete="given-name"
-                      />
-                    </div>
-                    {shouldShow("firstName") && (
-                      <small className="error">{errors.firstName}</small>
-                    )}
+                    <input
+                      value={firstName}
+                      onChange={(e)=>setFirstName(e.target.value)}
+                      onBlur={()=>setTouched(t=>({...t, firstName:true}))}
+                      placeholder="Enter first name"
+                      autoComplete="given-name"
+                      className={shouldShow("firstName") ? "invalid" : ""}
+                    />
+                    {shouldShow("firstName") && <small className="error">{errors.firstName}</small>}
                   </label>
 
                   <label className="field">
                     <span className="label">Last Name</span>
-                    <div className="input-shell">
-                      <input
-                        id="lastName"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        onBlur={() =>
-                          setTouched((t) => ({ ...t, lastName: true }))
-                        }
-                        placeholder="Enter last name"
-                        autoComplete="family-name"
-                      />
-                    </div>
-                    {shouldShow("lastName") && (
-                      <small className="error">{errors.lastName}</small>
-                    )}
+                    <input
+                      value={lastName}
+                      onChange={(e)=>setLastName(e.target.value)}
+                      onBlur={()=>setTouched(t=>({...t, lastName:true}))}
+                      placeholder="Enter last name"
+                      autoComplete="family-name"
+                      className={shouldShow("lastName") ? "invalid" : ""}
+                    />
+                    {shouldShow("lastName") && <small className="error">{errors.lastName}</small>}
                   </label>
                 </div>
 
                 <label className="field">
                   <span className="label">Email</span>
-                  <div className="input-shell">
-                    <input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      onBlur={() =>
-                        setTouched((t) => ({ ...t, email: true }))
-                      }
-                      placeholder="Enter your email"
-                      autoComplete="email"
-                    />
-                    <span className="right-icon" aria-hidden>
-                      ✉️
-                    </span>
-                  </div>
-                  {shouldShow("email") && (
-                    <small className="error">{errors.email}</small>
-                  )}
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e)=>setEmail(e.target.value)}
+                    onBlur={()=>setTouched(t=>({...t, email:true}))}
+                    placeholder="Enter your email"
+                    autoComplete="email"
+                    className={shouldShow("email") ? "invalid" : ""}
+                  />
+                  {shouldShow("email") && <small className="error">{errors.email}</small>}
                 </label>
 
                 <label className="field">
                   <span className="label">Password</span>
                   <div className="input-shell">
                     <input
-                      id="password"
                       type={showPwd ? "text" : "password"}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      onBlur={() =>
-                        setTouched((t) => ({ ...t, password: true }))
-                      }
+                      onChange={(e)=>setPassword(e.target.value)}
+                      onBlur={()=>setTouched(t=>({...t, password:true}))}
                       placeholder="Enter your password"
                       autoComplete="new-password"
+                      className={shouldShow("password") ? "invalid" : ""}
                     />
                     <button
                       type="button"
                       className="eye-btn"
                       aria-label={showPwd ? "Hide password" : "Show password"}
-                      onClick={() => setShowPwd((s) => !s)}
+                      title={showPwd ? "Hide" : "Show"}
+                      onClick={()=>setShowPwd(s=>!s)}
                     >
                       {showPwd ? "🙈" : "👁"}
                     </button>
                   </div>
-                  <small className="hint">
-                    Must include 8+ chars, upper, lower, number &amp; symbol.
-                  </small>
-                  {shouldShow("password") && (
-                    <small className="error">{errors.password}</small>
-                  )}
+                  <small className="hint">8+ chars, include upper, lower, number & symbol.</small>
+                  {shouldShow("password") && <small className="error">{errors.password}</small>}
                 </label>
 
                 <label className="field">
                   <span className="label">Confirm Password</span>
-                  <div className="input-shell">
-                    <input
-                      id="confirm"
-                      type={showPwd ? "text" : "password"}
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      onBlur={() =>
-                        setTouched((t) => ({ ...t, confirm: true }))
-                      }
-                      placeholder="Re-enter your password"
-                      autoComplete="new-password"
-                    />
-                  </div>
-                  {shouldShow("confirm") && (
-                    <small className="error">{errors.confirm}</small>
-                  )}
+                  <input
+                    type={showPwd ? "text" : "password"}
+                    value={confirm}
+                    onChange={(e)=>setConfirm(e.target.value)}
+                    onBlur={()=>setTouched(t=>({...t, confirm:true}))}
+                    placeholder="Re-enter your password"
+                    autoComplete="new-password"
+                    className={shouldShow("confirm") ? "invalid" : ""}
+                  />
+                  {shouldShow("confirm") && <small className="error">{errors.confirm}</small>}
                 </label>
 
                 <label className="checkline">
                   <input
                     type="checkbox"
                     checked={tos}
-                    onChange={(e) => setTos(e.target.checked)}
-                    onBlur={() =>
-                      setTouched((t) => ({ ...t, tos: true }))
-                    }
+                    onChange={(e)=>setTos(e.target.checked)}
+                    onBlur={()=>setTouched(t=>({...t, tos:true}))}
                   />
-                  <span>
-                    I agree to the{" "}
-                    <button
-                      type="button"
-                      className="link link-button"
-                      onClick={() =>
-                        alert("Terms of Service page coming soon")
-                      }
-                    >
-                      Terms of Service
-                    </button>{" "}
-                    &&{" "}
-                    <button
-                      type="button"
-                      className="link link-button"
-                      onClick={() =>
-                        alert("Privacy Policy page coming soon")
-                      }
-                    >
-                      Privacy Policy
-                    </button>
-                  </span>
+                  <span>I agree to the Terms & Privacy Policy</span>
                 </label>
-                {shouldShow("tos") && (
-                  <small className="error">{errors.tos}</small>
+                {shouldShow("tos") && <small className="error">{errors.tos}</small>}
+
+                {status.msg && (
+                  <div
+                    className={`status ${status.type}`}
+                    role={status.type === "bad" ? "alert" : "status"}
+                    aria-live="polite"
+                    style={{ marginTop: 8 }}
+                  >
+                    {status.msg}
+                  </div>
                 )}
 
-                <div className="btn-row">
+                <div className="btn-row" style={{ marginTop: 10 }}>
                   <button
                     type="submit"
-                    className="primary-btn"
+                    className={`primary-btn ${submitting ? "loading" : ""}`}
                     disabled={submitting}
                   >
                     {submitting ? "Creating..." : "Create Account"}
                   </button>
                 </div>
 
-                <div className={`status ${status.type}`}>{status.msg}</div>
+                <div className="alt-auth">
+                  Already have an account? <Link to="/login">Sign in</Link>
+                </div>
               </form>
             </div>
           </main>

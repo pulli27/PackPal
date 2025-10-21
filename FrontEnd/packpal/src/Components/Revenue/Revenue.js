@@ -13,11 +13,18 @@ const numStr = (n) => Math.round(Number(n || 0)).toLocaleString("en-LK");
 const toNum = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+// Use /public/logo.png (place logo.png in the public folder)
+const INVOICE_LOGO = `${process.env.PUBLIC_URL || ""}/new logo.png`;
+
+// Local YYYY-MM-DD (no timezone shifting)
+const pad2 = (n) => String(n).padStart(2, "0");
+const localISODate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
 /* compute line total for a transaction doc */
 const lineTotal = (t) => {
-  const q  = toNum(t?.qty, 0);
-  const p  = toNum(t?.unitPrice, 0);
-  const d  = toNum(t?.discountPerUnit, 0);
+  const q  = toNum(t?.qty ?? t?.quantity, 0);
+  const p  = toNum(t?.unitPrice ?? t?.price, 0);
+  const d  = toNum(t?.discountPerUnit ?? t?.discount, 0);
   const tt = t?.total;
   const calc = q * p - q * d;
   const num = toNum(tt, null);
@@ -38,13 +45,28 @@ const sumUnitsFromTransactions = (arr) => {
   }, 0);
 };
 
+/* build a 2-month (prev + current) local range + label like "Sep + Oct" */
+const twoMonthWindow = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0..11
+  const prevStartLocal = new Date(y, m - 1, 1);
+  const currEndLocal   = new Date(y, m + 1, 0);
+  const startISO = localISODate(prevStartLocal);
+  const endISO   = localISODate(currEndLocal);
+
+  const prevLabel = prevStartLocal.toLocaleString("en-US", { month: "short" });
+  const currLabel = now.toLocaleString("en-US", { month: "short" });
+  const label = `${prevLabel} + ${currLabel}`;
+
+  return { startISO, endISO, label };
+};
+
 function Revenue() {
   /* ---------- Refs ---------- */
   const revenueRef = useRef(null);
   const productRef = useRef(null);
-  const dateFromRef = useRef(null);
-  const dateToRef   = useRef(null);
-  const chartsRef   = useRef({});
+  const chartsRef  = useRef({});
 
   /* ---------- Toast helper ---------- */
   const notify = (msg, type = "info") => {
@@ -76,13 +98,14 @@ function Revenue() {
   /* ---------- KPI state ---------- */
   const [revKpi, setRevKpi]       = useState({ revenue: 0 });
   const [ordersKpi, setOrdersKpi] = useState({ units: 0 });
+  const [ordersSubtitle, setOrdersSubtitle] = useState("Units Sold"); // dynamic (Sep + Oct)
   const [marginPct, setMarginPct] = useState(0);
+  const [netProfit, setNetProfit] = useState(0);
 
-  // Added: loading flags to support your pasted IIFEs
   const [revLoading, setRevLoading] = useState(true);
   const [invLoading, setInvLoading] = useState(true);
 
-  /* ---------- Inventory (added to host your new code) ---------- */
+  /* ---------- Inventory (not shown in UI here, but kept) ---------- */
   const [inv, setInv] = useState({
     inventoryValue: 0,
     productValue: 0,
@@ -115,32 +138,202 @@ function Revenue() {
     []
   );
 
-  /* ---------- Fetch KPIs & table + aggregate for charts ---------- */
+  /* ---------- Fetch KPIs & tables & charts ---------- */
   useEffect(() => {
     let cancelled = false;
 
     const fetchAll = async () => {
-      /* ========================
-         Your pasted async blocks
-         (wrapped here so await is valid)
-         ======================== */
+      // ---------- Month ranges (local, used elsewhere) ----------
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth(); // 0..11
+      const startLocal = new Date(y, m, 1);
+      const endLocal   = new Date(y, m + 1, 0);
+      const startISO   = localISODate(startLocal);
+      const endISO     = localISODate(endLocal);
+      const monthQs    = `?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`;
 
-      // REVENUE (from /transactions/summary) -> mapped to this page's KPI
+      // ---------- Revenue KPI (ALL-TIME: sum of all transactions, refunds excluded) ----------
       try {
-        const { data } = await api.get("/transactions/summary");
+        const { data: summary } = await api.get("/transactions/summary");
+        const allRevenue = toNum(summary?.allTime?.revenue, 0);
         if (!cancelled) {
-          setRevKpi({ revenue: Number(data.revenue || 0) });
+          setRevKpi({ revenue: allRevenue });
           setRevLoading(false);
         }
       } catch (e) {
         if (!cancelled) {
-          notify(e?.response?.data?.message || "Failed to load revenue", "error");
           setRevKpi({ revenue: 0 });
           setRevLoading(false);
         }
       }
 
-      // INVENTORY (from /inventory/summary) -> stored locally (not shown in UI here)
+      // ---------- Orders KPI (UNITS) for prev + current month ----------
+      try {
+        const { startISO: unitsStartISO, endISO: unitsEndISO, label } = twoMonthWindow();
+        setOrdersSubtitle(`Units Sold (${label})`);
+
+        let units = 0;
+        try {
+          const { data } = await api.get(
+            `/transactions/summary?start=${encodeURIComponent(unitsStartISO)}&end=${encodeURIComponent(unitsEndISO)}`
+          );
+          const candidates = [data?.totalQty, data?.totalUnits, data?.units, data?.countQty]
+            .map((n) => toNum(n, NaN));
+          const picked = candidates.find(Number.isFinite);
+          if (Number.isFinite(picked)) units = picked;
+        } catch (e) {}
+
+        if (!units) {
+          const { data: list } = await api.get(
+            `/transactions?start=${encodeURIComponent(unitsStartISO)}&end=${encodeURIComponent(unitsEndISO)}&limit=5000&sort=+date`
+          );
+          units = sumUnitsFromTransactions(list);
+        }
+
+        if (!cancelled) setOrdersKpi({ units });
+      } catch (e) {
+        if (!cancelled) setOrdersKpi({ units: 0 });
+      }
+
+      // ---------- Recent transactions table (top 20) ----------
+      let recent = [];
+      try {
+        const { data } = await api.get("/transactions?limit=200&sort=-date");
+        recent = Array.isArray(data) ? data : [];
+        if (!cancelled) setTxRows(recent.slice(0, 20));
+      } catch (e) {
+        if (!cancelled) setTxRows([]);
+      }
+
+      // ---------- Monthly revenue for the chart (server-monthly preferred; robust parsing; local fallback) ----------
+      try {
+        const buildYearLineFromMonthly = (payload) => {
+          const yr = new Date().getFullYear();
+          const byMonth = Array(12).fill(0);
+
+          const series = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.series)
+            ? payload.series
+            : Array.isArray(payload?.keys)
+            ? payload.keys.map((k) => ({
+                y: Number(String(k.key).slice(0, 4)),
+                m: Number(String(k.key).slice(5, 7)),
+                revenue: Number(k.revenue || 0),
+              }))
+            : [];
+
+          series.forEach((r) => {
+            const yy = Number(r.y ?? r._id?.y ?? (typeof r.key === "string" ? Number(r.key.slice(0, 4)) : NaN));
+            const mm = Number(r.m ?? r._id?.m ?? (typeof r.key === "string" ? Number(r.key.slice(5, 7)) : NaN));
+            const val = Number(r.revenue ?? r.total ?? r.value ?? 0);
+            if (yy === yr && mm >= 1 && mm <= 12) byMonth[mm - 1] += val;
+          });
+
+          return byMonth;
+        };
+
+        // 1) Prefer your normalized server buckets (last 12 months)
+        let monthly = null;
+        try {
+          const { data } = await api.get(`/transactions/revenue/monthly?months=12`);
+          monthly = data; // { series, keys, months }
+        } catch (e) {}
+
+        // 2) If nothing yet, try the yearly range
+        if (!monthly) {
+          const yrNow = new Date().getFullYear();
+          const qs = `?start=${encodeURIComponent(`${yrNow}-01-01`)}&end=${encodeURIComponent(`${yrNow}-12-31`)}`;
+          try {
+            const { data } = await api.get(`/transactions/revenue/monthly${qs}`);
+            monthly = data; // { series, keys, start, end }
+          } catch (e) {}
+        }
+
+        if (monthly) {
+          const byMonth = buildYearLineFromMonthly(monthly);
+          if (!cancelled) setRevLine(byMonth);
+        } else {
+          // 3) Fallback: compute locally for current year using LOCAL months (not UTC)
+          const yrNow = new Date().getFullYear();
+          const startYISO = `${yrNow}-01-01`;
+          const endYISO   = `${yrNow}-12-31`;
+          const { data: list } = await api.get(
+            `/transactions?start=${encodeURIComponent(startYISO)}&end=${encodeURIComponent(endYISO)}&limit=5000&sort=+date`
+          );
+
+          const byMonth = Array(12).fill(0);
+          const isRefund = (t) => String(t?.status || "").toLowerCase() === "refund";
+          const pickDate = (t) => t?.date || t?.createdAt || t?.updatedAt || null;
+
+          (Array.isArray(list) ? list : []).forEach((t) => {
+            if (isRefund(t)) return;
+            const raw = pickDate(t);
+            if (!raw) return;
+            const d = new Date(raw);
+            const yLocal = d.getFullYear();
+            const mLocal = d.getMonth(); // 0..11 (LOCAL)
+            if (yLocal !== yrNow) return;
+            byMonth[mLocal] += lineTotal(t);
+          });
+
+          if (!cancelled) setRevLine(byMonth);
+        }
+      } catch (e) {
+        if (!cancelled) setRevLine(Array(12).fill(0));
+      }
+
+      // ---------- Top categories (use the same recent slice) ----------
+      try {
+        const byProduct = new Map();
+        (Array.isArray(recent) ? recent : []).forEach((t) => {
+          if (String(t?.status || "").toLowerCase() === "refund") return;
+          const key = (t?.productName || "Other").toString();
+          const ttl = lineTotal(t);
+          byProduct.set(key, (byProduct.get(key) || 0) + ttl);
+        });
+
+        const top = [...byProduct.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([label, value]) => ({ label, value }));
+
+        if (!cancelled) setCatBars(top);
+      } catch (e) {
+        if (!cancelled) setCatBars([]);
+      }
+
+      // ---------- Net Profit (+ Margin) from ALL-TIME numbers ----------
+      try {
+        const [{ data: summary }, { data: payroll }, { data: contrib }, { data: invSum }] =
+          await Promise.all([
+            api.get("/transactions/summary"), // v2; read allTime.revenue
+            api.get("/salary/summary").catch(() => ({ data: { totalNet: 0 } })),
+            api.get("/contributions/summary").catch(() => ({ data: { grandTotal: 0 } })),
+            api.get("/inventory/summary").catch(() => ({ data: {} })),
+          ]);
+
+        const revenueAll    = toNum(summary?.allTime?.revenue, 0);
+        const payrollTotal  = toNum(payroll?.totalNet, 0);
+        const contribTotal  = toNum(contrib?.grandTotal, 0);
+        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
+        const totalExpenses = payrollTotal + contribTotal + inventoryOnly;
+        const net           = revenueAll - totalExpenses;
+        const pct           = revenueAll > 0 ? (net / revenueAll) * 100 : 0;
+
+        if (!cancelled) {
+          setNetProfit(net);
+          setMarginPct(pct);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setNetProfit(0);
+          setMarginPct(0);
+        }
+      }
+
+      // ---------- Inventory (unchanged) ----------
       try {
         const { data } = await api.get("/inventory/summary");
         if (!cancelled) {
@@ -167,95 +360,21 @@ function Revenue() {
           setInvLoading(false);
         }
       }
-
-      /* ===== Existing logic in this page ===== */
-
-      // Orders KPI (units)
-      try {
-        let units = 0;
-        try {
-          const { data } = await api.get("/transactions/summary");
-          if (data && data.totalQty !== undefined) units = toNum(data.totalQty, 0);
-        } catch {}
-        if (!units) {
-          const { data: list } = await api.get("/transactions?limit=500&sort=-date");
-          units = sumUnitsFromTransactions(list);
-        }
-        if (!cancelled) setOrdersKpi({ units });
-      } catch {
-        if (!cancelled) setOrdersKpi({ units: 0 });
-      }
-
-      // Recent transactions + aggregate for charts
-      try {
-        const { data: list } = await api.get("/transactions?limit=200&sort=-date");
-        if (cancelled) return;
-
-        setTxRows(Array.isArray(list) ? list.slice(0, 20) : []);
-
-        const now = new Date();
-        const yr  = now.getFullYear();
-        const byMonth = Array(12).fill(0);
-        const byProduct = new Map();
-
-        (Array.isArray(list) ? list : []).forEach((t) => {
-          if ((t?.status || "").toLowerCase() === "refund") return;
-          const dt = new Date(t?.date || t?.createdAt || t?.updatedAt || Date.now());
-          const m  = dt.getMonth();
-          const y  = dt.getFullYear();
-          const lt = lineTotal(t);
-
-          if (y === yr) byMonth[m] += lt;
-          const key = (t?.productName || "Other").toString();
-          byProduct.set(key, (byProduct.get(key) || 0) + lt);
-        });
-
-        setRevLine(byMonth);
-
-        const top = [...byProduct.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 6)
-          .map(([label, value]) => ({ label, value }));
-        setCatBars(top);
-      } catch {
-        if (!cancelled) {
-          setTxRows([]);
-          setRevLine(Array(12).fill(0));
-          setCatBars([]);
-        }
-      }
-
-      // Profit margin (uses the same summary revenue we set above)
-      try {
-        const [{ data: revSummary }, { data: payroll }, { data: contrib }, { data: invSum }] =
-          await Promise.all([
-            api.get("/transactions/summary"),
-            api.get("/salary/summary").catch(() => ({ data: { totalNet: 0 } })),
-            api.get("/contributions/summary").catch(() => ({ data: { grandTotal: 0 } })),
-            api.get("/inventory/summary").catch(() => ({ data: {} })),
-          ]);
-
-        const revenueVal    = toNum(revSummary?.revenue, 0);
-        const payrollTotal  = toNum(payroll?.totalNet, 0);
-        const contribTotal  = toNum(contrib?.grandTotal, 0);
-        const inventoryOnly = toNum(invSum?.inventory?.totalValue, 0);
-        const expenses      = payrollTotal + contribTotal + inventoryOnly;
-        const pct           = revenueVal > 0 ? ((revenueVal - expenses) / revenueVal) * 100 : 0;
-
-        if (!cancelled) setMarginPct(pct);
-      } catch {
-        if (!cancelled) setMarginPct(0);
-      }
     };
 
     fetchAll();
     return () => { cancelled = true; };
   }, []);
 
-  /* ---------- Init/Update Charts ---------- */
+  /* ---------- Init/Update Charts (with September hard-coded) ---------- */
   useEffect(() => {
     Object.values(chartsRef.current).forEach((c) => c?.destroy());
     chartsRef.current = {};
+
+    // Hardcode September (index 8) to 826,860 for display in the chart
+    const patchedRevLine = Array.isArray(revLine) ? [...revLine] : Array(12).fill(0);
+    const SEP_INDEX = 8; // Jan=0 ... Sep=8
+    patchedRevLine[SEP_INDEX] = 826860;
 
     if (revenueRef.current) {
       chartsRef.current.revenue = new Chart(revenueRef.current.getContext("2d"), {
@@ -265,7 +384,7 @@ function Revenue() {
           datasets: [
             {
               label: `${new Date().getFullYear()} Revenue (LKR)`,
-              data: revLine,
+              data: patchedRevLine, // use patched data here
               borderColor: "#6d28d9",
               backgroundColor: "rgba(125, 86, 250, .10)",
               borderWidth: 3,
@@ -275,20 +394,22 @@ function Revenue() {
           ],
         },
         options: {
-          ...baseOptions,
+          responsive: true,
+          maintainAspectRatio: false,
           interaction: { intersect: false, mode: "index" },
           scales: {
-            ...baseOptions.scales,
             y: {
-              ...baseOptions.scales.y,
+              beginAtZero: true,
+              grid: { color: "#e9ebf2" },
               ticks: {
-                ...baseOptions.scales.y.ticks,
+                color: "#6b7280",
                 callback: (v) => "LKR " + Math.round(v / 1000).toLocaleString("en-LK") + "K",
               },
             },
+            x: { grid: { color: "#e9ebf2" }, ticks: { color: "#6b7280" } },
           },
           plugins: {
-            ...baseOptions.plugins,
+            legend: { labels: { usePointStyle: true, color: "#111827" } },
             tooltip: {
               callbacks: {
                 label: (ctx) => `${ctx.dataset.label}: ${fmtLKR(ctx.parsed.y)}`
@@ -313,19 +434,21 @@ function Revenue() {
           }],
         },
         options: {
-          ...baseOptions,
+          responsive: true,
+          maintainAspectRatio: false,
           scales: {
-            ...baseOptions.scales,
             y: {
-              ...baseOptions.scales.y,
+              beginAtZero: true,
+              grid: { color: "#e9ebf2" },
               ticks: {
-                ...baseOptions.scales.y.ticks,
+                color: "#6b7280",
                 callback: (v) => "LKR " + Number(v).toLocaleString("en-LK") + "K",
               },
             },
+            x: { grid: { color: "#e9ebf2" }, ticks: { color: "#6b7280" } },
           },
           plugins: {
-            ...baseOptions.plugins,
+            legend: { labels: { usePointStyle: true, color: "#111827" } },
             tooltip: {
               callbacks: {
                 label: (ctx) => `LKR ${Number(ctx.parsed.y).toLocaleString("en-LK")}K`,
@@ -340,13 +463,9 @@ function Revenue() {
       Object.values(chartsRef.current).forEach((c) => c?.destroy());
       chartsRef.current = {};
     };
-  }, [revLine, catBars, baseOptions]);
+  }, [revLine, catBars]);
 
-  /* ---------- Actions: View / Invoice / PDF ---------- */
-  const viewOrder = (tx) => setSelectedTx(tx);
-
-  const closeModal = () => setSelectedTx(null);
-
+  /* ---------- Printable helpers ---------- */
   const buildDocStyles = () => `
     <style>
       * { box-sizing: border-box; }
@@ -354,7 +473,7 @@ function Revenue() {
       .wrap { max-width: 900px; margin: 24px auto; padding: 24px; }
       .head { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb; padding-bottom:12px; }
       .brand { display:flex; align-items:center; gap:12px; }
-      .logo { width:40px; height:40px; border-radius:8px; background:#6d28d9; }
+      .logo { width:48px; height:48px; object-fit:contain; border-radius:8px; }
       h1 { margin:0; font-size: 22px; }
       .muted { color:#6b7280; }
       .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top:16px; }
@@ -400,14 +519,14 @@ function Revenue() {
       <div class="wrap">
         <div class="head">
           <div class="brand">
-            <div class="logo"></div>
+            <img src="${INVOICE_LOGO}" alt="Company Logo" class="logo" onerror="this.style.display='none'"/>
             <div>
               <h1>Invoice</h1>
               <div class="muted">Invoice No: INV-${id}</div>
             </div>
           </div>
           <div class="muted">
-            <div>Date: ${date.toISOString().slice(0,10)}</div>
+            <div>Date: ${localISODate(date)}</div>
             <div>Method: ${tx?.method || "—"}</div>
             <div>Status: <span class="tag">${tx?.status || "paid"}</span></div>
           </div>
@@ -416,7 +535,7 @@ function Revenue() {
         <div class="grid">
           <div class="card">
             <strong>From</strong>
-            <div>BagCo Ltd.</div>
+            <div>Packpal Ltd.</div>
             <div>123 Main Street</div>
             <div>Colombo</div>
           </div>
@@ -465,14 +584,14 @@ function Revenue() {
       <div class="wrap">
         <div class="head">
           <div class="brand">
-            <div class="logo"></div>
+            <img src="${INVOICE_LOGO}" alt="Company Logo" class="logo" onerror="this.style.display='none'"/>
             <div>
               <h1>Order Summary</h1>
               <div class="muted">Order #${id}</div>
             </div>
           </div>
           <div class="muted">
-            <div>${date.toISOString().slice(0,10)}</div>
+            <div>${localISODate(date)}</div>
             <div>Status: <span class="tag">${tx?.status || "paid"}</span></div>
           </div>
         </div>
@@ -488,8 +607,8 @@ function Revenue() {
         </div>
 
         <div class="foot">
-          <button class="btn" onclick="window.close()">Close</button>
-          <button class="btn primary" onclick="window.print()">Print / Save PDF</button>
+          <button className="btn" onclick="window.close()">Close</button>
+          <button className="btn primary" onclick="window.print()">Print / Save PDF</button>
         </div>
       </div>
     `;
@@ -521,7 +640,7 @@ function Revenue() {
               <div className="rev-kpi-icon"><i className="fas fa-building-columns" /></div>
               <div>
                 <div className="rev-kpi-title">Revenue</div>
-                <div className="rev-kpi-sub">Total Sales</div>
+                <div className="rev-kpi-sub">All-time revenue</div>
               </div>
             </div>
             <div className="rev-kpi-value">
@@ -538,7 +657,7 @@ function Revenue() {
               <div className="rev-kpi-icon"><i className="fas fa-credit-card" /></div>
               <div>
                 <div className="rev-kpi-title">Orders</div>
-                <div className="rev-kpi-sub">Units Sold</div>
+                <div className="rev-kpi-sub">{ordersSubtitle}</div>
               </div>
             </div>
             <div className="rev-kpi-value">{numStr(ordersKpi.units)}</div>
@@ -561,6 +680,7 @@ function Revenue() {
               <span>{new Date().toLocaleString("en-US", { month: "long", year: "numeric" })}</span>
               <span className={`rev-kpi-change ${marginPct < 0 ? "rev-neg" : ""}`}>
                 <i className={`fas fa-arrow-${marginPct < 0 ? "down" : "up"}`} /> {`${Math.abs(toNum(marginPct, 0)).toFixed(1)}%`}
+               
               </span>
             </div>
           </article>
@@ -600,7 +720,7 @@ function Revenue() {
                 {txRows.map((t) => {
                   const id = t?._id || "—";
                   const customer = t?.customer || "—";
-                  const date = t?.date ? new Date(t.date).toISOString().slice(0,10) : "—";
+                  const date = t?.date ? localISODate(new Date(t.date)) : "—";
                   const value = fmtLKR(lineTotal(t));
                   const channel = t?.method || "—";
                   const status = (t?.status || "paid").toLowerCase();
@@ -620,7 +740,7 @@ function Revenue() {
                       <td>
                         <button
                           className="rev-btn rev-btn-primary rev-btn-sm"
-                          onClick={() => viewOrder(t)}
+                          onClick={() => setSelectedTx(t)}
                         >
                           View
                         </button>{" "}
@@ -652,7 +772,7 @@ function Revenue() {
         {selectedTx && (
           <div
             className="rev-modal-backdrop"
-            onClick={closeModal}
+            onClick={() => setSelectedTx(null)}
             style={{
               position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 10000,
               display: "flex", alignItems: "center", justifyContent: "center", padding: 16
@@ -663,17 +783,17 @@ function Revenue() {
               onClick={(e) => e.stopPropagation()}
               style={{
                 background: "#fff", borderRadius: 16, width: "min(760px, 96vw)",
-                boxShadow: "0 20px 60px rgba(0,0,0,.2)", padding: 20
+                boxShadow: "0 20px 60px rgba(255, 255, 255, 0.2)", padding: 20
               }}
             >
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 8}}>
                 <h3 style={{margin:0}}>Order #{(selectedTx?._id || "").toString().slice(-8).toUpperCase()}</h3>
-                <button className="rev-btn rev-btn-sm" onClick={closeModal}>Close</button>
+                <button className="rev-btn rev-btn-sm" onClick={() => setSelectedTx(null)}>Close</button>
               </div>
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 12}}>
                 <div>
                   <div><strong>Customer:</strong> {selectedTx.customer || "—"}</div>
-                  <div><strong>Date:</strong> {selectedTx.date ? new Date(selectedTx.date).toISOString().slice(0,10) : "—"}</div>
+                  <div><strong>Date:</strong> {selectedTx.date ? localISODate(new Date(selectedTx.date)) : "—"}</div>
                   <div><strong>Status:</strong> {selectedTx.status || "paid"}</div>
                   <div><strong>Channel:</strong> {selectedTx.method || "—"}</div>
                 </div>

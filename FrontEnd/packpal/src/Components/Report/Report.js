@@ -12,7 +12,7 @@ const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 const PRODUCTS_PATH = "/api/products";
 const ITEMS_PATH = "/api/inventory";
 
-/** ======= Branding used only in the PDF ======= */
+/** ======= Branding used only in the PDF & header ======= */
 const LOGO_URL = "/new logo.png"; // local/public path or absolute URL
 const COMPANY = {
   name: "PackPal (Pvt) Ltd",
@@ -102,6 +102,21 @@ function inRange(dateStr, startStr, endStr) {
   return t >= s && t <= e;
 }
 const rafDelay = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+// fetch an image in /public as dataURL for jsPDF headers/footers
+async function loadImageAsDataURL(path) {
+  try {
+    const res = await fetch(path, { cache: "no-cache" });
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
 /* ======================================== */
 
@@ -494,9 +509,9 @@ export default function Report() {
     pdfRoot.appendChild(kpiGrid);
 
     // ======= Figures (each report-part; canvases -> images) =======
-    // IMPORTANT: skip the on-screen KPI section so it doesn't appear again in the PDF
+    // Skip on-screen KPI grid so it doesn't duplicate in PDF
     const allParts = Array.from((mainRef.current || document).querySelectorAll(".report-part"));
-    const parts = allParts.filter((p) => !p.querySelector(".metric-card")); // <-- skip KPI grid
+    const parts = allParts.filter((p) => !p.querySelector(".metric-card"));
 
     const escapeHtml = (s = "") =>
       s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
@@ -562,7 +577,7 @@ export default function Report() {
             pdf.text(label, pageW - 8 - pdf.getTextWidth(label), pageH - 6);
           }
         })
-        .save();
+        .save(); // auto-download
     } finally {
       pdfRoot.remove();
     }
@@ -579,12 +594,15 @@ export default function Report() {
         <div className="header">
           <div className="container">
             <div className="header-content">
-              <div>
-                <div className="header-title">
-                  <i className="fas fa-chart-line" />
-                  Reports & Analytics
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <img src={LOGO_URL} alt="logo" style={{ height: 28 }} />
+                <div>
+                  <div className="header-title">
+                    <i className="fas fa-chart-line" />
+                    Reports & Analytics
+                  </div>
+                  <p className="header-subtitle">{COMPANY.name}</p>
                 </div>
-                <p className="header-subtitle">Comprehensive inventory and business intelligence</p>
               </div>
               <button
                 onClick={generateReport}
@@ -633,7 +651,7 @@ export default function Report() {
             </div>
           </div>
 
-          {/* KPIs (UI layout kept) */}
+          {/* KPIs */}
           <div className="grid md-grid-4 report-part">
             <div className="metric-card">
               <div>

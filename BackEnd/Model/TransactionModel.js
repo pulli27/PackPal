@@ -1,46 +1,42 @@
+// BackEnd/Model/TransactionModel.js
 const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema(
   {
+    id: { type: String },
+
     customer: { type: String, required: true },
     customerId: String,
     fmc: { type: Boolean, default: false },
 
-    productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-      required: true,
-    },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
     productName: String,
 
     qty: { type: Number, default: 1, min: 1 },
     unitPrice: { type: Number, default: 0, min: 0 },
     discountPerUnit: { type: Number, default: 0, min: 0 },
-
-    // ✅ keep numeric; if old docs miss it, default to 0
     total: { type: Number, default: 0, min: 0 },
 
     method: { type: String, default: "Cash" },
-    status: {
-      type: String,
-      enum: ["Paid", "Pending", "Refund"],
-      default: "Paid",
-    },
+    status: { type: String, enum: ["Paid", "Pending", "Refund"], default: "Paid" },
     notes: String,
 
-    // ✅ correct default for dates is Date.now (function), not Date (constructor)
+    // Keep as Date so range queries/aggregations work well
     date: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-/**
- * ✅ Safety net: compute/normalize totals before save
- * - Ensures numeric fields
- * - Recomputes total when it's missing/invalid
- */
+// Coerce string date ("YYYY-MM-DD") into a Date at 00:00:00Z.
+transactionSchema.pre("validate", function (next) {
+  if (typeof this.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(this.date)) {
+    this.date = new Date(`${this.date}T00:00:00.000Z`);
+  }
+  next();
+});
+
+// Normalize numeric fields and compute total when not provided or invalid.
 transactionSchema.pre("save", function (next) {
-  // coerce numerics
   this.qty = Number(this.qty || 0);
   this.unitPrice = Number(this.unitPrice || 0);
   this.discountPerUnit = Number(this.discountPerUnit || 0);
@@ -50,7 +46,6 @@ transactionSchema.pre("save", function (next) {
   if (this.unitPrice < 0) this.unitPrice = 0;
   if (this.discountPerUnit < 0) this.discountPerUnit = 0;
 
-  // If total not set or looks wrong, recompute:
   const shouldCompute =
     !Number.isFinite(this.total) ||
     this.total <= 0 ||
@@ -63,5 +58,11 @@ transactionSchema.pre("save", function (next) {
 
   next();
 });
+
+// Helpful indexes
+transactionSchema.index({ createdAt: 1 });
+transactionSchema.index({ date: 1 });
+transactionSchema.index({ status: 1, createdAt: 1 });
+transactionSchema.index({ id: 1 });
 
 module.exports = mongoose.model("Transaction", transactionSchema);

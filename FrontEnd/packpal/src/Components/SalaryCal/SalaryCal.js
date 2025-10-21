@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./SalaryCal.css";
 import Sidebar from "../Sidebar/Sidebarsanu";
 import { NavLink } from "react-router-dom";
@@ -43,6 +43,9 @@ const DESIGNATION_OPTIONS = [
   "Product Manager",
 ];
 
+// utils
+const norm = (s) => String(s ?? "").toLowerCase();
+
 export default function SalaryCal() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +61,10 @@ export default function SalaryCal() {
     Acc_No: "",
   });
   const [editing, setEditing] = useState(null);
+
+  // Search (EmpId only)
+  const [q, setQ] = useState("");
+  const searchRef = useRef(null);
 
   async function load() {
     try {
@@ -82,6 +89,25 @@ export default function SalaryCal() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  useEffect(() => {
+    const onSlash = (e) => {
+      // only handle plain "/" presses
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // allow typing "/" inside the EPF fields only
+      const t = e.target;
+      const isEPFField = t && (t.id === "epfAdd" || t.id === "epfEdit");
+      if (isEPFField) return; // do NOT preventDefault; let "/" be typed
+
+      // otherwise: act as the shortcut
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+
+    window.addEventListener("keydown", onSlash);
+    return () => window.removeEventListener("keydown", onSlash);
   }, []);
 
   // Create
@@ -156,7 +182,7 @@ export default function SalaryCal() {
       EmpId: editing.EmpId,
       Emp_Name: sanitizeLettersOnly(editing.Emp_Name),
       Designation: sanitizeLettersOnly(editing.Designation),
-      Epf_No: editing.Epf_No,
+      Epf_No: editing.Epf_No, // keep slashes if user typed them
       Base_Sal:
         editing.Base_Sal === ""
           ? ""
@@ -211,6 +237,16 @@ export default function SalaryCal() {
     setEditing((s) => ({ ...s, [k]: v }));
   };
 
+  /* ====== Filter by EmpId only ====== */
+  const filteredRows = useMemo(() => {
+    const query = norm(q);
+    if (!query) return rows;
+    return rows.filter((r) => norm(r.EmpId).includes(query));
+  }, [rows, q]);
+
+  const showing = filteredRows.length;
+  const total = rows.length;
+
   return (
     <div className="salarycal page-wrap">
       <Sidebar />
@@ -237,13 +273,104 @@ export default function SalaryCal() {
             </NavLink>
           </div>
 
-          <h2>Employee Information</h2>
-          <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
-            + Add Employee Details
-          </button>
+          {/* ======= PRETTY SEARCH (above) ======= */}
+          <div className="pretty-search" style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, marginBottom: 6, flexWrap: "wrap" }}>
+            <div
+              style={{
+                flex: "1 1 360px",
+                maxWidth: 560,
+                background: "linear-gradient(180deg, #ffffff, #fafafa)",
+                border: "1px solid #e6e6e6",
+                borderRadius: 12,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                padding: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                  background: "#f8fafc",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+                title="Filter field"
+              >
+                Emp ID
+              </div>
+              <div style={{ position: "relative", flex: 1 }}>
+                <i
+                  className="fa fa-hashtag"
+                  style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", opacity: 0.6, fontSize: 14 }}
+                />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Type an Employee ID (Hint: press / to focus)"
+                  aria-label="Search by Employee ID"
+                  style={{
+                    width: "100%",
+                    padding: "10px 40px 10px 28px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 10,
+                    outline: "none",
+                    fontSize: 14,
+                    background: "white",
+                  }}
+                />
+                {q && (
+                  <button
+                    onClick={() => setQ("")}
+                    aria-label="Clear search"
+                    style={{
+                      position: "absolute",
+                      right: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      border: "none",
+                      background: "transparent",
+                      fontSize: 18,
+                      cursor: "pointer",
+                      lineHeight: 1,
+                      opacity: 0.7,
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <div
+                style={{ padding: "6px 10px", borderRadius: 999, background: "#F3F4F6", fontSize: 12, color: "#111827" }}
+                title="Matches"
+              >
+                {loading ? "…" : `${showing}/${total}`}
+              </div>
+            </div>
+          </div>
+
+          {/* helper line — fixed camelCase style key */}
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
+            Filtering by <strong>Employee ID</strong> only.
+          </div>
+
+          {/* ===== Title + Button on the SAME line ===== */}
+          <div className="section-header">
+            <h2>Employee Information</h2>
+            <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
+              + Add Employee Details
+            </button>
+          </div>
+          <div className="section-divider" />
 
           {addOpen && (
-            <div style={{ marginTop: 20 }}>
+            <div style={{ marginTop: 10 }}>
               {/* Ordered fields: EmpId, Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No */}
               <div className="form-grid two-col">
                 {/* 1. EmpId */}
@@ -268,7 +395,7 @@ export default function SalaryCal() {
                   />
                 </div>
 
-                {/* 3. Designation (next to Name if space allows) */}
+                {/* 3. Designation */}
                 <div className="form-group">
                   <label>Designation</label>
                   <select
@@ -284,10 +411,11 @@ export default function SalaryCal() {
                   </select>
                 </div>
 
-                {/* 4. EPF No */}
+                {/* 4. EPF No (allow slashes) */}
                 <div className="form-group">
                   <label>EPF No</label>
                   <input
+                    id="epfAdd"
                     type="text"
                     value={form.Epf_No}
                     onChange={(e) => handleAddChange("Epf_No", e.target.value)}
@@ -353,7 +481,7 @@ export default function SalaryCal() {
             </div>
           )}
 
-          <table id="employeeTable" style={{ marginTop: 20 }}>
+          <table id="employeeTable" style={{ marginTop: 10 }}>
             <thead>
               <tr>
                 <th>Employee ID</th>
@@ -370,14 +498,26 @@ export default function SalaryCal() {
                 <tr>
                   <td colSpan="7">Loading…</td>
                 </tr>
-              ) : rows.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan="7">No employees yet</td>
+                  <td colSpan="7">
+                    {q ? "No matches for that Employee ID." : "No employees yet"}
+                  </td>
                 </tr>
               ) : (
-                rows.map((r) => (
+                filteredRows.map((r) => (
                   <tr key={r._id}>
-                    <td>{r.EmpId}</td>
+                    <td>
+                      <span
+                        style={{
+                          background: q && norm(r.EmpId).includes(norm(q)) ? "#FEF3C7" : "transparent",
+                          borderRadius: 6,
+                          padding: "2px 6px",
+                        }}
+                      >
+                        {r.EmpId}
+                      </span>
+                    </td>
                     <td>{r.Emp_Name}</td>
                     <td>{r.Designation || ""}</td>
                     <td>{r.Epf_No || ""}</td>
@@ -427,7 +567,6 @@ export default function SalaryCal() {
             </div>
 
             <div className="modal-body">
-              {/* Ordered fields: EmpId, Name, Designation, Epf_No, Base_Sal, Bank_Name, branch, Acc_No */}
               <div className="form-grid two-col">
                 {/* 1. EmpId */}
                 <div className="form-group">
@@ -451,7 +590,7 @@ export default function SalaryCal() {
                   />
                 </div>
 
-                {/* 3. Designation (next to Name) */}
+                {/* 3. Designation */}
                 <div className="form-group">
                   <label>Designation</label>
                   <select
@@ -467,10 +606,11 @@ export default function SalaryCal() {
                   </select>
                 </div>
 
-                {/* 4. EPF No */}
+                {/* 4. EPF No (allow slashes) */}
                 <div className="form-group">
                   <label>EPF No</label>
                   <input
+                    id="epfEdit"
                     type="text"
                     value={editing?.Epf_No ?? ""}
                     onChange={(e) => handleEditChange("Epf_No", e.target.value)}
@@ -510,7 +650,6 @@ export default function SalaryCal() {
                     value={editing?.branch ?? ""}
                     onChange={(e) => handleEditChange("branch", e.target.value)}
                     pattern="[A-Za-z ]+"
-                    inputMode="text"
                   />
                 </div>
 

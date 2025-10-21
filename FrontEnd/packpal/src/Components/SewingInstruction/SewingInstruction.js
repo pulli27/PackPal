@@ -467,7 +467,7 @@ export default function SewingInstruction() {
               <input
                 className="search-input"
                 type="text"
-                placeholder="  Filter by bag type"
+                placeholder="Filter by bag type (prefix)…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="Filter by bag type prefix"

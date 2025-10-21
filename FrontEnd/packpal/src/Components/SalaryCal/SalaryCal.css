@@ -75,6 +75,41 @@
   border-bottom: 3px solid #667eea;
 }
 
+/* ===== Title + Button on the same line ===== */
+.salarycal .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+.salarycal .section-header h2 {
+  margin: 0;
+  padding: 0;
+  border: 0 !important;   /* remove default underline in inline header */
+  font-size: 1.6rem;
+  color: #2c3e50;
+}
+
+/* Full-width divider under the header row */
+.salarycal .section-divider {
+  height: 3px;
+  background: linear-gradient(90deg, #667eea, #a855f7);
+  border-radius: 2px;
+  margin: 6px 0 14px;
+}
+
+@media (max-width: 640px) {
+  .salarycal .section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .salarycal .section-header .btn {
+    width: 100%;
+  }
+}
+
 /* Base grid */
 .salarycal .form-grid {
   display: grid;
@@ -238,7 +273,7 @@
   margin-bottom: 4px;
   color: #374151;
 }
-salarycal .modal-body input,
+.salarycal .modal-body input,
 .salarycal .modal-body select {
   padding: 8px 10px;
   border: 2px solid #e5e7eb;

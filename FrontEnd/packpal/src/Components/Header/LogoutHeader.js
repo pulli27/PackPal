@@ -1,5 +1,5 @@
-// src/Components/Header/LogoutHeader.jsx
-import React from "react";
+// src/Components/Header/LogoutHeader.js
+import React, { useEffect, useState } from "react";
 import {
   FaHome, FaLayerGroup, FaPuzzlePiece, FaTags, FaGift,
   FaChevronDown, FaShoppingCart,
@@ -7,18 +7,55 @@ import {
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import "./Header.css";
 
+const STORAGE_KEY = "packPalCart";
+
 export default function LogoutHeader({
-  cartCount = 0,
+  cartCount: cartCountProp,   // optional override
   onCartClick = () => {},
   onDropdown = () => {},
 }) {
   const navigate = useNavigate();
+  const [cartCount, setCartCount] = useState(0);
+
+  // read cart count from localStorage
+  const readCount = () => {
+    try {
+      const arr = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      return Array.isArray(arr) ? arr.length : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  useEffect(() => {
+    // initialize
+    setCartCount(
+      typeof cartCountProp === "number" ? cartCountProp : readCount()
+    );
+
+    const refresh = () => {
+      setCartCount(readCount());
+    };
+
+    // react to localStorage/cart updates
+    const storageListener = (e) => {
+      if (e.key === STORAGE_KEY) refresh();
+    };
+
+    window.addEventListener("storage", storageListener);
+    window.addEventListener("cart:updated", refresh);
+
+    return () => {
+      window.removeEventListener("storage", storageListener);
+      window.removeEventListener("cart:updated", refresh);
+    };
+  }, [cartCountProp]);
 
   const handleLogout = () => {
     localStorage.removeItem("pp:token");
-    localStorage.removeItem("pp:role");
+    localStorage.removeItem("pp:user");
+    window.dispatchEvent(new Event("pp:auth:changed")); // notify switcher
     navigate("/home", { replace: true });
-    // or: window.location.reload();
   };
 
   return (
@@ -32,7 +69,7 @@ export default function LogoutHeader({
               <div className="logo-text">PackPal</div>
             </Link>
 
-            {/* Nav - same links */}
+            {/* Primary Nav (storefront only) */}
             <nav className="nav" aria-label="Primary">
               <ul className="nav-list">
                 <li className="nav-item">
@@ -41,26 +78,42 @@ export default function LogoutHeader({
                   </NavLink>
                 </li>
 
-                <li className="nav-item">
-                  <NavLink to="/collection" className="nav-link">
-                    <FaLayerGroup /> Collection{" "}
-                    <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
-                  </NavLink>
-
+                <li className="nav-item has-dropdown">
+                  <NavLink to="" className="nav-link">
+                                      <FaLayerGroup /> Collection{" "}
+                                      <FaChevronDown style={{ fontSize: "0.9rem", marginLeft: 6 }} />
+                                    </NavLink>
+                  
                   <div className="dropdown" role="menu" aria-label="Collections">
-                    <NavLink to="/kidsbag" className="dropdown-item" onClick={() => onDropdown("Kids Bag")}>
+                    <NavLink
+                      to="/kidsbag"
+                      className="dropdown-item"
+                      onClick={() => onDropdown("Kids Bag")}
+                    >
                       <div className="dropdown-title">Kids Bag</div>
                       <div className="dropdown-desc">Fun and colorful bags for children</div>
                     </NavLink>
-                    <NavLink to="/totebag" className="dropdown-item" onClick={() => onDropdown("Tote Bag")}>
+                    <NavLink
+                      to="/totebag"
+                      className="dropdown-item"
+                      onClick={() => onDropdown("Tote Bag")}
+                    >
                       <div className="dropdown-title">Tote Bag</div>
                       <div className="dropdown-desc">Spacious and versatile everyday bags</div>
                     </NavLink>
-                    <NavLink to="/handbag" className="dropdown-item" onClick={() => onDropdown("Handbag")}>
+                    <NavLink
+                      to="/handbag"
+                      className="dropdown-item"
+                      onClick={() => onDropdown("Handbag")}
+                    >
                       <div className="dropdown-title">Handbag</div>
                       <div className="dropdown-desc">Elegant bags for special occasions</div>
                     </NavLink>
-                    <NavLink to="/clutches" className="dropdown-item" onClick={() => onDropdown("Clutch")}>
+                    <NavLink
+                      to="/clutches"
+                      className="dropdown-item"
+                      onClick={() => onDropdown("Clutch")}
+                    >
                       <div className="dropdown-title">Clutch</div>
                       <div className="dropdown-desc">Compact and stylish evening bags</div>
                     </NavLink>
@@ -89,12 +142,27 @@ export default function LogoutHeader({
 
             {/* Actions */}
             <div className="header-actions">
-              <button className="btn btn-logout" onClick={handleLogout} title="Sign out" aria-label="Logout">
+              <button
+                className="btn btn-logout"
+                onClick={handleLogout}
+                title="Sign out"
+                aria-label="Logout"
+              >
                 Logout
               </button>
-              <button className="cart-btn" onClick={onCartClick} aria-label="Open cart">
+
+              <button
+                className="cart-btn"
+                onClick={() => {
+                  onCartClick();
+                  navigate("/cart");
+                }}
+                aria-label="Open cart"
+              >
                 <FaShoppingCart />
-                <div className="cart-badge" aria-live="polite">{cartCount}</div>
+                <div className="cart-badge" aria-live="polite">
+                  {typeof cartCountProp === "number" ? cartCountProp : cartCount}
+                </div>
               </button>
             </div>
           </div>

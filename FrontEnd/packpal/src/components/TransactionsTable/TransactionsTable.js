@@ -47,7 +47,7 @@ export default function TransactionsTable({
             <th>Customer</th>
             {showFMC && <th>FMC</th>}
             <th>Product</th>
-            <th>Qty</th>
+            <th>qty</th>
             <th className="right">Unit</th>
             <th className="right">Discount</th>
             <th className="right">Total</th>
